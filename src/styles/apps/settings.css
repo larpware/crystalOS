@@ -480,9 +480,65 @@
   text-align: center;
 }
 
+.cr-shortcut__keys {
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.cr-shortcut__keys .cr-kbd {
+  display: inline-block;
+}
+
+.cr-shortcut__keys:hover .cr-kbd {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+}
+
 .cr-shortcut__action {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.cr-shortcut__label {
   font-size: 12.5px;
   color: var(--text-secondary);
+}
+
+.cr-shortcut__tags {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.cr-shortcut__tags .cr-badge {
+  margin-left: 0;
+}
+
+.cr-shortcut__reset {
+  padding: 2px 7px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.cr-shortcut__reset:hover {
+  border-color: var(--border-default);
+  color: var(--text-primary);
+}
+
+.cr-shortcut[data-conflicting="true"] {
+  padding-left: 9px;
+  margin-left: -11px;
+  border-left: 2px solid var(--accent-danger);
 }
 
 .cr-shortcut .cr-badge {
@@ -733,4 +789,28 @@
   align-items: flex-start;
   gap: 12px;
   padding: 4px 0 10px;
+}
+
+/* ---- All Apps preview --------------------------------------------------
+   The real launcher grid markup, drawn inside the settings page. The launcher
+   styles live in shell.css and are shared, so this only has to give the grid a
+   frame and stop it stretching across a wide window. */
+
+.cr-allapps-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 12px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-medium);
+  background: var(--surface-2);
+}
+
+.cr-allapps-preview .cr-launcher__grid {
+  max-width: 560px;
+}
+
+.cr-allapps-preview .cr-launcher__tile {
+  cursor: default;
+  pointer-events: none;
 }

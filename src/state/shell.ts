@@ -52,7 +52,27 @@ export interface LauncherConfig {
   layout: "grid" | "list";
   showCategories: boolean;
   showRecents: boolean;
+  /** Artwork size for a grid tile, in pixels. The list and Recent sizes scale with it. */
+  iconSize: number;
+  /** Smallest width of a grid tile, in pixels. Wider tiles mean fewer columns. */
+  tileSize: number;
 }
+
+/** Bounds the All Apps sliders enforce, so a stored profile cannot render absurdly. */
+export const LAUNCHER_ICON_RANGE = { min: 28, max: 72 } as const;
+export const LAUNCHER_TILE_RANGE = { min: 84, max: 168 } as const;
+
+export const defaultLauncher: LauncherConfig = {
+  layout: "grid",
+  showCategories: true,
+  showRecents: true,
+  /* 44px artwork in a 104px tile. The supplied design drew its artwork much
+     larger, but at that size a tile reads as an illustration rather than an
+     application badge, and only a handful fit on screen. Both numbers are
+     sliders in Settings → All Apps. */
+  iconSize: 44,
+  tileSize: 104,
+};
 
 export interface DesktopConfig {
   showIcons: boolean;
@@ -233,7 +253,7 @@ export const useShellStore = create<ShellState>()(
     (set, get) => ({
       dock: defaultDock,
       panel: defaultPanel,
-      launcher: { layout: "grid", showCategories: true, showRecents: true },
+      launcher: defaultLauncher,
       desktop: { showIcons: true, iconSize: 56, alignToGrid: true, windowControls: "left" },
       lock: defaultLock,
 
@@ -286,7 +306,7 @@ export const useShellStore = create<ShellState>()(
     }),
     {
       name: "shell",
-      version: 13,
+      version: 14,
       storage: jsonStorageFor<ShellState>(),
       /**
        * v3 replaces the configurable floating dock with the fixed bottom
@@ -375,6 +395,12 @@ export const useShellStore = create<ShellState>()(
           state.dock = { ...defaultDock, ...state.dock };
           if (state.dock.padding === 14) state.dock.padding = defaultDock.padding;
           if (state.dock.borderRadius === 22) state.dock.borderRadius = defaultDock.borderRadius;
+        }
+        /* v14 gives All Apps its own artwork and tile sizes. A profile saved
+           before it has neither field, and the design's oversized artwork is
+           not what the new default is, so the merge supplies both. */
+        if (version < 14 && state) {
+          state.launcher = { ...defaultLauncher, ...state.launcher };
         }
         return state as ShellState;
       },

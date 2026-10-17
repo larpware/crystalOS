@@ -40,14 +40,18 @@ export function combo(key: string, modifiers: Partial<Omit<KeyCombo, "key">> = {
 
 export function comboFromEvent(event: KeyboardEvent, platform: "mac" | "other" = "other"): KeyCombo | null {
   if (isModifierKey(event.key)) return null;
+  void platform;
   return {
     key: normalizeKey(event.key),
-    // On a Mac, Command plays the role Ctrl plays elsewhere, so the two are
-    // folded together and the platform only changes how they are displayed.
-    ctrl: platform === "mac" ? event.ctrlKey : event.ctrlKey || event.metaKey,
+    // Modifiers are reported exactly as pressed. The binding that says
+    // `meta: true` is the Super/Command/Windows key and only ever matches that
+    // key; `ctrl: true` is the Control key. Folding one into the other would
+    // make "Super + L" unreachable on a non-Mac, because the folded value can
+    // never equal the literal `meta` flag it is compared against.
+    ctrl: event.ctrlKey,
     alt: event.altKey,
     shift: event.shiftKey,
-    meta: platform === "mac" ? event.metaKey : false,
+    meta: event.metaKey,
   };
 }
 

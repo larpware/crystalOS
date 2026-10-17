@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
+import { initSystemRegistry } from "./shell/systemCommands";
 
 /* Stylesheets are imported in cascade order: tokens first, then base, shared
    primitives, shell chrome, then per-application styles. */
@@ -34,6 +35,11 @@ const container = document.getElementById("crystal-root");
 if (!container) {
   throw new Error("CrystalOS could not find its mount point (#crystal-root).");
 }
+
+/* The command and shortcut registries are populated before React renders, so
+   the palette, the Settings → Keyboard list and the keydown dispatcher all see
+   the same set from the very first frame. Registration is idempotent. */
+initSystemRegistry();
 
 createRoot(container).render(
   <StrictMode>

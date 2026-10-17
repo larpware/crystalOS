@@ -6,9 +6,11 @@ import { useShellStore } from "@/state/shell";
 import { useSystemStore } from "@/state/system";
 import { useFsStore } from "@/state/fs";
 import { useSocialStore } from "@/state/social";
+import { useWindowStore } from "@/state/windows";
 import { applyTabIdentity, useTabIdentityStore } from "@/state/cloak";
 import { applyTheme } from "@/themes/apply";
 import { accentFromHex, customAccentId, findAccent, findTheme, themePresets } from "@/themes/presets";
+import { metaFor } from "@/apps/catalog";
 import { BootScreen, type BootStep } from "@/shell/BootScreen";
 import { Desktop } from "@/shell/Desktop";
 import { LockScreen } from "@/shell/LockScreen";
@@ -19,7 +21,12 @@ import { useVpnSync } from "@/hooks/useVpnSync";
 import { syncDeveloperMode } from "@/services/devtools";
 import { Icon } from "@/icons/Icon";
 import { Button } from "@/components/ui";
-import { restartSession } from "@/services/os";
+import { notify, restartSession } from "@/services/os";
+import {
+  flushSessionSave,
+  restoreSession as restoreDesktopSession,
+  scheduleSessionSave,
+} from "@/services/session";
 
 /* ==========================================================================
    CrystalOS root
@@ -268,6 +275,74 @@ export function App() {
     // The virtual filesystem is resolved before anything can reference it.
     void useFsStore.getState().nodes;
   }, [markSessionStart]);
+
+  /* ---- desktop session: restore once, then keep it saved --------------- *
+   * Restoration is guarded by a ref because React re-runs effects in
+   * development: without it, StrictMode would restore every saved window
+   * twice. The guard is deliberately a ref rather than state — it must not
+   * cause a re-render, and it must not be reset by a dependency change. */
+  const restoredSession = useRef(false);
+  useEffect(() => {
+    if (!setupComplete || powerState !== "on" || restoredSession.current) return;
+    restoredSession.current = true;
+
+    const report = restoreDesktopSession();
+    if (report.restored > 0) {
+      notify({
+        title: `Restored ${report.restored} window${report.restored === 1 ? "" : "s"}`,
+        body: "Your desktop was put back the way you left it.",
+        icon: "restore",
+      });
+    }
+    if (report.problem) {
+      // Saved data that exists but could not be read. Reported rather than
+      // silently dropped, because the desktop the user expects is missing.
+      notify({
+        title: "Saved desktop was not restored",
+        body: report.problem.message,
+        icon: "warning",
+      });
+    } else if (report.skipped.length > 0) {
+      // The session loaded, but some of it could not: the application was
+      // removed, excluded, or is not in this build.
+      notify({
+        title: `${report.skipped.length} window${report.skipped.length === 1 ? "" : "s"} could not be restored`,
+        body: report.skipped
+          .slice(0, 3)
+          .map((entry) => `${metaFor(entry.appId)?.name ?? entry.appId}: ${entry.reason}`)
+          .join(" · "),
+        icon: "warning",
+      });
+    }
+  }, [powerState, setupComplete]);
+
+  /* Autosave is driven by the window store rather than by each action, so a
+   * drag, a snap, a workspace switch and an app opening all funnel into one
+   * debounced write. A page being hidden flushes it, because a browser will not
+   * wait for a timer on the way out. */
+  useEffect(() => {
+    if (!setupComplete || powerState !== "on") return undefined;
+    const unsubscribe = useWindowStore.subscribe(() => scheduleSessionSave());
+    const persistNow = () => flushSessionSave();
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") persistNow();
+    };
+    window.addEventListener("pagehide", persistNow);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      unsubscribe();
+      window.removeEventListener("pagehide", persistNow);
+      document.removeEventListener("visibilitychange", onVisibility);
+      persistNow();
+    };
+  }, [powerState, setupComplete]);
+
+  // Leaving the desktop deliberately (sleep, lock, shut down) writes at once so
+  // nothing is lost to a pending debounce.
+  useEffect(() => {
+    if (powerState === "on" || !setupComplete) return;
+    flushSessionSave();
+  }, [powerState, setupComplete]);
 
   // Messaging attaches only while a profile exists, and detaches on sign-out.
   useEffect(() => {

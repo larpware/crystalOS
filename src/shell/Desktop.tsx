@@ -11,6 +11,8 @@ import { WindowManager } from "@/window-manager/WindowManager";
 import { Taskbar } from "./Taskbar";
 import { TopPanel } from "./TopPanel";
 import { Launcher } from "./Launcher";
+import { CommandPalette } from "./CommandPalette";
+import { WorkspaceOverview } from "./WorkspaceOverview";
 import { QuickSettings } from "./QuickSettings";
 import { NotificationCenter, ToastStack } from "./Notifications";
 import { WidgetLayer } from "./WidgetLayer";
@@ -310,6 +312,8 @@ export function Desktop() {
       <Launcher />
       <QuickSettings />
       <NotificationCenter />
+      <CommandPalette />
+      <WorkspaceOverview />
       <ToastStack />
 
       {contextMenu && (

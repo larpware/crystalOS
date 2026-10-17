@@ -6,7 +6,7 @@ import { useAppsStore } from "@/state/apps";
 import { useWindowStore } from "@/state/windows";
 import { useWorkspaceStore } from "@/state/workspaces";
 import type { WindowSnapshot, WindowState } from "@/types";
-import { loadJSON, removeKey, saveJSON } from "./storage";
+import { listKeys, loadJSON, removeKey, saveJSON } from "./storage";
 
 /* ==========================================================================
    CrystalOS session restore
@@ -197,6 +197,13 @@ export function saveSession(): SessionSnapshot {
 }
 
 export function readStoredSession(): ValidationResult {
+  /* Nothing saved is not a fault. A new profile simply has no desktop to put
+     back, and reporting that as corruption would greet every first boot with a
+     warning about its own emptiness. Only data that exists and cannot be read
+     counts as a problem. */
+  if (!listKeys().includes(SESSION_KEY)) {
+    return { snapshot: null, problem: null, dropped: 0 };
+  }
   const raw = loadJSON<unknown>(SESSION_KEY, null);
   return parseSession(raw);
 }

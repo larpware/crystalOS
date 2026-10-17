@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import {
   Badge,
   Button,
@@ -13,13 +13,20 @@ import {
   TextInput,
 } from "@/components/ui";
 import { Icon, AppIcon } from "@/icons/Icon";
-import { metaFor, optionalApps, systemApps, type AppMeta } from "@/apps/catalog";
+import { appCatalog, metaFor, optionalApps, systemApps, type AppMeta } from "@/apps/catalog";
+import { isImplemented } from "@/apps/registry";
 import { openApp } from "@/services/os";
 import { useAppsStore } from "@/state/apps";
 import { useNotificationStore } from "@/state/notifications";
-import { useShellStore } from "@/state/shell";
+import {
+  LAUNCHER_ICON_RANGE,
+  LAUNCHER_TILE_RANGE,
+  defaultLauncher,
+  useShellStore,
+} from "@/state/shell";
 import { useWidgetStore, widgetSize, WIDGET_CELL } from "@/state/widgets";
-import { shortcutList } from "@/shell/useGlobalShortcuts";
+import { shortcutViews, useShortcutStore } from "@/services/shortcuts";
+import { formatCombo, type KeyCombo } from "@/services/keys";
 import type { WidgetId } from "@/types";
 import { formatRelative } from "@/utils/format";
 
@@ -643,21 +650,129 @@ export function NotificationsPage() {
 
 /* ---- keyboard ---------------------------------------------------------- */
 
+/**
+ * Shortcut bindings, read straight from the registry the keydown dispatcher
+ * uses, so this page can never drift from what actually fires.
+ *
+ * A binding is re-recorded by pressing the keys: the next combination that
+ * arrives is taken as the new one, exactly as the dispatcher would see it.
+ */
 export function KeyboardPage() {
+  const { setBinding, clearBinding, resetAll } = useShortcutStore();
+  const [listening, setListening] = useState<string | null>(null);
+  const [captured, setCaptured] = useState<KeyCombo | null>(null);
+
+  const views = shortcutViews();
+  const conflicts = views.filter((view) => view.conflicting).length;
+  const customised = views.filter((view) => view.customised).length;
+
+  useEffect(() => {
+    if (!listening) return undefined;
+    const onKeyDown = (event: KeyboardEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.key === "Escape") {
+        setListening(null);
+        setCaptured(null);
+        return;
+      }
+      if (["Control", "Shift", "Alt", "Meta"].includes(event.key)) {
+        setCaptured({
+          key: "",
+          ctrl: event.ctrlKey,
+          alt: event.altKey,
+          shift: event.shiftKey,
+          meta: event.metaKey,
+        });
+        return;
+      }
+      setBinding(listening, {
+        key: event.key.toLowerCase(),
+        ctrl: event.ctrlKey,
+        alt: event.altKey,
+        shift: event.shiftKey,
+        meta: event.metaKey,
+      });
+      setListening(null);
+      setCaptured(null);
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [listening, setBinding]);
+
+  const preview = captured ? formatCombo(captured) : null;
+
   return (
     <>
       <Section
         title="Shortcuts"
-        description="Shortcuts are fixed in this build. Combinations marked as reserved may be claimed by the host browser before CrystalOS sees them."
+        description="Record a new combination for any action, or leave the default. Combinations the host browser claims are labelled rather than hidden."
       >
+        {conflicts > 0 && (
+          <Row
+            label={`${conflicts} conflict${conflicts === 1 ? "" : "s"}`}
+            description="Two shortcuts share a combination; only the first one registered will fire."
+          />
+        )}
         <div className="cr-shortcut-list">
-          {shortcutList.map((shortcut) => (
-            <div key={shortcut.id} className="cr-shortcut">
-              <kbd className="cr-kbd">{shortcut.keys}</kbd>
-              <span className="cr-shortcut__action">{shortcut.action}</span>
-              {shortcut.browserReserved && <Badge tone="warning">May be reserved</Badge>}
-            </div>
-          ))}
+          {views.map((view) => {
+            const isListening = listening === view.definition.id;
+            return (
+              <div
+                key={view.definition.id}
+                className="cr-shortcut"
+                data-conflicting={view.conflicting}
+              >
+                <button
+                  type="button"
+                  className="cr-shortcut__keys"
+                  aria-label={`Change ${view.definition.label}`}
+                  onClick={() => {
+                    setCaptured(null);
+                    setListening(isListening ? null : view.definition.id);
+                  }}
+                >
+                  <kbd className="cr-kbd">
+                    {isListening
+                      ? (preview ?? "Press keys…")
+                      : formatCombo(view.binding)}
+                  </kbd>
+                </button>
+                <span className="cr-shortcut__action">
+                  <span className="cr-shortcut__label">{view.definition.label}</span>
+                  {view.definition.description && (
+                    <span className="cr-row__desc">{view.definition.description}</span>
+                  )}
+                </span>
+                <span className="cr-shortcut__tags">
+                  {view.conflicting && <Badge tone="danger">Conflict</Badge>}
+                  {view.browserReserved && <Badge tone="warning">May be reserved</Badge>}
+                  {view.customised && (
+                    <button
+                      type="button"
+                      className="cr-shortcut__reset"
+                      onClick={() => clearBinding(view.definition.id)}
+                    >
+                      Reset
+                    </button>
+                  )}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        <div className="cr-button-row">
+          <Button
+            variant="ghost"
+            icon="refresh"
+            disabled={customised === 0}
+            onClick={() => {
+              resetAll();
+              setListening(null);
+            }}
+          >
+            Reset all{customised > 0 ? ` (${customised})` : ""}
+          </Button>
         </div>
       </Section>
       <Section title="Terminal">
@@ -792,6 +907,140 @@ export function ApplicationsPage() {
             </Button>
           </>
         )}
+      </Section>
+    </>
+  );
+}
+
+/* ---- all apps ---------------------------------------------------------- */
+
+/**
+ * The All Apps panel is the one surface with sizes of its own: the artwork in
+ * a tile, and the tile itself. Both are sliders, and the preview below renders
+ * the real tile markup at the chosen numbers rather than an illustration, so
+ * what is on screen is what the panel will do.
+ */
+export function AllAppsPage() {
+  const launcher = useShellStore((state) => state.launcher);
+  const setLauncher = useShellStore((state) => state.setLauncher);
+
+  const previewApps = useMemo(
+    () => appCatalog.filter((app) => isImplemented(app.id)).slice(0, 6),
+    [],
+  );
+
+  const dirty =
+    launcher.iconSize !== defaultLauncher.iconSize ||
+    launcher.tileSize !== defaultLauncher.tileSize ||
+    launcher.layout !== defaultLauncher.layout ||
+    launcher.showCategories !== defaultLauncher.showCategories ||
+    launcher.showRecents !== defaultLauncher.showRecents;
+
+  return (
+    <>
+      <Section
+        title="Preview"
+        description="The panel's own grid, drawn at the sizes below. Nothing here changes the taskbar or the desktop."
+      >
+        <div className="cr-allapps-preview">
+          <div
+            className="cr-launcher__grid"
+            style={{ "--launcher-tile": `${launcher.tileSize}px` } as CSSProperties}
+          >
+            {previewApps.map((app) => (
+              <span key={app.id} className="cr-launcher__tile">
+                <span className="cr-launcher__tile-icon">
+                  <AppIcon appId={app.id} name={app.icon} size={launcher.iconSize} />
+                </span>
+                <span className="cr-launcher__tile-name">{app.name}</span>
+              </span>
+            ))}
+          </div>
+          <p className="cr-row__desc cr-num">
+            Artwork {launcher.iconSize}px · tile {launcher.tileSize}px
+          </p>
+        </div>
+      </Section>
+
+      <Section title="Size">
+        <Row
+          label="Icon size"
+          description="Artwork inside each tile. The list rows and the Recent strip scale with it."
+          control={
+            <Slider
+              label="All Apps icon size"
+              min={LAUNCHER_ICON_RANGE.min}
+              max={LAUNCHER_ICON_RANGE.max}
+              value={launcher.iconSize}
+              onChange={(iconSize) => setLauncher({ iconSize })}
+              format={(value) => `${value}px`}
+            />
+          }
+        />
+        <Row
+          label="Tile size"
+          description="Smallest width of a tile. Wider tiles fit fewer per row and give the names more room."
+          control={
+            <Slider
+              label="All Apps tile size"
+              min={LAUNCHER_TILE_RANGE.min}
+              max={LAUNCHER_TILE_RANGE.max}
+              value={launcher.tileSize}
+              onChange={(tileSize) => setLauncher({ tileSize })}
+              format={(value) => `${value}px`}
+            />
+          }
+        />
+        <div className="cr-button-row">
+          <Button
+            variant="ghost"
+            icon="refresh"
+            disabled={!dirty}
+            onClick={() => setLauncher({ ...defaultLauncher })}
+          >
+            Reset to defaults
+          </Button>
+        </div>
+      </Section>
+
+      <Section title="Contents">
+        <Row
+          label="Category pills"
+          description="The All · System · Internet row above the grid."
+          control={
+            <Switch
+              checked={launcher.showCategories}
+              onChange={(showCategories) => setLauncher({ showCategories })}
+              label="Show category pills"
+            />
+          }
+        />
+        <Row
+          label="Recent strip"
+          description="The applications used most recently, in the panel's footer."
+          control={
+            <Switch
+              checked={launcher.showRecents}
+              onChange={(showRecents) => setLauncher({ showRecents })}
+              label="Show the recent strip"
+            />
+          }
+        />
+        <Row
+          label="Default layout"
+          description="Grid of artwork, or a compact list with each application's summary."
+          control={
+            <Segmented
+              label="Default All Apps layout"
+              value={launcher.layout}
+              onChange={(layout) => setLauncher({ layout })}
+              options={[
+                { value: "grid", label: "Grid" },
+                { value: "list", label: "List" },
+              ]}
+            />
+          }
+        />
       </Section>
     </>
   );

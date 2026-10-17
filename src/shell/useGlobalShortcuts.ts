@@ -1,54 +1,40 @@
 import { useEffect } from "react";
-import { useNotificationStore } from "@/state/notifications";
 import { useShellStore } from "@/state/shell";
-import { useWindowStore } from "@/state/windows";
-import { lockSession, openApp } from "@/services/os";
+import { comboFromEventMatches } from "@/services/keys";
+import { dispatchShortcut } from "@/services/shortcuts";
 
 /* ==========================================================================
    Global shortcuts
 
-   Browsers reserve some combinations (Ctrl+W closes the tab, Ctrl+L focuses the
-   address bar). Those are bound as well, because the browser stays in charge
-   when it claims a key — Settings → Keyboard documents exactly which ones may
-   never reach CrystalOS.
+   This hook is the OS's single keydown listener. It does not decide what a key
+   means — the shortcut registry does (`services/shortcuts`), which is why the
+   combinations here are the same ones Settings → Keyboard lists and lets the
+   user rebind, and why a command in the palette and its shortcut run the same
+   code path.
+
+   Two things stay in the hook because they are about the physical keyboard
+   rather than a binding:
+
+   - The Super key on its own opens the launcher. The action belongs to the
+     key *release*, and a registry binding can only describe a press.
+   - Browsers reserve some combinations (Ctrl+W closes the tab, Ctrl+L focuses
+     the address bar). Those are still registered; the browser simply wins when
+     it claims the key, and Settings marks them so a user is not surprised.
    ========================================================================== */
 
-export interface ShortcutSpec {
-  id: string;
-  keys: string;
-  action: string;
-  /** True when the browser may intercept the combination before the OS sees it. */
-  browserReserved?: boolean;
+function platform(): "mac" | "other" {
+  if (typeof navigator === "undefined") return "other";
+  return /mac|iphone|ipad|ipod/i.test(`${navigator.platform ?? ""} ${navigator.userAgent ?? ""}`)
+    ? "mac"
+    : "other";
 }
-
-export const shortcutList: ShortcutSpec[] = [
-  { id: "launcher", keys: "Super", action: "Open the application launcher" },
-  { id: "launcher-alt", keys: "Ctrl + Space", action: "Open the application launcher" },
-  { id: "overview", keys: "Super + Space", action: "Toggle the launcher" },
-  { id: "cycle", keys: "Alt + Tab", action: "Cycle between windows", browserReserved: true },
-  { id: "terminal", keys: "Ctrl + Alt + T", action: "Open a new terminal" },
-  { id: "close", keys: "Ctrl + W", action: "Close the focused window", browserReserved: true },
-  {
-    id: "close-all",
-    keys: "Ctrl + Shift + W",
-    action: "Close every window",
-    browserReserved: true,
-  },
-  { id: "lock", keys: "Super + L", action: "Lock the screen" },
-  { id: "dnd", keys: "Super + D", action: "Toggle Do Not Disturb" },
-  { id: "minimise", keys: "Super + H", action: "Minimise the focused window" },
-  { id: "maximise", keys: "Super + Up", action: "Maximise the focused window" },
-  { id: "snap-left", keys: "Super + Left", action: "Snap the focused window left" },
-  { id: "snap-right", keys: "Super + Right", action: "Snap the focused window right" },
-  { id: "escape", keys: "Escape", action: "Dismiss menus, overlays and the launcher" },
-  { id: "settings", keys: "Super + I", action: "Open Settings" },
-];
 
 export function useGlobalShortcuts(active: boolean): void {
   useEffect(() => {
     if (!active) return;
 
     let metaDownAlone = false;
+    const plat = platform();
 
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
@@ -57,131 +43,31 @@ export function useGlobalShortcuts(active: boolean): void {
         target?.tagName === "TEXTAREA" ||
         target?.isContentEditable === true;
 
-      const shell = useShellStore.getState();
-      const windows = useWindowStore.getState();
-      const focused = windows.windows.find((window) => window.focused);
-
-      // Escape always works — including while typing, where it should dismiss.
-      if (event.key === "Escape") {
-        if (shell.contextMenu) {
-          shell.closeContextMenu();
-          return;
-        }
-        if (shell.launcherOpen) {
-          shell.setLauncherOpen(false);
-          return;
-        }
-        if (shell.quickSettingsOpen) {
-          shell.setQuickSettingsOpen(false);
-          return;
-        }
-        if (shell.notificationCenterOpen) {
-          shell.setNotificationCenterOpen(false);
-          return;
-        }
-        return;
-      }
-
-      // Super on its own opens the launcher.
+      // Super alone is remembered, so the keyup can toggle the launcher.
       if (event.key === "Meta" && !event.ctrlKey && !event.altKey && !event.shiftKey) {
         metaDownAlone = true;
         return;
       }
-      if (metaDownAlone && event.key !== "Meta") {
-        metaDownAlone = false;
-      }
+      if (event.key !== "Meta") metaDownAlone = false;
 
-      if (typing) return;
+      const id = dispatchShortcut({
+        platform: plat,
+        typing,
+        matches: (binding) => comboFromEventMatches(binding, event, plat),
+      });
 
-      const meta = event.metaKey;
-      const ctrl = event.ctrlKey;
-      const alt = event.altKey;
-      const shift = event.shiftKey;
-      const key = event.key.toLowerCase();
-
-      // Ctrl+Space and Super+Space toggle the launcher.
-      if ((ctrl || meta) && event.key === " ") {
-        event.preventDefault();
-        shell.setLauncherOpen(!shell.launcherOpen);
-        return;
-      }
-
-      if (ctrl && alt && key === "t") {
-        event.preventDefault();
-        openApp("terminal", { newInstance: true });
-        return;
-      }
-
-      if (meta && key === "l") {
-        event.preventDefault();
-        lockSession();
-        return;
-      }
-
-      if (meta && key === "d") {
-        event.preventDefault();
-        const prefs = useNotificationStore.getState();
-        prefs.setPrefs({ doNotDisturb: !prefs.prefs.doNotDisturb });
-        return;
-      }
-
-      if (meta && key === "i") {
-        event.preventDefault();
-        openApp("settings");
-        return;
-      }
-
-      if (meta && key === "arrowup" && focused) {
-        event.preventDefault();
-        windows.toggleMaximize(focused.id);
-        return;
-      }
-
-      if (meta && key === "arrowleft" && focused) {
-        event.preventDefault();
-        windows.snap(focused.id, "left");
-        return;
-      }
-
-      if (meta && key === "arrowright" && focused) {
-        event.preventDefault();
-        windows.snap(focused.id, "right");
-        return;
-      }
-
-      if (meta && key === "h" && focused) {
-        event.preventDefault();
-        windows.minimize(focused.id);
-        return;
-      }
-
-      if (alt && event.key === "Tab") {
-        event.preventDefault();
-        windows.cycleFocus(shift ? -1 : 1);
-        return;
-      }
-
-      if (ctrl && shift && key === "w") {
-        event.preventDefault();
-        windows.closeAll();
-        return;
-      }
-
-      if (ctrl && !shift && key === "w") {
-        // The browser may close the tab first; close the window when it does not.
-        if (focused) {
-          event.preventDefault();
-          windows.close(focused.id);
-        }
-      }
+      // Only claim keys the OS actually used, so a stray Ctrl+K in a text field
+      // still reaches the field when no command is bound to it.
+      if (id) event.preventDefault();
     };
 
     const onKeyUp = (event: KeyboardEvent) => {
-      if (event.key === "Meta" && metaDownAlone) {
-        metaDownAlone = false;
-        const shell = useShellStore.getState();
-        shell.setLauncherOpen(!shell.launcherOpen);
-      }
+      if (event.key !== "Meta" || !metaDownAlone) return;
+      metaDownAlone = false;
+      const shell = useShellStore.getState();
+      // The registry owns "should the launcher be open", so reuse its decision:
+      // a Super press toggles whatever is already there.
+      shell.setLauncherOpen(!shell.launcherOpen);
     };
 
     window.addEventListener("keydown", onKeyDown);

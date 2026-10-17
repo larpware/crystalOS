@@ -4,6 +4,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type DragEvent as ReactDragEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
@@ -178,6 +179,13 @@ export function Launcher() {
     .map((appId) => available.find((candidate) => candidate.id === appId))
     .filter((app): app is (typeof available)[number] => Boolean(app));
 
+  /* One setting, three sizes: the grid tile carries the artwork the user
+     chose, and the list row and the Recent chips are derived from it so the
+     whole panel scales together instead of drifting apart. */
+  const iconSize = config.iconSize;
+  const listIconSize = Math.max(20, Math.round(iconSize * 0.6));
+  const recentIconSize = Math.max(16, Math.round(iconSize * 0.52));
+
   return (
     <div className="cr-launcher" data-side="bottom" onKeyDown={onKeyDown}>
       <div className="cr-launcher__scrim" onClick={() => setOpen(false)} aria-hidden="true" />
@@ -253,7 +261,7 @@ export function Launcher() {
                     draggable
                     onDragStart={(event: ReactDragEvent<HTMLElement>) => onAppDragStart(app.id, event)}
                   >
-                    <AppIcon appId={app.id} name={app.icon} size={40} />
+                    <AppIcon appId={app.id} name={app.icon} size={listIconSize} />
                     <span className="cr-launcher__row-text">
                       <span className="cr-launcher__row-name">{app.name}</span>
                       <span className="cr-launcher__row-summary cr-truncate">{app.summary}</span>
@@ -264,7 +272,10 @@ export function Launcher() {
               ))}
             </ul>
           ) : (
-            <div className="cr-launcher__grid">
+            <div
+              className="cr-launcher__grid"
+              style={{ "--launcher-tile": `${config.tileSize}px` } as CSSProperties}
+            >
               {ordered.map((app, index) => (
                 <button
                   key={app.id}
@@ -279,7 +290,7 @@ export function Launcher() {
                   title={app.summary}
                 >
                   <span className="cr-launcher__tile-icon">
-                    <AppIcon appId={app.id} name={app.icon} size={72} />
+                    <AppIcon appId={app.id} name={app.icon} size={iconSize} />
                   </span>
                   <span className="cr-launcher__tile-name cr-clamp-2">{app.name}</span>
                 </button>
@@ -303,7 +314,7 @@ export function Launcher() {
                     aria-label={app.name}
                     onClick={() => launch(app.id)}
                   >
-                    <AppIcon appId={app.id} name={app.icon} size={30} />
+                    <AppIcon appId={app.id} name={app.icon} size={recentIconSize} />
                   </button>
                 ))}
               </div>

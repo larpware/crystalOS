@@ -10,6 +10,7 @@ import {
   WallpaperPage,
 } from "./pages/appearance";
 import {
+  AllAppsPage,
   ApplicationsPage,
   DockPage,
   KeyboardPage,
@@ -86,6 +87,24 @@ const pages: SettingsPage[] = [
     group: "Shell",
     keywords: ["dock", "taskbar", "panel", "position", "icons", "autohide", "desktop", "windows"],
     Component: DockPage,
+  },
+  {
+    id: "allapps",
+    label: "All Apps",
+    icon: "grid",
+    group: "Shell",
+    keywords: [
+      "all apps",
+      "launcher",
+      "application menu",
+      "icon size",
+      "tile size",
+      "grid",
+      "list view",
+      "categories",
+      "recent",
+    ],
+    Component: AllAppsPage,
   },
   {
     id: "widgets",
