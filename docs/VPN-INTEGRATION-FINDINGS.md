@@ -269,8 +269,9 @@ node --test server/vpn/*.test.mjs src/services/vpn/*.test.mjs
 ## 12. The Hoxx VPN app and the account-free (manual) provider
 
 The provider layer was generalised so Proton is only one thing that can sit at the
-end of the CONNECT client. This ships as a **separate** "Hoxx VPN" application,
-and it is the provider the Crescent Browser uses by default.
+end of the CONNECT client. The account-free transport ships as its own
+application — CrystalVPN — and it is the provider the Crescent Browser uses by
+default.
 
 * **Provider model.** `server/vpn/endpoint.mjs` stores either `provider: "proton"`
   or `provider: "manual"`. The manual provider takes a `host`, `port`, `scheme`
@@ -283,18 +284,18 @@ and it is the provider the Crescent Browser uses by default.
   to a fixed probe target (`example.com:443`, `MANUAL_PROBE_TARGET`) and reports
   the proxy's own reply — it deliberately does not touch controller state, so
   testing never turns the VPN on or changes the provider.
-* **App.** `src/apps/hoxx/HoxxVpn.tsx` — endpoint form, "Test connection", the
+* **App.** `src/apps/crystalvpn/CrystalVpn.tsx` — endpoint form, "Test connection", the
   primary connect/disconnect action (which sets the provider to `manual` first so
   it can never silently tunnel through Proton), the per-path coverage matrix and
   the two verification checks. Because an endpoint has no catalogue, the app's
   "server list" is the CONNECT probe instead of a `/servers` fetch.
-* **Browser integration.** `providerAppId(null)` → `"hoxx"` and
-  `providerName(null)` → `"Hoxx"`, so the toolbar indicator, Quick Settings tile
-  and Settings → VPN page name Hoxx and open the Hoxx app when no provider has
-  been chosen; they follow the active provider otherwise.
+* **Browser integration.** `providerAppId()` → `"crystalvpn"` and
+  `providerName()` → `"CrystalVPN"` for every snapshot, so the toolbar
+  indicator, Quick Settings tile and Settings → VPN page all name CrystalVPN and
+  open the CrystalVPN app.
 * **Premium.** Not unlocked, and stated so in the app's own "How this works"
-  section. Hoxx's paid tier is a server-issued entitlement (`user_premium`), not
-  a client flag; see [HOXX-VPN-FINDINGS.md](HOXX-VPN-FINDINGS.md).
+  section. The account-free transport has no paid tier at all; see
+  [HOXX-VPN-FINDINGS.md](HOXX-VPN-FINDINGS.md) for why Hoxx itself is not used.
 
 ### Verified live (runtime, this machine)
 
@@ -308,11 +309,11 @@ and it is the provider the Crescent Browser uses by default.
   `CONNECT example.com:443` — the probe target on the wire, both for the test and
   for the connect. With no exit-check URL, egress stayed honestly
   `conclusive: false`.
-* The Hoxx window rendered the live `connected` state (endpoint, tunnel
-  `Confirmed`, exit address `Unknown`), the Quick Settings tile read **Hoxx VPN**,
-  Settings → VPN showed the Hoxx provider/endpoint rows and both app links, and
-  the Crescent Browser toolbar tooltip read
-  *"…open Hoxx VPN settings."*
+* The CrystalVPN window rendered the live `connected` state (endpoint, tunnel
+  `Confirmed`, exit address `Unknown`), the Quick Settings tile read
+  **CrystalVPN**, Settings → VPN showed the provider/endpoint rows and both app
+  links, and the Crescent Browser toolbar tooltip read
+  *"…open CrystalVPN settings."*
 * Clearing the endpoint returned the backend to `provider: "proton"`,
   `endpoint: null`, `status: "disconnected"`.
 
