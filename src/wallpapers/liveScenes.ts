@@ -259,6 +259,82 @@ const ember: SceneRenderer = ({ ctx, width, height, t, pointerX, pointerY }) => 
   ctx.fillRect(0, height * 0.4, width, height * 0.6);
 };
 
+const snowfall: SceneRenderer = ({ ctx, width, height, t, pointerX, pointerY }) => {
+  clear(ctx, width, height, "#0d1119", "#07090c");
+
+  // Deterministic flakes so the drift is stable between frames.
+  let seed = 7331;
+  const random = () => {
+    seed = (seed * 1664525 + 1013904223) % 4294967296;
+    return seed / 4294967296;
+  };
+
+  const count = Math.min(180, Math.round((width * height) / 14000));
+  for (let i = 0; i < count; i += 1) {
+    const baseX = random();
+    const depth = 0.3 + random() * 0.7;
+    const speed = 16 + depth * 26;
+    const travel = (t * speed + random() * height) % (height + 60);
+    const y = travel - 30 + pointerY * 6 * depth;
+    const x = baseX * width + Math.sin(t * 0.28 + i * 0.7) * 22 * depth + pointerX * 10 * depth;
+    // Fade the flake in near the top and out near the bottom so the loop
+    // never shows a hard edge.
+    const fade = Math.sin((travel / (height + 60)) * Math.PI);
+    const alpha = (0.12 + depth * 0.34) * fade;
+    ctx.fillStyle = `rgba(226, 236, 250, ${Math.max(0, alpha).toFixed(3)})`;
+    ctx.beginPath();
+    ctx.arc(x, y, 1 + depth * 2.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  const cold = ctx.createLinearGradient(0, 0, 0, height);
+  cold.addColorStop(0, "rgba(90, 120, 170, 0.12)");
+  cold.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = cold;
+  ctx.fillRect(0, 0, width, height);
+};
+
+const dunes: SceneRenderer = ({ ctx, width, height, t, pointerX }) => {
+  clear(ctx, width, height, "#1a140e", "#080605");
+
+  const ridges = [
+    { y: 0.46, amp: 34, speed: 0.012, color: "rgba(58, 40, 26, 0.55)", offset: 0 },
+    { y: 0.6, amp: 44, speed: 0.009, color: "rgba(44, 30, 20, 0.7)", offset: 2.2 },
+    { y: 0.76, amp: 28, speed: 0.006, color: "rgba(30, 21, 14, 0.85)", offset: 4.4 },
+  ];
+
+  for (const ridge of ridges) {
+    ctx.beginPath();
+    ctx.moveTo(0, height);
+    for (let x = 0; x <= width; x += 14) {
+      const phase = (x / width) * Math.PI * 2;
+      const y =
+        height * ridge.y +
+        Math.sin(phase * 1.1 + t * ridge.speed + ridge.offset) * ridge.amp +
+        Math.sin(phase * 2.3 + t * ridge.speed * 0.6 + ridge.offset) * ridge.amp * 0.3;
+      ctx.lineTo(x, y);
+    }
+    ctx.lineTo(width, height);
+    ctx.closePath();
+    ctx.fillStyle = ridge.color;
+    ctx.fill();
+  }
+
+  // A low sun behind the crest line, warm and very faint.
+  const sun = ctx.createRadialGradient(
+    width * 0.7 + pointerX * 30,
+    height * 0.24,
+    0,
+    width * 0.7 + pointerX * 30,
+    height * 0.24,
+    Math.max(width, height) * 0.5,
+  );
+  sun.addColorStop(0, "rgba(190, 130, 70, 0.1)");
+  sun.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = sun;
+  ctx.fillRect(0, 0, width, height);
+};
+
 export const liveScenes: Record<LiveSceneId, SceneRenderer> = {
   aurora,
   drift,
@@ -267,6 +343,8 @@ export const liveScenes: Record<LiveSceneId, SceneRenderer> = {
   waves,
   rainfall,
   ember,
+  snowfall,
+  dunes,
 };
 
 export const liveSceneLabels: Record<LiveSceneId, string> = {
@@ -277,4 +355,6 @@ export const liveSceneLabels: Record<LiveSceneId, string> = {
   waves: "Ridgeline",
   rainfall: "Rainfall",
   ember: "Embers",
+  snowfall: "Snowfall",
+  dunes: "Dunes",
 };

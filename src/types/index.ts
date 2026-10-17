@@ -245,7 +245,12 @@ export interface WallpaperSource {
   id: string;
   name: string;
   kind: WallpaperKind;
-  category: "landscape" | "abstract" | "graphics" | "custom" | "video";
+  /**
+   * Shown under the tile name and included in the library search, so the
+   * values are the words a user would actually type ("space", "city"), not
+   * an internal taxonomy.
+   */
+  category: "landscape" | "abstract" | "graphics" | "space" | "city" | "custom" | "video";
   /** Remote or object URL for image/video wallpapers. */
   url?: string;
   /** CSS background used when the remote asset cannot load, and for gradients. */
@@ -264,7 +269,9 @@ export type LiveSceneId =
   | "starfield"
   | "waves"
   | "rainfall"
-  | "ember";
+  | "ember"
+  | "snowfall"
+  | "dunes";
 
 /* ==========================================================================
    Widgets
