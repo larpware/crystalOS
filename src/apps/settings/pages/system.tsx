@@ -633,6 +633,10 @@ export function PowerPage() {
   const muted = usePlaybackStore((state) => state.muted);
   const toggleMuted = usePlaybackStore((state) => state.toggleMuted);
   const setPowerState = useShellStore((state) => state.setPowerState);
+  const removeExtraBootAnimation = useSystemStore((state) => state.removeExtraBootAnimation);
+  const setRemoveExtraBootAnimation = useSystemStore(
+    (state) => state.setRemoveExtraBootAnimation,
+  );
   const battery = useBattery();
   const deviceType = useSystemStore((state) => state.deviceType);
   const windowCount = useWindowStore((state) => state.windows.length);
@@ -666,6 +670,20 @@ export function PowerPage() {
             Shut down
           </Button>
         </div>
+      </Section>
+
+      <Section title="Startup">
+        <Row
+          label="Remove extra boot animation time"
+          description="The boot screen holds for a randomised 3–7 seconds so a start reads as a start. That hold is the only part of boot that is not real work; switching this on removes it and leaves the brief honest minimum. It is also skipped automatically whenever motion is reduced or performance mode is on."
+          control={
+            <Switch
+              label="Remove extra boot animation time"
+              checked={removeExtraBootAnimation}
+              onChange={setRemoveExtraBootAnimation}
+            />
+          }
+        />
       </Section>
 
       <Section title="Display and sound">

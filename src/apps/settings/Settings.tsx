@@ -175,7 +175,7 @@ const pages: SettingsPage[] = [
     label: "Power",
     icon: "battery-full",
     group: "System",
-    keywords: ["power", "battery", "sleep", "restart", "shutdown", "lock", "dim", "volume"],
+    keywords: ["power", "battery", "sleep", "restart", "shutdown", "lock", "dim", "volume", "boot", "startup", "start up", "animation", "splash"],
     Component: PowerPage,
   },
   {

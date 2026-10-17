@@ -28,6 +28,17 @@ export interface SystemState {
   /** Lets widgets tick in the background; disabling drops them to a slow clock. */
   backgroundWidgetUpdates: boolean;
   /**
+   * Removes the presentational hold from the boot screen.
+   *
+   * Boot itself is real work, but a start that is over in a single frame does
+   * not read as a start, so the screen is held for a randomised few seconds on
+   * top. That hold is the only part of boot that is not work, so it is offered
+   * as a switch: turning it on removes the extra time and leaves the honest
+   * short floor. It is skipped anyway while motion is reduced or performance
+   * mode is on.
+   */
+  removeExtraBootAnimation: boolean;
+  /**
    * Master switch for the Scramjet proxy across the whole OS. When off, every
    * proxied application (Browser, Drive, Spotify, Audiomack, the proxy app)
    * loads its destination directly in its own window instead of through the
@@ -59,6 +70,7 @@ export interface SystemState {
   setDeveloperMode: (enabled: boolean) => void;
   setMotionOverride: (motion: MotionOverride) => void;
   setBackgroundWidgetUpdates: (enabled: boolean) => void;
+  setRemoveExtraBootAnimation: (enabled: boolean) => void;
   setProxyEnabled: (enabled: boolean) => void;
   /** Sets one application's proxy stance. Keyed by its destination. */
   setProxyMode: (key: string, mode: ProxyMode) => void;
@@ -82,6 +94,7 @@ export const useSystemStore = create<SystemState>()(
       reduceTransparency: false,
       glassSurfaces: true,
       backgroundWidgetUpdates: true,
+      removeExtraBootAnimation: false,
       proxyEnabled: true,
       proxyModes: {},
       sessionStartedAt: Date.now(),
@@ -93,6 +106,8 @@ export const useSystemStore = create<SystemState>()(
       setDeveloperMode: (developerMode) => set({ developerMode }),
       setMotionOverride: (motionOverride) => set({ motionOverride }),
       setBackgroundWidgetUpdates: (backgroundWidgetUpdates) => set({ backgroundWidgetUpdates }),
+      setRemoveExtraBootAnimation: (removeExtraBootAnimation) =>
+        set({ removeExtraBootAnimation }),
       setProxyEnabled: (proxyEnabled) => set({ proxyEnabled }),
       setProxyMode: (key, mode) =>
         set((state) => ({ proxyModes: { ...state.proxyModes, [key]: mode } })),
@@ -116,6 +131,7 @@ export const useSystemStore = create<SystemState>()(
         reduceTransparency: state.reduceTransparency,
         glassSurfaces: state.glassSurfaces,
         backgroundWidgetUpdates: state.backgroundWidgetUpdates,
+        removeExtraBootAnimation: state.removeExtraBootAnimation,
         proxyEnabled: state.proxyEnabled,
         proxyModes: state.proxyModes,
       }) as SystemState,

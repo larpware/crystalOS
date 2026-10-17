@@ -96,6 +96,39 @@
   color: var(--text-muted);
 }
 
+/* One tip at the foot of the screen, in the spirit of a game's loading screen.
+   Absolutely positioned so it never disturbs the centred lockup above it, and
+   laid out on the baseline so the label sits with the sentence rather than
+   floating above it. */
+.cr-boot__tip {
+  position: absolute;
+  bottom: 50px;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px;
+  width: min(560px, 82vw);
+  text-align: center;
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+  animation: cr-fade-in 420ms var(--ease-standard);
+}
+
+.cr-boot__tip-label {
+  flex: none;
+  font-size: var(--fs-xxs);
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cr-boot__tip {
+    animation: none;
+  }
+}
+
 /* ---- lock screen ------------------------------------------------------- */
 .cr-lock {
   position: absolute;

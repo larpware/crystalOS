@@ -12,6 +12,7 @@ import { applyTheme } from "@/themes/apply";
 import { accentFromHex, customAccentId, findAccent, findTheme, themePresets } from "@/themes/presets";
 import { metaFor } from "@/apps/catalog";
 import { BootScreen, type BootStep } from "@/shell/BootScreen";
+import { resolveBootTargetMs } from "@/shell/boot";
 import { Desktop } from "@/shell/Desktop";
 import { LockScreen } from "@/shell/LockScreen";
 import { SetupWizard } from "@/shell/SetupWizard";
@@ -68,21 +69,35 @@ export function App() {
   const detachChat = useChatStore((state) => state.detach);
 
   /* ---- boot ------------------------------------------------------------ *
-   * The boot screen reports real startup work and nothing else. Each step is
-   * marked as its own await finishes, so a session check that takes three
-   * seconds keeps the boot screen up for three seconds instead of inventing a
-   * progress animation that finishes first.
+   * The boot screen reports real startup work and nothing else beyond the hold
+   * described below. Each step is marked as its own await finishes, so a
+   * session check that takes three seconds keeps the boot screen up for three
+   * seconds instead of inventing a progress animation that finishes first.
    *
-   * The one deliberate addition is a minimum display time: on a warm profile
-   * the whole sequence can finish in a single frame, and a boot screen that
-   * flashes for 20ms reads as a glitch rather than as a start-up. */
+   * Two additions, both deliberate. A minimum display time (MIN_VISIBLE_MS)
+   * keeps a warm profile from flashing a boot screen for 20ms. Above that, a
+   * randomised hold gives the start the weight of a start — and because that
+   * hold is the one part of boot that is no longer work, it is opt-out: the
+   * Setting → Power switch, reduced motion and performance mode each drop the
+   * screen back to the honest floor. resolveBootTargetMs owns that decision.
+   *
+   * The target is chosen once, on mount, before anything is drawn, so the bar
+   * and the wait always describe the same boot. */
   const [bootSteps, setBootSteps] = useState<BootStep[]>([]);
   const [booted, setBooted] = useState(false);
+  const [bootTargetMs] = useState(() => {
+    const state = useSystemStore.getState();
+    return resolveBootTargetMs({
+      removeExtraBootAnimation: state.removeExtraBootAnimation,
+      performanceMode: state.performanceMode,
+      motionOverride: state.motionOverride,
+      prefersReducedMotion: prefersReducedMotion(),
+    });
+  });
 
   useEffect(() => {
     let cancelled = false;
     const started = Date.now();
-    const MIN_VISIBLE_MS = 900;
     /** How long the desktop will wait for the account server before starting. */
     const SESSION_WAIT_MS = 4000;
 
@@ -119,7 +134,7 @@ export function App() {
       if (cancelled) return;
       setBootSteps(["theme", "storage", "session"]);
 
-      const remaining = MIN_VISIBLE_MS - (Date.now() - started);
+      const remaining = bootTargetMs - (Date.now() - started);
       if (remaining > 0) await new Promise((resolve) => window.setTimeout(resolve, remaining));
       if (cancelled) return;
       setBooted(true);
@@ -129,7 +144,7 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, [restoreSession]);
+  }, [restoreSession, bootTargetMs]);
 
   // Friends, requests and friend messages are only polled while a registered
   // account is signed in. Guests never touch the account server.
@@ -380,7 +395,7 @@ export function App() {
   if (!booted) {
     return (
       <div className="cr-root" data-device={deviceType}>
-        <BootScreen completed={bootSteps} />
+        <BootScreen completed={bootSteps} targetMs={bootTargetMs} />
       </div>
     );
   }
