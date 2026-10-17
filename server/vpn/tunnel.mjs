@@ -1,20 +1,17 @@
 /*
  * CrystalOS — Proton proxy transport
  *
- * ## What the Proton extension actually does
+ * ## What Proton's transport actually is
  *
- * The extension shipped in this repository (protonvpnextension/) is an MV3
- * WebExtension whose manifest asks for `proxy`. It never opens a VPN tunnel
- * itself. `tools/proxy.ts` builds a `fixed_servers` proxy config with
- * `scheme: 'https'` pointing at the selected server on port 4443 (443 for
- * Secure Core), and `vpn/getBasicAuth.ts` supplies a pre-emptive Basic
- * `Proxy-Authorization` header from the short-lived credentials Proton mints per
- * session. Everything else — server choice, credential issuance, status — is
- * plain HTTPS to `account.proton.me/api/`.
+ * A client points its proxy settings at a `fixed_servers` config with
+ * `scheme: 'https'` addressing the selected server on port 4443 (443 for Secure
+ * Core), and sends a pre-emptive Basic `Proxy-Authorization` header built from
+ * the short-lived credentials Proton mints per session. Everything else — server
+ * choice, credential issuance, status — is plain HTTPS to
+ * `account.proton.me/api/`.
  *
- * An HTTPS CONNECT proxy is ordinary TCP, so none of that requires a Chromium
- * extension host. This module is the same transport, spoken from CrystalOS's own
- * backend.
+ * An HTTPS CONNECT proxy is ordinary TCP, so that requires no browser extension
+ * host. This module is the same transport, spoken from CrystalOS's own backend.
  *
  * ## Why it lives on the backend
  *

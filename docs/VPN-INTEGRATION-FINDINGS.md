@@ -6,11 +6,12 @@ A real connected session has NOT been exercised, because no Proton credentials
 exist on this machine. §8 says exactly which claims are verified and which are not.**
 
 This document replaces the earlier audit, which concluded the integration was
-impossible. That conclusion was wrong: the Proton VPN extension **is** present in
-the repository (`protonvpnextension/`), and its source describes a connection
-mechanism this architecture can actually speak — an authenticated HTTPS `CONNECT`
-proxy on the VPN server. What follows records what was found, what was built, and
-what has been proven.
+impossible. That conclusion was wrong: Proton's transport is an authenticated
+HTTPS `CONNECT` proxy on the VPN server, which this architecture can actually
+speak. What follows records what was found, what was built, and what has been
+proven. (The Proton extension used as the reference at the time was a licensed
+third-party artefact and has since been removed from the repository; the constants
+it documented are described in prose at the top of `server/vpn/config.mjs`.)
 
 ---
 
@@ -20,7 +21,7 @@ what has been proven.
 | --- | --- |
 | Runtime | `index.html` → React 19 + Vite web app. No Electron, no Chromium extension host, no `chrome.*` APIs anywhere in `src`. |
 | Proxied browsing | `server/scramjet/index.js` — a Node backend serving `/wisp/` (WebSocket), `/scram`, `/controller`, `/clients`, plus the accounts API. Transport: **libcurl**. |
-| Proton extension | `protonvpnextension/` — a real MV3 WebExtension with TypeScript source, `manifest.permissions: ["proxy", …]`. |
+| Proton transport | An authenticated HTTPS `CONNECT` proxy on the VPN server, port 4443 (443 for Secure Core), with a pre-emptive Basic `Proxy-Authorization` header from credentials minted per session. |
 | REA | `reverse-engineer-anything/rea-rea-agents-6.5.0` — a TypeScript static-analysis framework driven through a documented CLI. |
 | Request path | browser frame → Scramjet service worker → Wisp WebSocket → **the Node backend** → the site. |
 
@@ -30,10 +31,12 @@ traffic, while a VPN in the browser page could not.
 
 ## 2. What REA was used for, and what it could not do
 
-REA was run through its own documented interface against the extension's source
-directory (`analyze_javascript_application`, subject `protonvpnextension/source`),
-producing a signed evidence bundle and a summary projection (artifacts in
-`.tmp-logs/rea-ext-evidence.json`, `.tmp-logs/rea-summary.txt`).
+REA was run through its own documented interface against the Proton extension's
+source directory (`analyze_javascript_application`, subject
+`protonvpnextension/source`), producing a signed evidence bundle and a summary
+projection (artifacts in `.tmp-logs/rea-ext-evidence.json`,
+`.tmp-logs/rea-summary.txt`). That directory has since been removed from the
+repository.
 
 What it reported:
 
@@ -56,14 +59,14 @@ and storage relationships do not prove runtime execution". It therefore could no
 confirm how the extension behaves at run time, and its request extraction was too
 thin (6 relations) to be the source of the endpoints.
 
-**So the endpoints, headers and credential contract were read directly from the
-extension's TypeScript source**, and REA's bundle was used as corroboration and to
-establish the negative facts above. REA is a development aid here; the running
-integration does not depend on it.
+**So the endpoints, headers and credential contract were read directly from
+Proton's own client source at the time**, and REA's bundle was used as
+corroboration and to establish the negative facts above. REA is a development aid
+here; the running integration does not depend on it.
 
 ## 3. The real connection mechanism
 
-`protonvpnextension/source/js/` declares it plainly:
+The client's `source/js/` declared it plainly (paths as they were then):
 
 * `tools/proxy.ts` builds a `fixed_servers` proxy config with `scheme: 'https'`
   pointing at the selected server on port **4443** (**443** for Secure Core).

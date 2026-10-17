@@ -1,18 +1,14 @@
 /*
  * CrystalOS — Proton VPN integration constants
  *
- * Every value here was read out of the Proton VPN browser extension that ships
- * with this repository (protonvpnextension/config.js and
- * protonvpnextension/source/js/config.ts), not invented. The extension is an
- * MV3 WebExtension whose entire transport is `chrome.proxy` pointed at an
- * **HTTPS CONNECT proxy** run by the selected Proton VPN server, authenticated
- * with short-lived credentials minted by Proton's own API. None of that needs a
- * Chromium extension host — a CONNECT proxy is ordinary TCP — so the same
- * mechanism is what CrystalOS's backend speaks.
+ * Every value here is a published Proton endpoint, port or API path, not an
+ * invented one. Proton's transport is an **HTTPS CONNECT proxy** run by the
+ * selected Proton VPN server, authenticated with short-lived credentials minted
+ * by Proton's own API. That needs no browser extension host — a CONNECT proxy is
+ * ordinary TCP — so it is what CrystalOS's backend speaks directly.
  *
- * Keep these aligned with the extension: a proxy port or path that drifts from
- * what Proton actually serves produces a connection that fails for no visible
- * reason.
+ * Keep these aligned with what Proton actually serves: a proxy port or path that
+ * drifts produces a connection that fails for no visible reason.
  */
 
 /** Endpoints and ports, taken from the extension's `config.js`. */
