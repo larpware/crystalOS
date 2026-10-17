@@ -46,13 +46,54 @@ const IMAGE_LIMIT = 40;
 /** Replaced at install time with the shell document. */
 const SHELL_URL = "/";
 
+/**
+ * True for the document a development server serves.
+ *
+ * Vite's development HTML points at module URLs (/@vite/client, /src/main.tsx)
+ * that only exist while the server is running. Caching one is worse than
+ * caching nothing: when the server later stops, the worker answers the
+ * navigation from its cache, the module script fails to load, and the desktop
+ * comes up as an empty, near-black page with nothing in the console to explain
+ * it. The browser's own "cannot reach this site" page is strictly more useful,
+ * so a development shell is served but never stored.
+ */
+async function isDevelopmentShell(response) {
+  if (!response.ok) return false;
+  const type = response.headers.get("content-type") ?? "";
+  if (!type.includes("text/html")) return false;
+  try {
+    return (await response.clone().text()).includes("/@vite/client");
+  } catch {
+    return false;
+  }
+}
+
+/** Drops a cached development shell left behind by an earlier version. */
+async function forgetDevelopmentShell() {
+  try {
+    const cache = await caches.open(SHELL_CACHE);
+    const cached = await cache.match(SHELL_URL);
+    if (cached && (await isDevelopmentShell(cached))) await cache.delete(SHELL_URL);
+  } catch {
+    // The shell cache is an optimisation; failing to prune it is not fatal.
+  }
+}
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches
-      .open(SHELL_CACHE)
-      .then((cache) => cache.addAll([SHELL_URL, "/manifest.webmanifest"]))
-      .catch(() => undefined)
-      .then(() => self.skipWaiting()),
+    (async () => {
+      try {
+        const cache = await caches.open(SHELL_CACHE);
+        const shell = await fetch(SHELL_URL, { cache: "reload" });
+        if (!(await isDevelopmentShell(shell))) await cache.put(SHELL_URL, shell);
+        const manifest = await fetch("/manifest.webmanifest");
+        if (manifest.ok) await cache.put("/manifest.webmanifest", manifest);
+      } catch {
+        // An offline-capable install is an optimisation; the worker must still
+        // activate so Scramjet routing works.
+      }
+      await self.skipWaiting();
+    })(),
   );
 });
 
@@ -65,6 +106,7 @@ self.addEventListener("activate", (event) => {
           .filter((key) => key.startsWith("crescent-") && !key.startsWith(VERSION))
           .map((key) => caches.delete(key)),
       );
+      await forgetDevelopmentShell();
       await self.clients.claim();
     })(),
   );
@@ -96,18 +138,20 @@ self.addEventListener("fetch", (event) => {
       (async () => {
         try {
           const response = await fetch(request);
-          const cache = await caches.open(SHELL_CACHE);
-          cache.put(SHELL_URL, response.clone());
+          // A development shell is returned to the page but never stored — see
+          // isDevelopmentShell.
+          if (!(await isDevelopmentShell(response))) {
+            const cache = await caches.open(SHELL_CACHE);
+            cache.put(SHELL_URL, response.clone());
+          }
           return response;
         } catch {
           const cached = (await caches.match(SHELL_URL)) ?? (await caches.match(request));
-          return (
-            cached ??
-            new Response("CrystalOS is offline and no cached copy is available yet.", {
-              status: 503,
-              headers: { "content-type": "text/plain" },
-            })
-          );
+          if (cached) return cached;
+          // No cached shell: fail the navigation so the browser shows its own
+          // offline page, rather than answering with a document whose scripts
+          // cannot load.
+          throw new Error("CrystalOS is offline and no cached copy is available yet.");
         }
       })(),
     );

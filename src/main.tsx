@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
+import { AppErrorBoundary } from "./components/ErrorBoundary";
 import { initSystemRegistry } from "./shell/systemCommands";
 
 /* Stylesheets are imported in cascade order: tokens first, then base, shared
@@ -41,9 +42,17 @@ if (!container) {
    the same set from the very first frame. Registration is idempotent. */
 initSystemRegistry();
 
+/* The desktop is wrapped in the same boundary the window manager puts around
+   each application. Without one, a crash anywhere in the root tree — a bad
+   persisted value, a theme that will not resolve, an effect that throws —
+   unmounts the whole tree and leaves an empty near-black page with nothing to
+   read and no way back. With it, the failure names itself and offers a reload,
+   and the stored profile is left untouched. */
 createRoot(container).render(
   <StrictMode>
-    <App />
+    <AppErrorBoundary appName="CrystalOS">
+      <App />
+    </AppErrorBoundary>
   </StrictMode>,
 );
 
@@ -53,6 +62,11 @@ createRoot(container).render(
    The service worker keeps the shell loadable offline. It is registered after
    the first paint so it never delays startup, and it is skipped in development
    where Vite serves modules that are not stable between reloads.
+
+   Development is not left without a worker, though: the Scramjet bootstrap
+   registers the same script to route proxied requests (see services/scramjet).
+   Only the offline-shell half is skipped here, and sw.js refuses to cache a
+   development document in either case — see the note on the shell cache there.
    ========================================================================== */
 
 if ("serviceWorker" in navigator && import.meta.env.PROD) {

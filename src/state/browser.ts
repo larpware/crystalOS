@@ -175,7 +175,14 @@ export const useBrowserStore = create<BrowserState>()(
         set({ tabs: keep, activeTabId: keep[0]?.id ?? null });
       },
 
-      setActiveTab: (activeTabId) => set({ activeTabId }),
+      /* Setting the tab that is already active is not a change, and saying so
+         matters: components read the whole store object, which is a new object
+         after every write, so a redundant write here re-renders them, which can
+         re-run the effect that made the call. */
+      setActiveTab: (activeTabId) => {
+        if (get().activeTabId === activeTabId) return;
+        set({ activeTabId });
+      },
 
       navigate: (id, input) => {
         const value = input.trim();

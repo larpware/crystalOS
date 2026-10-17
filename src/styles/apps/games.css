@@ -272,6 +272,36 @@
   margin-top: 2px;
 }
 
+/* ---- per-game profile -------------------------------------------------- *
+ * The profile editor lives at the foot of the detail panel, which is a narrow
+ * drawer, so its text rows stack and its controls take the full width. */
+
+.cr-game-profile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.cr-game-profile h3 {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.cr-game-profile .cr-row {
+  padding: 5px 0;
+}
+
+.cr-game-profile .cr-row__control > * {
+  width: 100%;
+}
+
 /* ---- player ------------------------------------------------------------ */
 
 .cr-game-player {

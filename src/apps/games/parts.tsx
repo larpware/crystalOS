@@ -1,9 +1,15 @@
-import { useEffect, useRef, useState } from "react";
-import { Badge, Button, IconButton, Tooltip } from "@/components/ui";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Badge, Button, IconButton, Row, Segmented, Switch, TextInput, Tooltip } from "@/components/ui";
 import { Icon } from "@/icons/Icon";
-import { useGamesStore } from "@/state/games";
+import {
+  gameLaunchModes,
+  isDefaultGameProfile,
+  normaliseGameProfile,
+  useGamesStore,
+} from "@/state/games";
 import { formatRelative } from "@/utils/format";
 import { categoryLabels, tilePalette, type CrystalOSGame } from "./catalogue";
+import { gameDisplayTitle } from "./launch";
 
 /* ==========================================================================
    Shared Games parts
@@ -52,17 +58,19 @@ export function GameCard({
 }) {
   const favourite = useGamesStore((state) => state.favourites.includes(game.id));
   const toggleFavourite = useGamesStore((state) => state.toggleFavourite);
+  const profileTitle = useGamesStore((state) => state.profiles[game.id]?.title ?? "");
+  const title = gameDisplayTitle(game, profileTitle);
 
   return (
     <article className="cr-game-card" data-launched={launched}>
       {game.editorsChoice && <span className="cr-game-card__choice">Editor's Choice</span>}
-      <button type="button" className="cr-game-card__hit" onClick={onOpen} aria-label={`${game.title} details`}>
+      <button type="button" className="cr-game-card__hit" onClick={onOpen} aria-label={`${title} details`}>
         <GameCover game={game} />
         <span
           className="cr-game-card__favourite"
           role="button"
           tabIndex={0}
-          aria-label={favourite ? `Unfavourite ${game.title}` : `Favourite ${game.title}`}
+          aria-label={favourite ? `Unfavourite ${title}` : `Favourite ${title}`}
           onKeyDown={(event) => {
             if (event.key === "Enter" || event.key === " ") {
               event.stopPropagation();
@@ -79,10 +87,10 @@ export function GameCard({
       </button>
       <div className="cr-game-card__meta">
         <div className="cr-game-card__text">
-          <span className="cr-game-card__title">{game.title}</span>
+          <span className="cr-game-card__title">{title}</span>
           <span className="cr-game-card__sub">{categoryLabels[game.category]}</span>
         </div>
-        <Tooltip label={`Play ${game.title}`}>
+        <Tooltip label={`Play ${title}`}>
           <Button size="sm" variant="primary" icon="play" onClick={onPlay}>
             Play
           </Button>
@@ -108,8 +116,50 @@ export function GameDetail({
 }) {
   const favourite = useGamesStore((state) => state.favourites.includes(game.id));
   const toggleFavourite = useGamesStore((state) => state.toggleFavourite);
-  const sessions = useGamesStore((state) => state.sessions.filter((entry) => entry.gameId === game.id));
+  /* The store's array is read as-is and filtered in a memo. A selector that
+     returns `state.sessions.filter(...)` hands React a brand-new array on every
+     call, and React's external-store check reads it twice per commit — so it
+     never settles, and the drawer dies with "Maximum update depth exceeded". */
+  const allSessions = useGamesStore((state) => state.sessions);
+  const sessions = useMemo(
+    () => allSessions.filter((entry) => entry.gameId === game.id),
+    [allSessions, game.id],
+  );
   const lastSession = sessions[0];
+
+  const storedProfile = useGamesStore((state) => state.profiles[game.id]);
+  const setProfile = useGamesStore((state) => state.setProfile);
+  const resetProfile = useGamesStore((state) => state.resetProfile);
+  const profile = useMemo(() => normaliseGameProfile(storedProfile), [storedProfile]);
+  const title = gameDisplayTitle(game, profile.title);
+  const mode = gameLaunchModes.find((entry) => entry.value === profile.launchMode) ?? gameLaunchModes[0];
+
+  /* Tags are typed as one comma-separated line. The field keeps its own draft
+     while it is being edited and commits on blur or Enter, so a half-typed
+     "co-op," is not rewritten out from under the caret on every keystroke. The
+     ref lets the commit also run when the drawer closes or the selection moves
+     to another game — otherwise anything typed but not blurred is dropped. */
+  const [tagDraft, setTagDraft] = useState<string | null>(null);
+  const pendingTags = useRef<string | null>(tagDraft);
+  pendingTags.current = tagDraft;
+
+  const commitTags = () => {
+    if (tagDraft === null) return;
+    setProfile(game.id, {
+      tags: tagDraft.split(",").map((tag) => tag.trim()).filter(Boolean),
+    });
+    setTagDraft(null);
+  };
+
+  useEffect(() => {
+    return () => {
+      const pending = pendingTags.current;
+      if (pending === null) return;
+      useGamesStore.getState().setProfile(game.id, {
+        tags: pending.split(",").map((tag) => tag.trim()).filter(Boolean),
+      });
+    };
+  }, [game.id]);
 
   return (
     <div className="cr-game-detail">
@@ -118,14 +168,20 @@ export function GameDetail({
       </div>
       <div className="cr-game-detail__body">
         <header>
-          <h2>{game.title}</h2>
+          <h2>{title}</h2>
           <p className="cr-row__desc">
+            {title === game.title ? null : `${game.title} · `}
             {categoryLabels[game.category]} · {game.host || "unknown host"}
           </p>
         </header>
 
         <div className="cr-game-detail__badges">
           <Badge>{game.collection}</Badge>
+          {profile.tags.map((tag) => (
+            <Badge key={tag} tone="accent">
+              {tag}
+            </Badge>
+          ))}
           {sessions.length > 0 && (
             <Badge tone="accent">
               {sessions.length} session{sessions.length === 1 ? "" : "s"}
@@ -156,6 +212,100 @@ export function GameDetail({
             Close
           </Button>
         </div>
+
+        <div className="cr-game-profile">
+          <h3>Profile</h3>
+          <p className="cr-row__desc">
+            Kept in this browser profile and applied to this game wherever it is launched from.
+          </p>
+
+          <Row
+            label="Display name"
+            description="Shown in place of the catalogue title."
+            stacked
+          >
+            <TextInput
+              aria-label="Display name"
+              placeholder={game.title}
+              value={profile.title}
+              onChange={(event) => setProfile(game.id, { title: event.target.value })}
+            />
+          </Row>
+
+          <Row
+            label="Note"
+            description="Private to this profile; nothing reads it but you."
+            stacked
+          >
+            <TextInput
+              aria-label="Note"
+              placeholder="Add a note"
+              value={profile.notes}
+              onChange={(event) => setProfile(game.id, { notes: event.target.value })}
+            />
+          </Row>
+
+          <Row
+            label="Tags"
+            description="Comma separated. Up to eight, shown with the game in this panel."
+            stacked
+          >
+            <TextInput
+              aria-label="Tags"
+              placeholder="co-op, short, arcade"
+              value={tagDraft ?? profile.tags.join(", ")}
+              onChange={(event) => setTagDraft(event.target.value)}
+              onBlur={commitTags}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") commitTags();
+              }}
+            />
+          </Row>
+
+          <Row
+            label="Launch"
+            description={mode.hint}
+            control={
+              <Segmented
+                label="Launch mode"
+                value={profile.launchMode}
+                onChange={(value) => setProfile(game.id, { launchMode: value })}
+                options={gameLaunchModes.map((entry) => ({ value: entry.value, label: entry.label }))}
+              />
+            }
+          />
+
+          <Row
+            label="Fullscreen on launch"
+            description="Asks for fullscreen as the frame opens, where the browser allows it without a fresh click."
+            control={
+              <Switch
+                label="Fullscreen on launch"
+                checked={profile.fullscreenOnLaunch}
+                onChange={(checked) => setProfile(game.id, { fullscreenOnLaunch: checked })}
+              />
+            }
+          />
+
+          <Row
+            label="Reset"
+            description={
+              isDefaultGameProfile(profile)
+                ? "This game is already on the catalogue defaults."
+                : "Returns the name, note, tags and launch behaviour to the defaults."
+            }
+            control={
+              <Button
+                size="sm"
+                icon="refresh"
+                disabled={isDefaultGameProfile(profile)}
+                onClick={() => resetProfile(game.id)}
+              >
+                Reset profile
+              </Button>
+            }
+          />
+        </div>
       </div>
     </div>
   );
@@ -181,6 +331,10 @@ export function GamePlayer({
   const [fullscreen, setFullscreen] = useState(false);
   const [failed, setFailed] = useState(false);
 
+  const storedProfile = useGamesStore((state) => state.profiles[game.id]);
+  const profile = useMemo(() => normaliseGameProfile(storedProfile), [storedProfile]);
+  const title = gameDisplayTitle(game, profile.title);
+
   useEffect(() => {
     startedAt.current = Date.now();
     return () => {
@@ -188,6 +342,16 @@ export function GamePlayer({
       if (seconds >= 5) onSession(seconds);
     };
   }, [game.id, nonce, onSession]);
+
+  /* A profile asking for fullscreen gets one attempt as the frame mounts.
+     Browsers only honour requestFullscreen while a gesture is still live, and
+     Play was clicked a moment ago, so it usually lands — but a refusal is not a
+     failure, and the bar's own fullscreen control is still there. Re-attempted
+     when the frame is reloaded, matching the reset on `nonce`. */
+  useEffect(() => {
+    if (!profile.fullscreenOnLaunch || !document.fullscreenEnabled) return;
+    hostRef.current?.requestFullscreen?.().catch(() => undefined);
+  }, [profile.fullscreenOnLaunch, nonce]);
 
   useEffect(() => {
     const onChange = () => setFullscreen(document.fullscreenElement === hostRef.current);
@@ -210,7 +374,7 @@ export function GamePlayer({
     <div className="cr-game-player">
       <header className="cr-game-player__bar">
         <span className="cr-game-player__title">
-          <Icon name="games" size={15} /> {game.title}
+          <Icon name="games" size={15} /> {title}
         </span>
         <span className="cr-game-player__host">{game.host}</span>
         <div className="cr-game-player__controls">
@@ -237,7 +401,7 @@ export function GamePlayer({
         <iframe
           key={nonce}
           className="cr-game-player__frame"
-          title={game.title}
+          title={title}
           src={game.url}
           allow="autoplay; fullscreen; gamepad; clipboard-write"
           sandbox="allow-forms allow-modals allow-orientation-lock allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-presentation allow-same-origin allow-scripts"

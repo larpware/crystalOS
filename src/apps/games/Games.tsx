@@ -15,6 +15,7 @@ import {
   type CrystalOSGame,
   type GameCategory,
 } from "./catalogue";
+import { gameDisplayTitle, launchGame } from "./launch";
 import { GameCard, GameCover, GameDetail, GamePlayer } from "./parts";
 
 /* ==========================================================================
@@ -39,14 +40,31 @@ export function Games({ windowId }: AppProps) {
   const recents = useGamesStore((state) => state.recents);
   const sessions = useGamesStore((state) => state.sessions);
   const recordSession = useGamesStore((state) => state.recordSession);
+  const profiles = useGamesStore((state) => state.profiles);
   const setWindowTitle = useWindowStore((state) => state.setTitle);
+
+  /**
+   * Every Play path goes through here. A profile set to "Browser tab" or
+   * "System browser" is completed by launchGame and never reaches the frame, so
+   * `playing` is only set for the games that really run in this window.
+   */
+  const startGame = (game: CrystalOSGame) => {
+    if (launchGame(game) === "embedded") setPlaying(game);
+  };
+
+  const titleOf = (game: CrystalOSGame) =>
+    gameDisplayTitle(game, profiles[game.id]?.title ?? "");
 
   useEffect(() => {
     setPage(1);
   }, [category, query, view]);
 
   useEffect(() => {
-    setWindowTitle(windowId, playing ? `${playing.title} — CrystalOS Games` : "CrystalOS Games");
+    setWindowTitle(
+      windowId,
+      playing ? `${titleOf(playing)} — CrystalOS Games` : "CrystalOS Games",
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playing, setWindowTitle, windowId]);
 
   const source = useMemo(() => {
@@ -115,7 +133,7 @@ export function Games({ windowId }: AppProps) {
                 <section className="cr-games__hero">
                   <FeaturedHero
                     game={featuredGames[0]}
-                    onPlay={setPlaying}
+                    onPlay={startGame}
                     onOpen={setDetail}
                     recentAt={sessions.find((entry) => entry.gameId === featuredGames[0]?.id)?.at}
                   />
@@ -125,7 +143,7 @@ export function Games({ windowId }: AppProps) {
                         key={game.id}
                         type="button"
                         className="cr-games__hero-tile"
-                        onClick={() => setPlaying(game)}
+                        onClick={() => startGame(game)}
                       >
                         <GameCover game={game} radius={5} />
                         <span className="cr-games__hero-tile-text">
@@ -198,7 +216,7 @@ export function Games({ windowId }: AppProps) {
                       key={game.id}
                       game={game}
                       launched={Boolean(launchCounts.get(game.id))}
-                      onPlay={() => setPlaying(game)}
+                      onPlay={() => startGame(game)}
                       onOpen={() => setDetail(game)}
                     />
                   ))}
@@ -235,7 +253,7 @@ export function Games({ windowId }: AppProps) {
                 <h3>Measured sessions</h3>
                 {sessions.slice(0, 8).map((session) => (
                   <div key={`${session.gameId}-${session.at}`} className="cr-games__history-row">
-                    <span>{gameById.get(session.gameId)?.title ?? session.gameId}</span>
+                    <span>{titleOf(gameById.get(session.gameId) ?? ({ id: session.gameId, title: session.gameId } as CrystalOSGame))}</span>
                     <span className="cr-row__desc">
                       {Math.max(1, Math.round(session.seconds / 60))} min ·{" "}
                       {formatRelative(session.at)}
@@ -254,7 +272,7 @@ export function Games({ windowId }: AppProps) {
             game={detail}
             onClose={() => setDetail(null)}
             onPlay={() => {
-              setPlaying(detail);
+              startGame(detail);
               setDetail(null);
             }}
           />

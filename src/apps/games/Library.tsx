@@ -14,6 +14,7 @@ import {
   type CrystalOSGame,
 } from "./catalogue";
 import { GameCard, GameCover, GamePlayer } from "./parts";
+import { gameDisplayTitle, launchGame } from "./launch";
 
 /* ==========================================================================
    Game Library
@@ -41,11 +42,25 @@ export function GameLibrary({ windowId }: AppProps) {
   const recordSession = useGamesStore((state) => state.recordSession);
   const hidden = useGamesStore((state) => state.hidden);
   const clearHistory = useGamesStore((state) => state.clearHistory);
+  const profiles = useGamesStore((state) => state.profiles);
   const setWindowTitle = useWindowStore((state) => state.setTitle);
 
+  /** The name a game is shown under: the profile's override, else the catalogue's. */
+  const titleOf = (game: CrystalOSGame) => gameDisplayTitle(game, profiles[game.id]?.title ?? "");
+
+  /** Every Play path goes through launchGame, so a profile set to open in a
+      Browser tab never ends up in this window's frame. */
+  const startGame = (game: CrystalOSGame) => {
+    if (launchGame(game) === "embedded") setPlaying(game);
+  };
+
   useEffect(() => {
-    setWindowTitle(windowId, playing ? `${playing.title} — Game Library` : "Game Library");
-  }, [playing, setWindowTitle, windowId]);
+    setWindowTitle(
+      windowId,
+      playing ? `${gameDisplayTitle(playing, profiles[playing.id]?.title ?? "")} — Game Library` : "Game Library",
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playing, profiles, setWindowTitle, windowId]);
 
   const playtime = useMemo(() => {
     const map = new Map<string, number>();
@@ -72,11 +87,14 @@ export function GameLibrary({ windowId }: AppProps) {
       if (filter === "played" && !playtime.has(game.id)) return false;
       if (filter === "never" && playtime.has(game.id)) return false;
       if (!value) return true;
-      return `${game.title} ${game.host}`.toLowerCase().includes(value);
+      const profile = profiles[game.id];
+      return `${gameDisplayTitle(game, profile?.title ?? "")} ${game.host} ${(profile?.tags ?? []).join(" ")}`
+        .toLowerCase()
+        .includes(value);
     });
 
     return filtered.sort((a, b) => {
-      if (sort === "name") return a.title.localeCompare(b.title);
+      if (sort === "name") return titleOf(a).localeCompare(titleOf(b));
       if (sort === "playtime") return (playtime.get(b.id) ?? 0) - (playtime.get(a.id) ?? 0);
       const aRank = recents.indexOf(a.id);
       const bRank = recents.indexOf(b.id);
@@ -88,7 +106,7 @@ export function GameLibrary({ windowId }: AppProps) {
       return a.addedIndex - b.addedIndex;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [collection, favourites, filter, hidden, query, recents, sessions, sort]);
+  }, [collection, favourites, filter, hidden, profiles, query, recents, sessions, sort]);
 
   const totalSeconds = [...playtime.values()].reduce((total, value) => total + value, 0);
   const focused = gameById.get(focusedId) ?? list[0] ?? games[0];
@@ -208,7 +226,7 @@ export function GameLibrary({ windowId }: AppProps) {
                         key={game.id}
                         game={game}
                         launched={playtime.has(game.id)}
-                        onPlay={() => setPlaying(game)}
+                        onPlay={() => startGame(game)}
                         onOpen={() => setFocusedId(game.id)}
                       />
                     ))}
@@ -232,7 +250,7 @@ export function GameLibrary({ windowId }: AppProps) {
                         <span className="cr-library__table-game">
                           <GameCover game={game} radius={4} />
                           <span>
-                            <strong>{game.title}</strong>
+                            <strong>{titleOf(game)}</strong>
                             <span className="cr-row__desc">{game.host}</span>
                           </span>
                         </span>
@@ -247,7 +265,7 @@ export function GameLibrary({ windowId }: AppProps) {
                             ? formatRelative(lastPlayed.get(game.id) as number)
                             : "—"}
                         </span>
-                        <Button size="sm" icon="play" onClick={() => setPlaying(game)}>
+                        <Button size="sm" icon="play" onClick={() => startGame(game)}>
                           Play
                         </Button>
                       </div>
@@ -268,10 +286,15 @@ export function GameLibrary({ windowId }: AppProps) {
                     <div className="cr-library__detail-art">
                       <GameCover game={focused} radius={7} />
                     </div>
-                    <h3>{focused.title}</h3>
+                    <h3>{titleOf(focused)}</h3>
                     <div className="cr-library__detail-badges">
                       <Badge>{categoryLabels[focused.category]}</Badge>
                       <Badge>{focused.collection}</Badge>
+                      {(profiles[focused.id]?.tags ?? []).map((tag) => (
+                        <Badge key={tag} tone="accent">
+                          {tag}
+                        </Badge>
+                      ))}
                     </div>
                     <dl className="cr-library__facts">
                       <div>
@@ -300,7 +323,7 @@ export function GameLibrary({ windowId }: AppProps) {
                       </div>
                     </dl>
                     <div className="cr-library__detail-actions">
-                      <Button variant="primary" icon="play" onClick={() => setPlaying(focused)}>
+                      <Button variant="primary" icon="play" onClick={() => startGame(focused)}>
                         Play
                       </Button>
                       <Button

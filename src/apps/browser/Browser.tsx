@@ -72,24 +72,35 @@ export function Browser({ args }: AppProps) {
   const activeId = store.activeTabId;
   const active = useMemo(() => tabs.find((tab) => tab.id === activeId) ?? null, [tabs, activeId]);
 
-  // A window with no tabs should still be usable.
+  /* A window with no tabs should still be usable, and one whose active tab was
+     closed should fall back to the last remaining tab.
+     The actions are read from getState() rather than taken from the subscribed
+     `store` object. That object is replaced on every write, so an effect that
+     listed it as a dependency re-ran after each of its own updates and never
+     settled — which is what took the whole window down with "Maximum update
+     depth exceeded" the first time a link was opened into a fresh window. */
   useEffect(() => {
-    if (tabs.length === 0) store.newTab(store.homepage, true);
-    if (!activeId && tabs.length > 0) store.setActiveTab(tabs[tabs.length - 1].id);
-  }, [tabs, activeId, store]);
+    if (tabs.length === 0) {
+      useBrowserStore.getState().newTab(undefined, true);
+      return;
+    }
+    if (!activeId) useBrowserStore.getState().setActiveTab(tabs[tabs.length - 1].id);
+  }, [tabs, activeId]);
 
   useEffect(() => {
     if (!active) return;
     setAddress(active.url.startsWith("about:") ? "" : active.url);
   }, [active?.id, active?.url, active]);
 
-  // A tab opened by another application carries its id in the window args.
+  /* A tab opened by another application carries its id in the window args, so
+     the window comes up on the tab that was asked for. Keyed on the id alone,
+     and the tab list is read when the effect runs. */
   useEffect(() => {
     const requested = typeof args?.tabId === "string" ? args.tabId : null;
-    if (requested && store.tabs.some((tab) => tab.id === requested)) {
-      store.setActiveTab(requested);
-    }
-  }, [args?.tabId, store]);
+    if (!requested) return;
+    const state = useBrowserStore.getState();
+    if (state.tabs.some((tab) => tab.id === requested)) state.setActiveTab(requested);
+  }, [args?.tabId]);
 
   const navigate = () => {
     if (!active) return;
