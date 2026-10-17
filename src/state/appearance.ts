@@ -11,6 +11,19 @@ export interface WallpaperConfig {
   desktopId: string;
   lockId: string;
   scale: WallpaperScale;
+  /**
+   * User zoom on top of `scale`, where 1 is "as fitted".
+   *
+   * Below 1 shrinks the artwork so a tight crop can be pulled back into view;
+   * above 1 pushes in past the fit. Always applied about the picture's centre,
+   * then shifted by `offsetX` / `offsetY`, so the two controls compose in a way
+   * people already expect from a photo cropper.
+   */
+  zoom: number;
+  /** Horizontal push in percent of the viewport. Negative moves the art left. */
+  offsetX: number;
+  /** Vertical push in percent of the viewport. Negative moves the art up. */
+  offsetY: number;
   /** 0–0.6 darkening layer behind desktop UI. */
   dim: number;
   blur: number;
@@ -83,6 +96,9 @@ export const defaultWallpaperConfig: WallpaperConfig = {
   desktopId: "ridge-dusk",
   lockId: "ridge-dusk",
   scale: "cover",
+  zoom: 1,
+  offsetX: 0,
+  offsetY: 0,
   dim: 0.28,
   blur: 0,
   syncLock: true,
@@ -157,8 +173,21 @@ export const useAppearanceStore = create<AppearanceState>()(
     }),
     {
       name: "appearance",
-      version: 1,
+      version: 2,
       storage: jsonStorageFor<AppearanceState>(),
+      /**
+       * v1 shipped no wallpaper framing. Rejecting the saved profile would throw
+       * away the user's theme, their imported wallpapers and every custom theme,
+       * so the new fields are filled with the "as fitted" values and an upgrade
+       * stays invisible.
+       */
+      migrate: (persisted, version) => {
+        const state = persisted as Partial<AppearanceState>;
+        if (version < 2 && state?.wallpaper) {
+          state.wallpaper = { ...defaultWallpaperConfig, ...state.wallpaper };
+        }
+        return state as AppearanceState;
+      },
       partialize: (state) =>
         ({
           themeId: state.themeId,

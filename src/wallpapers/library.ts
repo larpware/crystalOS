@@ -9,8 +9,17 @@ import type { WallpaperSource } from "@/types";
    wallpapers have no remote dependency at all.
    ========================================================================== */
 
-function unsplash(id: string, width = 2560): string {
-  return `https://images.unsplash.com/${id}?auto=format&fit=crop&w=${width}&q=80`;
+/**
+ * Builds a QHD+ source URL.
+ *
+ * 2560px looked soft on a 4K panel and on any hidpi display, where a full-width
+ * wallpaper needs roughly `cssWidth * devicePixelRatio` real pixels. 3840 is the
+ * largest size Unsplash serves without a paid tier, so that is the ceiling; the
+ * renderer never needs to upscale below it, and `auto=format` still negotiates
+ * WebP/AVIF so the extra pixels cost far less than they would as JPEG.
+ */
+function unsplash(id: string, width = 3840): string {
+  return `https://images.unsplash.com/${id}?auto=format&w=${width}&q=85`;
 }
 
 /** Neutral gradient used when a photographic wallpaper cannot be fetched. */

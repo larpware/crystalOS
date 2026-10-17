@@ -37,10 +37,10 @@ const darkBase: ThemeTokens = {
   shadowSoft: "0 1px 2px rgba(0,0,0,.3), 0 2px 6px rgba(0,0,0,.22)",
   shadowPopover: "0 18px 40px -12px rgba(0,0,0,.58), 0 4px 12px rgba(0,0,0,.38)",
   shadowWindow: "0 28px 60px -18px rgba(0,0,0,.62), 0 5px 14px rgba(0,0,0,.38)",
-  accent: "#5b8ce8",
-  accentHover: "#6f9aeb",
-  accentMuted: "rgba(91,140,232,.16)",
-  accentOnMuted: "#b5cbf5",
+  accent: "#0a84ff",
+  accentHover: "#3d9bff",
+  accentMuted: "rgba(10,132,255,.22)",
+  accentOnMuted: "#a8c9ff",
 };
 
 export const themePresets: ThemePreset[] = [
@@ -147,10 +147,10 @@ export const themePresets: ThemePreset[] = [
       shadowSoft: "0 1px 2px rgba(0,0,0,.36), 0 2px 8px rgba(2,4,10,.3)",
       shadowPopover: "0 20px 46px -12px rgba(0,0,0,.66), 0 6px 16px rgba(2,4,10,.5)",
       shadowWindow: "0 34px 74px -20px rgba(0,0,0,.7), 0 8px 20px rgba(2,4,10,.5)",
-      accent: "#6f7dff",
-      accentHover: "#8390ff",
-      accentMuted: "rgba(111,125,255,.18)",
-      accentOnMuted: "#b3bbff",
+      accent: "#5e5ce6",
+      accentHover: "#7b79f0",
+      accentMuted: "rgba(94,92,230,.22)",
+      accentOnMuted: "#b9b8f5",
       wallpaperDefault: "night-sky",
     },
   },
@@ -189,10 +189,10 @@ export const themePresets: ThemePreset[] = [
       shadowSoft: "0 1px 0 rgba(0,0,0,.4), 0 2px 4px rgba(0,0,0,.3)",
       shadowPopover: "0 12px 24px -8px rgba(0,0,0,.6), 0 2px 6px rgba(0,0,0,.45)",
       shadowWindow: "0 18px 34px -14px rgba(0,0,0,.64), 0 3px 8px rgba(0,0,0,.4)",
-      accent: "#e08a4b",
-      accentHover: "#eb9a60",
-      accentMuted: "rgba(224,138,75,.16)",
-      accentOnMuted: "#f0b184",
+      accent: "#8e8e93",
+      accentHover: "#a6a6ab",
+      accentMuted: "rgba(142,142,147,.24)",
+      accentOnMuted: "#d6d6da",
       wallpaperDefault: "gradient-graphite",
     },
   },
@@ -230,10 +230,10 @@ export const themePresets: ThemePreset[] = [
       shadowSoft: "0 1px 2px rgba(0,6,12,.34), 0 3px 8px rgba(0,6,12,.26)",
       shadowPopover: "0 20px 42px -14px rgba(0,8,14,.6), 0 4px 12px rgba(0,8,14,.4)",
       shadowWindow: "0 30px 62px -20px rgba(0,8,14,.62), 0 6px 16px rgba(0,8,14,.4)",
-      accent: "#3fb8d8",
-      accentHover: "#57c8e5",
-      accentMuted: "rgba(63,184,216,.16)",
-      accentOnMuted: "#8adcef",
+      accent: "#40c8e0",
+      accentHover: "#63d5ea",
+      accentMuted: "rgba(64,200,224,.22)",
+      accentOnMuted: "#a5e6f2",
       wallpaperDefault: "cold-peak",
     },
   },
@@ -271,10 +271,10 @@ export const themePresets: ThemePreset[] = [
       shadowSoft: "0 1px 2px rgba(10,6,2,.32), 0 3px 7px rgba(10,6,2,.24)",
       shadowPopover: "0 18px 38px -14px rgba(10,6,2,.56), 0 4px 12px rgba(10,6,2,.36)",
       shadowWindow: "0 28px 58px -20px rgba(10,6,2,.58), 0 6px 16px rgba(10,6,2,.34)",
-      accent: "#c9793f",
-      accentHover: "#d98a4f",
-      accentMuted: "rgba(201,121,63,.18)",
-      accentOnMuted: "#e9ae82",
+      accent: "#ff9f0a",
+      accentHover: "#ffb340",
+      accentMuted: "rgba(255,159,10,.20)",
+      accentOnMuted: "#ffd39b",
       wallpaperDefault: "gradient-ember",
     },
   },
@@ -312,10 +312,10 @@ export const themePresets: ThemePreset[] = [
       shadowSoft: "0 1px 2px rgba(6,2,12,.34), 0 3px 8px rgba(6,2,12,.26)",
       shadowPopover: "0 20px 44px -14px rgba(6,2,12,.6), 0 4px 12px rgba(6,2,12,.4)",
       shadowWindow: "0 30px 64px -20px rgba(6,2,12,.62), 0 6px 16px rgba(6,2,12,.4)",
-      accent: "#a97ce0",
-      accentHover: "#b98feb",
-      accentMuted: "rgba(169,124,224,.16)",
-      accentOnMuted: "#d3b6f5",
+      accent: "#bf5af2",
+      accentHover: "#cd7df5",
+      accentMuted: "rgba(191,90,242,.22)",
+      accentOnMuted: "#dfaaf9",
       wallpaperDefault: "gradient-violet",
     },
   },
@@ -357,10 +357,10 @@ export const themePresets: ThemePreset[] = [
       shadowSoft: "0 1px 2px rgba(2,8,4,.34), 0 2px 5px rgba(2,8,4,.22)",
       shadowPopover: "0 16px 34px -14px rgba(2,8,4,.56), 0 3px 10px rgba(2,8,4,.34)",
       shadowWindow: "0 24px 52px -18px rgba(2,8,4,.6), 0 4px 12px rgba(2,8,4,.32)",
-      accent: "#3a8a52",
-      accentHover: "#47a061",
-      accentMuted: "rgba(58,138,82,.18)",
-      accentOnMuted: "#8fd0a5",
+      accent: "#34c759",
+      accentHover: "#4fd471",
+      accentMuted: "rgba(52,199,89,.20)",
+      accentOnMuted: "#9ee5b3",
       wallpaperDefault: "ivy-canopy",
     },
   },
@@ -397,10 +397,10 @@ export const themePresets: ThemePreset[] = [
       shadowSoft: "0 1px 2px rgba(20,24,32,.06), 0 2px 6px rgba(20,24,32,.08)",
       shadowPopover: "0 16px 34px -12px rgba(20,24,32,.22), 0 3px 10px rgba(20,24,32,.12)",
       shadowWindow: "0 24px 50px -18px rgba(20,24,32,.26), 0 4px 12px rgba(20,24,32,.12)",
-      accent: "#2f6fe0",
-      accentHover: "#4180ee",
-      accentMuted: "rgba(47,111,224,.14)",
-      accentOnMuted: "#2559bd",
+      accent: "#007aff",
+      accentHover: "#0068e0",
+      accentMuted: "rgba(0,122,255,.14)",
+      accentOnMuted: "#0059bd",
       wallpaperDefault: "dawn-ridge",
     },
   },
@@ -463,33 +463,140 @@ export function findTheme(id: string): ThemePreset | undefined {
    Accent overrides — applied on top of whatever theme is active.
    -------------------------------------------------------------------------- */
 
+/* --------------------------------------------------------------------------
+   Accents
+
+   Every accent is a single base colour. Hover, active, the translucent
+   selection fills and the two text colours are all derived from it, because
+   hand-written variants are exactly how an accent system drifts: a pastel
+   "on-muted" that only reads on a dark theme, or white label text on an amber
+   button.
+
+   The palette is what real desktops actually ship — the macOS system colours,
+   Windows 11's accent set and Adwaita's slate — so a user arriving from any of
+   them finds the colour they already trust rather than an invented one.
+   -------------------------------------------------------------------------- */
+
 export interface AccentOption {
   id: string;
   name: string;
   value: string;
   hover: string;
+  active: string;
   muted: string;
+  /** Heavier fill for a selected row than `muted`. */
+  mutedStrong: string;
   onMuted: string;
+  /** Label and icon colour on a solid accent fill; dark on light accents. */
+  onAccent: string;
 }
 
-function makeAccent(
-  id: string,
-  name: string,
-  base: string,
-  hover: string,
-  muted: string,
-  onMuted: string,
-): AccentOption {
-  return { id, name, value: base, hover, muted, onMuted };
+export interface AccentVariants {
+  value: string;
+  hover: string;
+  active: string;
+  muted: string;
+  mutedStrong: string;
+  onMuted: string;
+  onAccent: string;
+}
+
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
+
+function rgbToHsl(rgb: { r: number; g: number; b: number }): { h: number; s: number; l: number } {
+  const r = rgb.r / 255;
+  const g = rgb.g / 255;
+  const b = rgb.b / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  const d = max - min;
+  let h = 0;
+  let s = 0;
+  if (d !== 0) {
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+    else if (max === g) h = ((b - r) / d + 2) / 6;
+    else h = ((r - g) / d + 4) / 6;
+  }
+  return { h: h * 360, s: s * 100, l: l * 100 };
+}
+
+function hslToHex(h: number, s: number, l: number): string {
+  const sN = clamp01(s / 100);
+  const lN = clamp01(l / 100);
+  const c = (1 - Math.abs(2 * lN - 1)) * sN;
+  const hp = (((h % 360) + 360) % 360) / 60;
+  const x = c * (1 - Math.abs((hp % 2) - 1));
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  if (hp < 1) [r, g, b] = [c, x, 0];
+  else if (hp < 2) [r, g, b] = [x, c, 0];
+  else if (hp < 3) [r, g, b] = [0, c, x];
+  else if (hp < 4) [r, g, b] = [0, x, c];
+  else if (hp < 5) [r, g, b] = [x, 0, c];
+  else [r, g, b] = [c, 0, x];
+  const m = lN - c / 2;
+  const to = (v: number) => toHexChannel((v + m) * 255);
+  return `#${to(r)}${to(g)}${to(b)}`;
+}
+
+/** WCAG relative luminance, 0 (black) to 1 (white). */
+function relativeLuminance(rgb: { r: number; g: number; b: number }): number {
+  const lin = (v: number) => {
+    const c = v / 255;
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * lin(rgb.r) + 0.7152 * lin(rgb.g) + 0.0722 * lin(rgb.b);
+}
+
+/**
+ * Builds every accent variant from one colour for a given appearance.
+ *
+ * The appearance matters: an "on-muted" label has to be light on a dark theme
+ * and dark on a light one, and hover should raise contrast in both cases rather
+ * than always lighten.
+ */
+export function accentVariants(baseHex: string, appearance: "dark" | "light"): AccentVariants {
+  const rgb = parseHexColor(baseHex) ?? { r: 10, g: 132, b: 255 };
+  const { h, s, l } = rgbToHsl(rgb);
+  const dark = appearance === "dark";
+  const hover = hslToHex(h, s, dark ? Math.min(96, l + 9) : Math.max(12, l - 7));
+  const active = hslToHex(h, s, dark ? Math.max(10, l - 9) : Math.max(8, l - 12));
+  const hue = h.toFixed(0);
+  const sat = s.toFixed(0);
+  const lig = l.toFixed(0);
+  return {
+    value: baseHex,
+    hover,
+    active,
+    muted: `hsla(${hue}, ${sat}%, ${lig}%, ${dark ? 0.22 : 0.16})`,
+    mutedStrong: `hsla(${hue}, ${sat}%, ${lig}%, ${dark ? 0.34 : 0.26})`,
+    onMuted: hslToHex(h, Math.min(s, 62), dark ? 80 : 28),
+    // 0.42 is where white stops being readable on the fill and dark ink starts.
+    onAccent: relativeLuminance(rgb) > 0.42 ? "#14161c" : "#ffffff",
+  };
+}
+
+function accentOption(id: string, name: string, base: string): AccentOption {
+  return { id, name, ...accentVariants(base, "dark") };
 }
 
 export const accentOptions: AccentOption[] = [
-  makeAccent("blue", "Blue", "#5b8ce8", "#6f9aeb", "rgba(91,140,232,.16)", "#b5cbf5"),
-  makeAccent("teal", "Teal", "#2fb6a8", "#45c6b8", "rgba(47,182,168,.16)", "#84ded3"),
-  makeAccent("green", "Green", "#4caf6d", "#5fc180", "rgba(76,175,109,.16)", "#93d8a9"),
-  makeAccent("amber", "Amber", "#dda13a", "#e9b055", "rgba(221,161,58,.16)", "#f0c983"),
-  makeAccent("rose", "Rose", "#e2647f", "#ec7991", "rgba(226,100,127,.16)", "#f4a8ba"),
-  makeAccent("violet", "Violet", "#9b7ae0", "#ac8dea", "rgba(155,122,224,.16)", "#c9b2f2"),
+  accentOption("blue", "Blue", "#0a84ff"),
+  accentOption("indigo", "Indigo", "#5e5ce6"),
+  accentOption("violet", "Violet", "#bf5af2"),
+  accentOption("rose", "Pink", "#ff375f"),
+  accentOption("red", "Red", "#ff453a"),
+  accentOption("orange", "Orange", "#ff9f0a"),
+  accentOption("amber", "Amber", "#e5a50a"),
+  accentOption("yellow", "Yellow", "#f2c94c"),
+  accentOption("green", "Green", "#30d158"),
+  accentOption("teal", "Teal", "#40c8e0"),
+  accentOption("graphite", "Graphite", "#8e8e93"),
 ];
 
 export function findAccent(id: string): AccentOption | undefined {
@@ -544,35 +651,17 @@ export function normaliseHex(value: string): string | null {
   return `#${toHexChannel(rgb.r)}${toHexChannel(rgb.g)}${toHexChannel(rgb.b)}`;
 }
 
-function mix(rgb: { r: number; g: number; b: number }, target: number, amount: number) {
-  return {
-    r: channel(rgb.r + (target - rgb.r) * amount),
-    g: channel(rgb.g + (target - rgb.g) * amount),
-    b: channel(rgb.b + (target - rgb.b) * amount),
-  };
-}
-
 /**
- * Builds a full accent option from one colour.
+ * Builds a full accent option from one colour the user picked.
  *
- * Hover lifts the colour toward white by 12%, muted keeps the hue at 18%
- * alpha for selected backgrounds, and on-muted lifts it by 55% so text and
- * icons drawn on a muted fill stay legible on a dark theme.
+ * The option carries the dark-appearance variants for the settings preview;
+ * `applyTheme` re-derives them for the theme's actual appearance so a custom
+ * accent behaves exactly like a preset one on a light theme.
  */
 export function accentFromHex(value: string, name = "Custom"): AccentOption | null {
-  const rgb = parseHexColor(value);
-  if (!rgb) return null;
-  const base = `#${toHexChannel(rgb.r)}${toHexChannel(rgb.g)}${toHexChannel(rgb.b)}`;
-  const hover = mix(rgb, 255, 0.12);
-  const soft = mix(rgb, 255, 0.55);
-  return {
-    id: customAccentId,
-    name,
-    value: base,
-    hover: `#${toHexChannel(hover.r)}${toHexChannel(hover.g)}${toHexChannel(hover.b)}`,
-    muted: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, .18)`,
-    onMuted: `#${toHexChannel(soft.r)}${toHexChannel(soft.g)}${toHexChannel(soft.b)}`,
-  };
+  const base = normaliseHex(value);
+  if (!base) return null;
+  return { id: customAccentId, name, ...accentVariants(base, "dark") };
 }
 
 /* --------------------------------------------------------------------------

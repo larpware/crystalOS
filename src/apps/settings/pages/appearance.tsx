@@ -33,6 +33,7 @@ import {
 import type { CustomTheme, IconPack, LiveSceneId, ThemeTokens, WallpaperScale } from "@/types";
 import { createId } from "@/utils/format";
 import { liveSceneLabels } from "@/wallpapers/liveScenes";
+import { useResolvedWallpaper } from "@/wallpapers/Wallpaper";
 import {
   displayFontOptions,
   monoFontOptions,
@@ -581,6 +582,11 @@ export function WallpaperPage() {
     [wallpaper.desktopId],
   );
 
+  // Framing only means something for a picture or video. A generated gradient
+  // and a live scene have nothing to zoom into, so those rows stay hidden
+  // rather than offering a control that would do nothing.
+  const frameable = Boolean(useResolvedWallpaper(wallpaper.desktopId).url);
+
   const sceneOptions = (Object.keys(liveSceneLabels) as LiveSceneId[]).map((scene) => ({
     value: scene,
     label: liveSceneLabels[scene],
@@ -614,6 +620,83 @@ export function WallpaperPage() {
             />
           }
         />
+        {frameable && (
+          <>
+            <Row
+              label="Zoom"
+              description="Pushes past, or pulls back from, the fitted size. Under 100% reveals more of a picture that is cropped too tight."
+              control={
+                <Slider
+                  label="Wallpaper zoom"
+                  min={0.5}
+                  max={3}
+                  step={0.01}
+                  value={wallpaper.zoom}
+                  onChange={(zoom) => setWallpaper({ zoom })}
+                  format={(value) => `${Math.round(value * 100)}%`}
+                />
+              }
+            />
+            <Row
+              label="Position"
+              description="Slides the wallpaper to choose which part of the picture stays in frame."
+              stacked
+            >
+              <div className="cr-wp-framer__sliders">
+                <div className="cr-wp-framer__field">
+                  <span>Horizontal</span>
+                  <Slider
+                    label="Wallpaper horizontal position"
+                    min={-50}
+                    max={50}
+                    step={1}
+                    value={wallpaper.offsetX}
+                    onChange={(offsetX) => setWallpaper({ offsetX })}
+                    format={(value) => `${Math.round(value)}%`}
+                  />
+                </div>
+                <div className="cr-wp-framer__field">
+                  <span>Vertical</span>
+                  <Slider
+                    label="Wallpaper vertical position"
+                    min={-50}
+                    max={50}
+                    step={1}
+                    value={wallpaper.offsetY}
+                    onChange={(offsetY) => setWallpaper({ offsetY })}
+                    format={(value) => `${Math.round(value)}%`}
+                  />
+                </div>
+              </div>
+            </Row>
+            <Row
+              label="Framing"
+              description="Reset the zoom and position, or fit the whole picture inside the screen."
+              control={
+                <>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    icon="refresh"
+                    onClick={() => setWallpaper({ zoom: 1, offsetX: 0, offsetY: 0 })}
+                  >
+                    Reset
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    icon="maximize"
+                    onClick={() =>
+                      setWallpaper({ scale: "contain", zoom: 1, offsetX: 0, offsetY: 0 })
+                    }
+                  >
+                    Fit whole picture
+                  </Button>
+                </>
+              }
+            />
+          </>
+        )}
         <Row
           label="Dim behind desktop UI"
           description="A dark layer keeps panel and dock labels readable on bright wallpapers."

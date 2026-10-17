@@ -8,8 +8,8 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
 } from "react";
-import { AppIcon } from "@/icons/Icon";
-import { Badge, Button, Chip, IconButton, Tooltip } from "@/components/ui";
+import { AppIcon, Icon } from "@/icons/Icon";
+import { Badge } from "@/components/ui";
 import { appCatalog } from "@/apps/catalog";
 import { isImplemented } from "@/apps/registry";
 import { useAppsStore } from "@/state/apps";
@@ -20,12 +20,30 @@ import { APP_CATEGORY_LABEL, type AppCategory } from "@/types";
 import { useSystemStore } from "@/state/system";
 
 /* ==========================================================================
-   Launcher
+   Launcher — "All Apps"
 
-   Fast to open and keyboard-first: type to filter, arrow keys to move, Enter to
-   launch, Escape to dismiss. Layout follows the dock position so it always
-   opens where the user's attention already is.
+   Visual language follows the supplied All Apps design: a glass panel holding a
+   search row, category pills, an artwork grid, and a bottom bar that pairs a
+   Recent strip with a status row (Settings · List view · key hints · system
+   actions).
+
+   Behaviour is the shell's own and is unchanged: type to filter, arrow keys to
+   move, Enter to launch, Escape to dismiss, right-click for the application
+   menu, and dragging a tile out places a desktop shortcut.
+
+   The panel is drawn over the live desktop instead of the design's page
+   background, because in the OS the wallpaper behind it belongs to the user.
    ========================================================================== */
+
+const CATEGORIES: (AppCategory | "all")[] = [
+  "all",
+  "system",
+  "internet",
+  "media",
+  "games",
+  "productivity",
+  "utilities",
+];
 
 export function Launcher() {
   const open = useShellStore((state) => state.launcherOpen);
@@ -141,17 +159,8 @@ export function Launcher() {
       }
       if (event.key === "Tab") {
         event.preventDefault();
-        const categories: (AppCategory | "all")[] = [
-          "all",
-          "system",
-          "internet",
-          "media",
-          "games",
-          "productivity",
-          "utilities",
-        ];
-        const index = categories.indexOf(category);
-        setCategory(categories[(index + 1) % categories.length]);
+        const index = CATEGORIES.indexOf(category);
+        setCategory(CATEGORIES[(index + 1) % CATEGORIES.length]);
       }
     },
     [category, cursor, launch, ordered, setOpen],
@@ -164,21 +173,23 @@ export function Launcher() {
 
   if (!open) return null;
 
-  const categories: (AppCategory | "all")[] = [
-    "all",
-    "system",
-    "internet",
-    "media",
-    "games",
-    "productivity",
-    "utilities",
-  ];
+  const recentApps = recents
+    .slice(0, 6)
+    .map((appId) => available.find((candidate) => candidate.id === appId))
+    .filter((app): app is (typeof available)[number] => Boolean(app));
 
   return (
     <div className="cr-launcher" data-side="bottom" onKeyDown={onKeyDown}>
       <div className="cr-launcher__scrim" onClick={() => setOpen(false)} aria-hidden="true" />
-      <div className="cr-launcher__panel" role="dialog" aria-modal="true" aria-label="Application launcher">
+      <div
+        className="cr-launcher__panel"
+        role="dialog"
+        aria-modal="true"
+        aria-label="All applications"
+      >
+        {/* search -------------------------------------------------------- */}
         <div className="cr-launcher__search">
+          <Icon name="search" size={18} className="cr-launcher__search-icon" />
           <input
             ref={inputRef}
             className="cr-launcher__input"
@@ -191,31 +202,42 @@ export function Launcher() {
           <kbd className="cr-launcher__kbd">Esc</kbd>
         </div>
 
+        {/* category pills ------------------------------------------------ */}
         {config.showCategories && (
-          <div className="cr-launcher__categories">
-            {categories.map((entry) => (
-              <Chip
+          <div className="cr-launcher__categories" role="tablist" aria-label="Application categories">
+            {CATEGORIES.map((entry) => (
+              <button
                 key={entry}
-                active={category === entry}
+                type="button"
+                role="tab"
+                aria-selected={category === entry}
+                className="cr-launcher__tab"
+                data-active={category === entry}
                 onClick={() => setCategory(entry)}
               >
                 {entry === "all" ? "All" : APP_CATEGORY_LABEL[entry]}
-              </Chip>
+              </button>
             ))}
             <span className="cr-launcher__count cr-num">{ordered.length}</span>
           </div>
         )}
 
+        {/* grid / list --------------------------------------------------- */}
         <div className="cr-launcher__body" ref={listRef}>
           {ordered.length === 0 ? (
             <div className="cr-empty">
-              <div className="cr-empty__title">No applications match</div>
-              <p className="cr-empty__hint">
-                Try a different term, or switch back to All to see every installed application.
-              </p>
-              <Button size="sm" onClick={() => { setQuery(""); setCategory("all"); }}>
+              <div className="cr-empty__title">No apps found</div>
+              <p className="cr-empty__hint">Try a different search term.</p>
+              <button
+                type="button"
+                className="cr-launcher__reset"
+                onClick={() => {
+                  setQuery("");
+                  setCategory("all");
+                }}
+              >
                 Reset filters
-              </Button>
+              </button>
             </div>
           ) : config.layout === "list" ? (
             <ul className="cr-launcher__list">
@@ -231,7 +253,7 @@ export function Launcher() {
                     draggable
                     onDragStart={(event: ReactDragEvent<HTMLElement>) => onAppDragStart(app.id, event)}
                   >
-                    <AppIcon appId={app.id} name={app.icon} size={26} />
+                    <AppIcon appId={app.id} name={app.icon} size={40} />
                     <span className="cr-launcher__row-text">
                       <span className="cr-launcher__row-name">{app.name}</span>
                       <span className="cr-launcher__row-summary cr-truncate">{app.summary}</span>
@@ -256,7 +278,9 @@ export function Launcher() {
                   onDragStart={(event: ReactDragEvent<HTMLElement>) => onAppDragStart(app.id, event)}
                   title={app.summary}
                 >
-                  <AppIcon appId={app.id} name={app.icon} size={46} />
+                  <span className="cr-launcher__tile-icon">
+                    <AppIcon appId={app.id} name={app.icon} size={72} />
+                  </span>
                   <span className="cr-launcher__tile-name cr-clamp-2">{app.name}</span>
                 </button>
               ))}
@@ -264,54 +288,114 @@ export function Launcher() {
           )}
         </div>
 
-        {config.showRecents && recents.length > 0 && !query && category === "all" && (
-          <div className="cr-launcher__recents">
-            <span className="cr-launcher__recents-label">Recent</span>
-            {recents.slice(0, 6).map((appId) => {
-              const app = available.find((candidate) => candidate.id === appId);
-              if (!app) return null;
-              return (
-                <Tooltip key={appId} label={app.name}>
-                  <button type="button" className="cr-launcher__recent" onClick={() => launch(appId)}>
-                    <AppIcon appId={appId} name={app.icon} size={24} />
-                  </button>
-                </Tooltip>
-              );
-            })}
-          </div>
-        )}
-
+        {/* bottom bar ---------------------------------------------------- */}
         <div className="cr-launcher__footer">
-          <div className="cr-launcher__footer-group">
-            <Button size="sm" variant="ghost" icon="settings" onClick={() => launch("settings")}>
-              Settings
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              icon={config.layout === "grid" ? "list" : "grid"}
-              onClick={() => setConfig({ layout: config.layout === "grid" ? "list" : "grid" })}
-            >
-              {config.layout === "grid" ? "List view" : "Grid view"}
-            </Button>
+          {config.showRecents && recentApps.length > 0 && !query && category === "all" && (
+            <div className="cr-launcher__recent-row">
+              <span className="cr-launcher__recent-label">Recent</span>
+              <div className="cr-launcher__recent-icons">
+                {recentApps.map((app) => (
+                  <button
+                    key={app.id}
+                    type="button"
+                    className="cr-launcher__recent"
+                    title={app.name}
+                    aria-label={app.name}
+                    onClick={() => launch(app.id)}
+                  >
+                    <AppIcon appId={app.id} name={app.icon} size={30} />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="cr-launcher__status-row">
+            <div className="cr-launcher__status-group">
+              <button
+                type="button"
+                className="cr-launcher__status-btn"
+                onClick={() => launch("settings")}
+              >
+                <Icon name="settings" size={14} />
+                Settings
+              </button>
+              <span className="cr-launcher__sep-v" aria-hidden="true" />
+              <button
+                type="button"
+                className="cr-launcher__status-btn"
+                title="Toggle list view"
+                onClick={() => setConfig({ layout: config.layout === "grid" ? "list" : "grid" })}
+              >
+                <Icon name={config.layout === "grid" ? "list" : "grid"} size={14} />
+                {config.layout === "grid" ? "List view" : "Grid view"}
+              </button>
+            </div>
+
             {!performanceMode && (
-              <span className="cr-launcher__hint">
-                ↑ ↓ to move · Enter to open · Tab for categories
-              </span>
+              <div className="cr-launcher__hints">
+                <span className="cr-launcher__hint">
+                  <span className="cr-launcher__kbd">↑↓</span> move
+                </span>
+                <span className="cr-launcher__hint">
+                  <span className="cr-launcher__kbd">↵</span> open
+                </span>
+                <span className="cr-launcher__hint">
+                  <span className="cr-launcher__kbd">Tab</span> categories
+                </span>
+              </div>
             )}
-          </div>
-          <div className="cr-launcher__footer-group">
-            <IconButton icon="lock" label="Lock screen" onClick={() => { lockSession(); setOpen(false); }} />
-            <IconButton icon="sleep" label="Sleep" onClick={() => { sleepSession(); setOpen(false); }} />
-            <IconButton
-              icon="restart"
-              label="Restart session"
-              onClick={() => {
-                useWindowStore.getState().closeAll();
-                setOpen(false);
-              }}
-            />
-            <IconButton icon="power" label="Shut down" onClick={() => { powerOff(); setOpen(false); }} />
+
+            <div className="cr-launcher__system">
+              <button
+                type="button"
+                className="cr-launcher__sys-btn"
+                title="Lock screen"
+                aria-label="Lock screen"
+                onClick={() => {
+                  lockSession();
+                  setOpen(false);
+                }}
+              >
+                <Icon name="lock" size={16} />
+              </button>
+              <button
+                type="button"
+                className="cr-launcher__sys-btn"
+                title="Sleep"
+                aria-label="Sleep"
+                onClick={() => {
+                  sleepSession();
+                  setOpen(false);
+                }}
+              >
+                <Icon name="sleep" size={16} />
+              </button>
+              <button
+                type="button"
+                className="cr-launcher__sys-btn"
+                title="Restart session"
+                aria-label="Restart session"
+                onClick={() => {
+                  useWindowStore.getState().closeAll();
+                  setOpen(false);
+                }}
+              >
+                <Icon name="restart" size={16} />
+              </button>
+              <button
+                type="button"
+                className="cr-launcher__sys-btn cr-launcher__sys-btn--power"
+                title="Shut down"
+                aria-label="Shut down"
+                onClick={() => {
+                  powerOff();
+                  setOpen(false);
+                }}
+              >
+                <Icon name="power" size={16} />
+              </button>
+            </div>
           </div>
         </div>
       </div>

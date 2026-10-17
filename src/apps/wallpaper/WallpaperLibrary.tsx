@@ -11,7 +11,7 @@ import {
   listCustomWallpapers,
   renameCustomWallpaper,
 } from "@/wallpapers/custom";
-import { WallpaperPreview, useResolvedWallpaper } from "@/wallpapers/Wallpaper";
+import { WallpaperFramer, WallpaperPreview, useResolvedWallpaper } from "@/wallpapers/Wallpaper";
 import { gradientWallpapers, builtInWallpapers, liveWallpapers } from "@/wallpapers/library";
 import type { CustomWallpaperRecord, WallpaperSource } from "@/types";
 import { liveSceneLabels } from "@/wallpapers/liveScenes";
@@ -401,9 +401,13 @@ function DetailModal({
       }
     >
       <div className="cr-wp-detail">
-        <div className="cr-wp-detail__stage">
-          <WallpaperPreview id={entry.id} radius={8} className="cr-wp-detail__preview" />
-        </div>
+        {resolved.url ? (
+          <WallpaperFramer id={entry.id} />
+        ) : (
+          <div className="cr-wp-detail__stage">
+            <WallpaperPreview id={entry.id} radius={8} className="cr-wp-detail__preview" />
+          </div>
+        )}
         <dl className="cr-wp-detail__facts">
           <div>
             <dt>Kind</dt>

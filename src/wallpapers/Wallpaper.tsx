@@ -1,4 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
+import { Button, Segmented, Slider } from "@/components/ui";
+import { Icon } from "@/icons/Icon";
 import { useAppearanceStore } from "@/state/appearance";
 import { useSystemStore } from "@/state/system";
 import { findBuiltInWallpaper } from "./library";
@@ -200,8 +209,24 @@ export function WallpaperLayer({ target, dimmed }: WallpaperLayerProps) {
     resolved.kind === "live" && !resolved.isCustom && live.enabled && !performanceMode;
 
   const frozen = prefersReducedMotion() || performanceMode;
-  const objectFit = wallpaper.scale === "contain" ? "contain" : "cover";
+  const objectFit =
+    wallpaper.scale === "contain" ? "contain" : wallpaper.scale === "fill" ? "fill" : "cover";
   const isVideo = resolved.isCustom && resolved.kind === "live";
+
+  /* Framing: the fit mode decides how the picture meets the viewport, then the
+     user's zoom pushes in or pulls back about the centre, and the offsets slide
+     it. Blur is compensated for here rather than in the stylesheet so the
+     transform stays a single value and cannot fight with a hover rule. */
+  const zoom = Number.isFinite(wallpaper.zoom) ? wallpaper.zoom : 1;
+  const offsetX = Number.isFinite(wallpaper.offsetX) ? wallpaper.offsetX : 0;
+  const offsetY = Number.isFinite(wallpaper.offsetY) ? wallpaper.offsetY : 0;
+  const blurComp = wallpaper.blur > 0 ? 1 + wallpaper.blur / 120 : 1;
+  const framing: CSSProperties = {
+    objectFit,
+    transformOrigin: "center center" as const,
+    transform: `translate(${offsetX}%, ${offsetY}%) scale(${(blurComp * zoom).toFixed(4)})`,
+    filter: wallpaper.blur > 0 ? `blur(${wallpaper.blur}px)` : undefined,
+  };
 
   return (
     <div
@@ -219,12 +244,7 @@ export function WallpaperLayer({ target, dimmed }: WallpaperLayerProps) {
           decoding="async"
           onLoad={() => setImageReady(true)}
           onError={() => setImageFailed(true)}
-          style={{
-            objectFit,
-            opacity: imageReady ? 1 : 0,
-            filter: wallpaper.blur > 0 ? `blur(${wallpaper.blur}px)` : undefined,
-            transform: wallpaper.blur > 0 ? `scale(${1 + wallpaper.blur / 120})` : undefined,
-          }}
+          style={{ ...framing, opacity: imageReady ? 1 : 0 }}
         />
       )}
 
@@ -238,7 +258,7 @@ export function WallpaperLayer({ target, dimmed }: WallpaperLayerProps) {
           playsInline
           onLoadedData={() => setImageReady(true)}
           onError={() => setImageFailed(true)}
-          style={{ objectFit, opacity: imageReady ? 1 : 0 }}
+          style={{ ...framing, opacity: imageReady ? 1 : 0 }}
         />
       )}
 
@@ -314,6 +334,201 @@ export function WallpaperPreview({
           style={{ width: "100%", height: "100%", objectFit: "cover" }}
         />
       )}
+    </div>
+  );
+}
+
+function clampNumber(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+/**
+ * A framing stage for the Wallpaper Library: drag to choose which part of the
+ * picture stays in frame, scroll or use a slider to zoom, and switch how the
+ * picture meets the viewport.
+ *
+ * It writes the same desktop-wide framing values the Settings page does, so the
+ * real wallpaper behind the dialog changes as the user works — the preview is
+ * not a separate mock.
+ */
+export function WallpaperFramer({ id, className }: { id: string; className?: string }) {
+  const resolved = useResolvedWallpaper(id);
+  const wallpaper = useAppearanceStore((state) => state.wallpaper);
+  const setWallpaper = useAppearanceStore((state) => state.setWallpaper);
+  const [ready, setReady] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const stage = useRef<HTMLDivElement>(null);
+  const drag = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
+
+  const zoom = Number.isFinite(wallpaper.zoom) ? wallpaper.zoom : 1;
+  const offsetX = Number.isFinite(wallpaper.offsetX) ? wallpaper.offsetX : 0;
+  const offsetY = Number.isFinite(wallpaper.offsetY) ? wallpaper.offsetY : 0;
+  const isVideo = resolved.isCustom && resolved.kind === "live";
+  const objectFit =
+    wallpaper.scale === "contain" ? "contain" : wallpaper.scale === "fill" ? "fill" : "cover";
+
+  /* React attaches wheel listeners passively, so `preventDefault` needs a native
+     listener; otherwise scrolling would zoom *and* scroll the dialog. */
+  useEffect(() => {
+    const node = stage.current;
+    if (!node) return;
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      const current = useAppearanceStore.getState().wallpaper.zoom;
+      setWallpaper({
+        zoom: clampNumber(Number((current - event.deltaY * 0.0016).toFixed(3)), 0.5, 3),
+      });
+    };
+    node.addEventListener("wheel", onWheel, { passive: false });
+    return () => node.removeEventListener("wheel", onWheel);
+  }, [setWallpaper]);
+
+  const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    drag.current = { x: event.clientX, y: event.clientY, ox: offsetX, oy: offsetY };
+    // Capture keeps the drag alive when the pointer leaves the stage. An engine
+    // can throw if the pointer is already gone, which must not end the drag.
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      /* pointer not capturable */
+    }
+  };
+
+  const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const start = drag.current;
+    const box = stage.current?.getBoundingClientRect();
+    if (!start || !box || !box.width || !box.height) return;
+    setWallpaper({
+      offsetX: clampNumber(start.ox + ((event.clientX - start.x) / box.width) * 100, -50, 50),
+      offsetY: clampNumber(start.oy + ((event.clientY - start.y) / box.height) * 100, -50, 50),
+    });
+  };
+
+  const endDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
+    drag.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  };
+
+  return (
+    <div className={className}>
+      <div
+        ref={stage}
+        className="cr-wp-framer"
+        style={{ background: resolved.fallback }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        onDoubleClick={() => setWallpaper({ zoom: 1, offsetX: 0, offsetY: 0 })}
+        role="img"
+        aria-label="Wallpaper framing preview. Drag to reposition."
+      >
+        {resolved.url && !isVideo && !failed && (
+          <img
+            className="cr-wp-framer__image"
+            src={resolved.url}
+            alt=""
+            draggable={false}
+            decoding="async"
+            onLoad={() => setReady(true)}
+            onError={() => setFailed(true)}
+            style={{
+              objectFit,
+              opacity: ready ? 1 : 0,
+              transform: `translate(${offsetX}%, ${offsetY}%) scale(${zoom.toFixed(4)})`,
+            }}
+          />
+        )}
+        {resolved.url && isVideo && !failed && (
+          <video
+            className="cr-wp-framer__image"
+            src={resolved.url}
+            muted
+            loop
+            autoPlay
+            playsInline
+            onError={() => setFailed(true)}
+            style={{
+              objectFit,
+              transform: `translate(${offsetX}%, ${offsetY}%) scale(${zoom.toFixed(4)})`,
+            }}
+          />
+        )}
+        <span className="cr-wp-framer__hint">
+          <Icon name="crop" size={12} /> Drag to reframe · scroll to zoom · double-click to reset
+        </span>
+      </div>
+
+      <div className="cr-wp-framer__controls">
+        <Segmented
+          label="Wallpaper fit"
+          value={wallpaper.scale}
+          onChange={(scale) => setWallpaper({ scale })}
+          options={[
+            { value: "cover", label: "Fill" },
+            { value: "contain", label: "Fit" },
+            { value: "fill", label: "Stretch" },
+          ]}
+        />
+        <div className="cr-wp-framer__sliders">
+          <div className="cr-wp-framer__field">
+            <span>Zoom</span>
+            <Slider
+              label="Wallpaper zoom"
+              min={0.5}
+              max={3}
+              step={0.01}
+              value={zoom}
+              onChange={(value) => setWallpaper({ zoom: value })}
+              format={(value) => `${Math.round(value * 100)}%`}
+            />
+          </div>
+          <div className="cr-wp-framer__field">
+            <span>Horizontal</span>
+            <Slider
+              label="Wallpaper horizontal position"
+              min={-50}
+              max={50}
+              step={1}
+              value={offsetX}
+              onChange={(value) => setWallpaper({ offsetX: value })}
+              format={(value) => `${Math.round(value)}%`}
+            />
+          </div>
+          <div className="cr-wp-framer__field">
+            <span>Vertical</span>
+            <Slider
+              label="Wallpaper vertical position"
+              min={-50}
+              max={50}
+              step={1}
+              value={offsetY}
+              onChange={(value) => setWallpaper({ offsetY: value })}
+              format={(value) => `${Math.round(value)}%`}
+            />
+          </div>
+        </div>
+        <div className="cr-wp-framer__actions">
+          <Button
+            size="sm"
+            variant="ghost"
+            icon="refresh"
+            onClick={() => setWallpaper({ zoom: 1, offsetX: 0, offsetY: 0 })}
+          >
+            Reset framing
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            icon="maximize"
+            onClick={() => setWallpaper({ scale: "contain", zoom: 1, offsetX: 0, offsetY: 0 })}
+          >
+            Fit whole picture
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

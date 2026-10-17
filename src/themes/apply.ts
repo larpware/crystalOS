@@ -1,7 +1,7 @@
 import type { ThemePreset, ThemeTokens } from "@/types";
 import { PANEL_BASE_HEIGHT, PANEL_DOCK_GAP } from "@/state/shell";
 import { fontStack } from "./fonts";
-import type { AccentOption } from "./presets";
+import { accentVariants, type AccentOption } from "./presets";
 
 /* ==========================================================================
    Theme application
@@ -83,6 +83,7 @@ export interface ApplyThemeOptions {
 export function applyTheme(theme: ThemePreset, options: ApplyThemeOptions): void {
   if (typeof document === "undefined") return;
   const root = document.documentElement.style;
+  const isLight = isLightRoot(theme.tokens.bgRoot);
 
   for (const [token, variable] of Object.entries(tokenToVariable) as [
     keyof typeof tokenToVariable,
@@ -92,16 +93,20 @@ export function applyTheme(theme: ThemePreset, options: ApplyThemeOptions): void
     if (typeof value === "string" && value.length > 0) root.setProperty(variable, value);
   }
 
-  const accent = options.accent;
-  if (accent) {
-    root.setProperty("--accent-primary", accent.value);
-    root.setProperty("--accent-primary-hover", accent.hover);
-    root.setProperty("--accent-primary-active", accent.value);
-    root.setProperty("--accent-primary-muted", accent.muted);
-    root.setProperty("--accent-on-muted", accent.onMuted);
-  } else {
-    root.setProperty("--accent-primary-active", theme.tokens.accent);
-  }
+  /* The accent is derived from one colour — the user's chosen accent, or the
+     theme's own — so hover, active, the selection fills and both text colours
+     stay in step. Deriving `onAccent` is what makes an amber or yellow accent
+     usable: label text flips to near-black on a light fill instead of staying
+     white and unreadable. */
+  const accentBase = options.accent?.value ?? theme.tokens.accent;
+  const accent = accentVariants(accentBase, isLight ? "light" : "dark");
+  root.setProperty("--accent-primary", accent.value);
+  root.setProperty("--accent-primary-hover", accent.hover);
+  root.setProperty("--accent-primary-active", accent.active);
+  root.setProperty("--accent-primary-muted", accent.muted);
+  root.setProperty("--accent-primary-muted-strong", accent.mutedStrong);
+  root.setProperty("--accent-on-muted", accent.onMuted);
+  root.setProperty("--text-on-accent", accent.onAccent);
 
   // Elevation is derived from the theme's own window shadow so focused and
   // inactive windows stay in the same lighting family.
@@ -134,7 +139,6 @@ export function applyTheme(theme: ThemePreset, options: ApplyThemeOptions): void
 
   // Launcher scrim — derived from the theme's root background so it adapts to
   // both dark and light appearances.
-  const isLight = isLightRoot(theme.tokens.bgRoot);
   const scrimBase = isLight ? "rgba(0, 0, 0, 0.32)" : "rgba(4, 5, 8, 0.42)";
   root.setProperty("--launcher-scrim", scrimBase);
 
