@@ -34,9 +34,8 @@ traffic, while a VPN in the browser page could not.
 REA was run through its own documented interface against the Proton extension's
 source directory (`analyze_javascript_application`, subject
 `protonvpnextension/source`), producing a signed evidence bundle and a summary
-projection (artifacts in `.tmp-logs/rea-ext-evidence.json`,
-`.tmp-logs/rea-summary.txt`). That directory has since been removed from the
-repository.
+projection. That directory and the `.tmp-logs/` analysis artifacts derived from
+it have since been removed from the repository.
 
 What it reported:
 

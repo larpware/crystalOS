@@ -8,13 +8,25 @@ import type { ReleaseNote, SystemVersion } from "@/types";
    ========================================================================== */
 
 export const SYSTEM_VERSION: SystemVersion = {
-  version: "1.2.0",
-  build: "2026.10.17-crystal",
+  version: "1.3.0",
+  build: "2026.10.17-crystal.2",
   releaseDate: "2026-10-17",
   codename: "CrystalOS",
 };
 
 export const releaseNotes: ReleaseNote[] = [
+  {
+    version: "1.3.0",
+    date: "2026-10-17",
+    changed: [
+      "The repository no longer carries the two vendored third-party browser extensions — Hoxx VPN Proxy and the Proton VPN extension. Both were reference material for VPN transports CrystalOS speaks directly, neither was imported at runtime, and both were redistributed under licences that do not permit it. What they documented now lives as prose at the top of server/vpn/config.mjs.",
+      "The VPN findings documents describe the transports directly instead of quoting request formats recovered from a client that is no longer present. HOXX-VPN-FINDINGS.md now records only why Hoxx is not used and what was removed for licence compliance.",
+      "Scratch from that investigation — the .tmp-logs analysis output, the .tmp-undo snapshots and the .tmp-* capture scripts — is deleted and ignored, so analysis output and third-party material cannot be committed again.",
+    ],
+    fixed: [
+      "The VPN findings document still described the account-free provider as the “Hoxx VPN” app and pointed at src/apps/hoxx/HoxxVpn.tsx, which does not exist. Both now name CrystalVPN and src/apps/crystalvpn/CrystalVpn.tsx.",
+    ],
+  },
   {
     version: "1.2.0",
     date: "2026-10-17",

@@ -13,3 +13,6 @@ dist-ssr/
 npm-debug.log*
 .vite/
 coverage/
+
+# Agent scratch: analysis logs, capture scripts and undo snapshots. Never committed.
+.tmp-*
