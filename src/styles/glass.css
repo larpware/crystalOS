@@ -1,0 +1,252 @@
+/* ==========================================================================
+   Glass themes — the frosted material
+
+   Glass themes mark <html> with data-glass="true". This layer owns everything
+   that makes them read as glass rather than as "dark plastic you can see
+   through":
+
+     • the window canvas (the one backdrop filter every app inherits)
+     • structural panels — sidebars, rails, toolbars, list headers
+     • interior tiles — cards, rows, tables, list items
+     • floating overlays — modals, menus, launcher, quick settings, widgets
+
+   Two things make frost read as frost. A blurred backdrop only shows over a
+   detailed wallpaper, and most of these wallpapers are smooth gradients, so
+   blur alone is invisible. What actually sells it is the *haze* (a milky white
+   wash that lightens rather than darkens) laid over a saturated backdrop. That
+   is why every surface here gets --glass-haze and a saturating filter, not
+   just the window.
+
+   Three independent switches pull the interior back to opaque surfaces:
+     • Settings → Appearance → Frost app surfaces (data-glass-surfaces="off")
+     • Settings → Appearance → Reduce transparency  (data-transparency="reduced")
+     • High-contrast mode                            (data-contrast="high")
+   ========================================================================== */
+
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) {
+  /* Tints, from lightest (a panel sitting in a window) to heaviest (a dialog
+     floating over the raw wallpaper, which has to stay legible over anything). */
+  --glass-panel-bg: color-mix(in srgb, var(--surface-1) 58%, transparent);
+  --glass-tile-bg: color-mix(in srgb, var(--surface-1) 76%, transparent);
+  --glass-overlay-bg: color-mix(in srgb, var(--surface-1) 84%, transparent);
+
+  /* The frost itself: a milky wash, a saturating blur, and a lit edge. */
+  --glass-haze: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.085) 0%,
+    rgba(255, 255, 255, 0.035) 100%
+  );
+  --glass-frost: blur(26px) saturate(1.7) brightness(1.03);
+  --glass-frost-deep: blur(40px) saturate(1.85) brightness(1.05);
+  --glass-edge: color-mix(in srgb, var(--edge-light) 34%, var(--border-subtle));
+  --glass-edge-strong: color-mix(in srgb, var(--edge-light) 48%, var(--border-default));
+}
+
+/* The gating selector, spelled out once for reference:
+   :root[data-glass="true"]:not([data-glass-surfaces="off"])
+     :not([data-transparency="reduced"]):not([data-contrast="high"]) */
+
+/* ---- 1. The window: one frost every app inherits -------------------------
+   The body and the app roots below it are made transparent so the interior
+   composites against this single sheet instead of stacking four translucent
+   layers into an opaque slab. The tint is lifted a little toward the desktop
+   colour so the window is frosted, not see-through. */
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-window {
+  background-color: color-mix(in srgb, var(--window-bg) 85%, var(--bg-desktop));
+  backdrop-filter: var(--glass-frost-deep);
+  -webkit-backdrop-filter: var(--glass-frost-deep);
+}
+
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-window__body {
+  background: transparent;
+}
+
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-window__titlebar {
+  background-image: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--edge-light) 42%, transparent) 0%,
+    transparent 58%
+  );
+  background-color: color-mix(in srgb, var(--surface-1) 55%, transparent);
+  backdrop-filter: var(--glass-frost);
+  -webkit-backdrop-filter: var(--glass-frost);
+}
+
+/* ---- 2. App roots --------------------------------------------------------
+   Every application paints a full-surface background; under glass that layer
+   is redundant with the window and only darkens the interior. */
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-app,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-settings,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-browser,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-music,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-media,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-messages,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-games,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-game-player,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-store,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-updates,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-wp-lib,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-proxy,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-vpn {
+  background: transparent;
+}
+
+/* ---- 3. Structural panels ------------------------------------------------
+   Sidebars, rails, toolbars and list headers: a lighter frosted sheet inside
+   the window, with the lit top edge every glass surface carries. */
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-app__sidebar,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-app__header,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-settings__aside,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-music__rail,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-media__rail,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-messages__rail,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-library__rail,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-music__bar,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-media__list-bar,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-browser__tabs,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-browser__toolbar,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-store__hero,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-store__bar,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-updates__bar,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-wp-lib__bar,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-wp-lib__foot,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-proxy__bar,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-games__bar,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-game-player__bar,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-library__bar,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-messages__identity,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-messages__head,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-music__list-head,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-games__drawer,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-setup__rail {
+  background-color: var(--glass-panel-bg);
+  background-image: var(--surface-sheen), var(--glass-haze);
+  border-color: var(--glass-edge);
+  backdrop-filter: var(--glass-frost);
+  -webkit-backdrop-filter: var(--glass-frost);
+  box-shadow: var(--lift-1);
+}
+
+/* ---- 4. Interior tiles ---------------------------------------------------
+   Cards, rows, tables and list items. These deliberately carry no backdrop
+   filter of their own: the window behind them is already frosted, and one
+   filter per card would mean a compositing pass per card in a grid of sixty.
+   They take the haze, a lighter tint and a lit edge instead, which is what
+   makes them read as panes of the same glass rather than as flat chips. */
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-swatch,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-credit,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-impact,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-theme-list__item,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-widget-picker__item,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-kbd,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-color-input,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-icon-preview__tile,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-about__mark,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-profile__avatar,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-game-card,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-games__feature,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-games__hero-tile,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-games__category,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-library__rail-note,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-library__detail,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-store__card,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-release,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-store__note,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-updates__table,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-music__rail-note,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-music__now-art,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-music__seek,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-media__error,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-media__rail-note,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-messages__guest-note,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-messages__request,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-messages__member-option,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-messages__avatar,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-browser__notice,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-browser__direct-bar,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-browser__cloak,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-browser__shortcut-icon,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-browser__tab[data-active="true"],
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-wp-detail__note,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-wp-detail__stage,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-wp-tile,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-proxy__retry,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-setup__card,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-setup__theme,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-setup__guest,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-setup__check,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-quick__tile,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-quick__accent,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-toast__icon,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-launcher__kbd,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-widget__shortcut,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-hz--corner {
+  background-color: var(--glass-tile-bg);
+  background-image: var(--surface-sheen), var(--glass-haze);
+  border-color: var(--glass-edge);
+  box-shadow: var(--lift-1);
+}
+
+/* ---- 5. Floating overlays ------------------------------------------------
+   These leave the window entirely and float over the raw wallpaper, so they
+   carry the deepest frost and the heaviest tint. */
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-modal,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-menu,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-popover,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-launcher__panel,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-quick,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-center,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-toast,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-widget,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-setup__panel,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-lock__account .cr-account-form,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-lock[data-bg="solid"] .cr-lock__identity {
+  background-color: var(--glass-overlay-bg);
+  background-image: var(--surface-sheen), var(--glass-haze);
+  border-color: var(--glass-edge-strong);
+  backdrop-filter: var(--glass-frost-deep);
+  -webkit-backdrop-filter: var(--glass-frost-deep);
+}
+
+/* ---- 6. Desktop chrome and widgets ---------------------------------------
+   The top bar, the dock and the widget headers frost the wallpaper directly. */
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-panel,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-taskbar__strip {
+  background-image: var(--surface-sheen), var(--glass-haze);
+  backdrop-filter: var(--glass-frost-deep);
+  -webkit-backdrop-filter: var(--glass-frost-deep);
+}
+
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-widget__header {
+  background-color: var(--glass-tile-bg);
+  background-image: var(--surface-sheen), var(--glass-haze);
+  border-color: var(--glass-edge);
+}
+
+/* ---- 7. Remainder ---------------------------------------------------------
+   The surfaces that are neither a rail nor a card — a composer, a player bar,
+   a footer, a start-page panel — kept flat in the first pass and were the
+   reason the frost looked like it had been applied unevenly. */
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-music__player,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-media__controls,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-messages__composer,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-messages__members,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-launcher__footer,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-center__footer,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-setup__footer {
+  background-color: var(--glass-panel-bg);
+  background-image: var(--surface-sheen), var(--glass-haze);
+  border-color: var(--glass-edge);
+  backdrop-filter: var(--glass-frost);
+  -webkit-backdrop-filter: var(--glass-frost);
+}
+
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-messages__composer-box,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-browser__overlay,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-proxy__overlay,
+:root[data-glass="true"]:not([data-glass-surfaces="off"]):not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-music__error {
+  background-color: var(--glass-tile-bg);
+  background-image: var(--surface-sheen), var(--glass-haze);
+  border-color: var(--glass-edge);
+  box-shadow: var(--lift-1);
+}

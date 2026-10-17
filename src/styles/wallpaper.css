@@ -1,0 +1,41 @@
+/* ==========================================================================
+   Wallpaper layer
+   ========================================================================== */
+
+.cr-wallpaper {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  contain: strict;
+}
+
+.cr-wallpaper__image,
+.cr-wallpaper__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  transition: opacity var(--dur-slow) var(--ease-standard);
+}
+
+.cr-wallpaper__canvas {
+  image-rendering: auto;
+}
+
+.cr-wallpaper__dim {
+  position: absolute;
+  inset: 0;
+  background: #05060a;
+  transition: opacity var(--dur-slow) var(--ease-standard);
+  pointer-events: none;
+}
+
+/* Tile scaling is handled by repeating the image instead of stretching it. */
+.cr-wallpaper[data-scale="tile"] .cr-wallpaper__image {
+  width: auto;
+  height: auto;
+  min-width: 100%;
+  min-height: 100%;
+  background-repeat: repeat;
+}

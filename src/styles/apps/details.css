@@ -1,0 +1,133 @@
+/* ==========================================================================
+   Application details
+
+   Every rule here belongs to a class that had markup but never a stylesheet —
+   a flex row that laid out as a block, an error panel with no frame, a note with
+   no margin. They are gathered in one file because each is a handful of lines,
+   grouped by the application it belongs to.
+
+   Anything with real structure belongs in that application's own stylesheet;
+   this is the finishing pass, not a home for new components.
+   ========================================================================== */
+
+/* ---- Quick Settings ---------------------------------------------------- */
+
+.cr-quick__status-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+/* ---- first-run setup --------------------------------------------------- */
+
+.cr-setup__footer-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ---- Settings → Accounts ----------------------------------------------- */
+
+.cr-profile__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* Settings → Tab identity: a preset is a favicon followed by its name. */
+.cr-cloak-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.cr-cloak-row__icon {
+  flex: none;
+  border-radius: var(--radius-xs);
+}
+
+/* ---- Browser ----------------------------------------------------------- */
+
+.cr-browser__overlay-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+/* ---- Messages ---------------------------------------------------------- */
+
+.cr-messages__identity-code {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.cr-messages__identity-hint {
+  margin: 0;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: var(--fs-xxs);
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+/* ---- Music ------------------------------------------------------------- */
+
+/* Library problems are reported in one panel rather than one banner per file,
+   so a folder of broken files cannot bury the player. */
+.cr-music__errors {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 10px 14px 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-medium);
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--accent-warning);
+  background-color: var(--surface-1);
+  background-image: var(--surface-sheen);
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.cr-music__dismiss {
+  align-self: flex-start;
+  margin-top: 2px;
+  font-size: var(--fs-xs);
+  font-weight: 550;
+  color: var(--accent-primary);
+  cursor: default;
+}
+
+.cr-music__limit-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 14px 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-medium);
+  border: 1px solid var(--border-subtle);
+  background-color: var(--surface-1);
+  background-image: var(--surface-sheen);
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+  color: var(--text-tertiary);
+}
+
+/* ---- Proxied applications ---------------------------------------------- */
+
+.cr-proxy__status-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

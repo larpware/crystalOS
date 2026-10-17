@@ -1,0 +1,564 @@
+/* ==========================================================================
+   Widgets
+   ========================================================================== */
+
+.cr-widgets {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-widgets);
+  pointer-events: none;
+}
+
+.cr-widget {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-large);
+  background: color-mix(in srgb, var(--surface-1) 88%, transparent);
+  box-shadow: var(--shadow-1);
+  pointer-events: auto;
+  overflow: hidden;
+  will-change: transform;
+}
+
+.cr-widget[data-draggable="true"] {
+  cursor: grab;
+  touch-action: none;
+}
+
+.cr-widget[data-active="true"] {
+  border-color: color-mix(in srgb, var(--accent-primary) 40%, transparent);
+  box-shadow: var(--shadow-2);
+}
+
+/* Shift is held mid-drag: the widget is about to land on the grid, so it says
+   so instead of appearing to stick. */
+.cr-widget[data-snapping="true"] {
+  border-color: color-mix(in srgb, var(--accent-primary) 55%, transparent);
+  box-shadow:
+    var(--shadow-2),
+    0 0 0 3px color-mix(in srgb, var(--accent-primary) 14%, transparent);
+}
+
+.cr-widget__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex: none;
+  height: 26px;
+  padding: 0 6px 0 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--surface-2) 60%, transparent);
+}
+
+.cr-widget__title {
+  font-size: var(--fs-xxs);
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.cr-widget__remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-xs);
+  color: var(--text-muted);
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-standard);
+}
+
+.cr-widget:hover .cr-widget__remove {
+  opacity: 1;
+}
+
+.cr-widget__remove:hover {
+  background: var(--surface-3);
+  color: var(--text-primary);
+}
+
+.cr-widget__body {
+  flex: 1;
+  min-height: 0;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- resize grip -------------------------------------------------------
+   A corner grip rather than a border, so the widget chrome stays quiet until
+   the pointer is on it. It resizes in whole cells, matching the grid the
+   widget is placed on. */
+.cr-widget__resize {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  display: grid;
+  place-items: center;
+  /* A generous grip: small corner handles are the usual reason a resize feels
+     unreliable. The drawn ticks stay small; the target is this whole box plus
+     the padded hit area below. */
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-small);
+  color: var(--text-muted);
+  cursor: nwse-resize;
+  touch-action: none;
+  opacity: 0;
+  transition:
+    opacity var(--dur-fast) var(--ease-standard),
+    background var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard);
+}
+
+/* A wider invisible target that still reads as the corner. */
+.cr-widget__resize::before {
+  content: "";
+  position: absolute;
+  inset: -6px -6px 0 0;
+}
+
+/* Whenever resizing is possible the grip is faintly visible, so it is
+   discoverable before the pointer arrives; hover makes it solid. */
+.cr-widget[data-draggable="true"] .cr-widget__resize {
+  opacity: 0.5;
+}
+
+.cr-widget:hover .cr-widget__resize,
+.cr-widget[data-active="true"] .cr-widget__resize,
+.cr-widget__resize:focus-visible {
+  opacity: 1;
+}
+
+.cr-widget__resize:hover {
+  background: var(--surface-3);
+  color: var(--text-primary);
+}
+
+/* The grip itself: two ticks drawn from borders, no artwork needed. */
+.cr-widget__resize::after {
+  content: "";
+  width: 9px;
+  height: 9px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  border-radius: 0 0 2px 0;
+}
+
+.cr-widget__center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.cr-widget__muted-icon {
+  color: var(--text-disabled);
+}
+
+.cr-widget__hint {
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+  line-height: 1.4;
+}
+
+/* ---- clock ------------------------------------------------------------- */
+.cr-widget__clock {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+}
+
+.cr-widget__clock-time {
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: var(--text-primary);
+  line-height: 1.1;
+}
+
+.cr-widget__clock-date {
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+}
+
+/* ---- calendar ---------------------------------------------------------- */
+.cr-widget__calendar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.cr-widget__calendar-head {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.cr-widget__calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.cr-widget__calendar-grid span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 20px;
+  border-radius: var(--radius-xs);
+  color: var(--text-tertiary);
+}
+
+.cr-widget__calendar-grid--head span {
+  color: var(--text-disabled);
+  font-size: var(--fs-xxs);
+  font-weight: 600;
+}
+
+.cr-widget__calendar-grid span[data-empty="true"] {
+  color: transparent;
+}
+
+.cr-widget__calendar-grid span[data-today="true"] {
+  background: var(--accent-primary);
+  color: var(--text-on-accent);
+  font-weight: 600;
+}
+
+/* ---- weather ----------------------------------------------------------- */
+.cr-widget__weather {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+  color: var(--text-secondary);
+}
+
+.cr-widget__weather-temp {
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.1;
+}
+
+.cr-widget__weather-label {
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+}
+
+.cr-widget__weather-meta,
+.cr-widget__weather-credit {
+  font-size: var(--fs-xxs);
+  color: var(--text-muted);
+}
+
+/* ---- notes ------------------------------------------------------------- */
+.cr-widget__textarea {
+  width: 100%;
+  height: 100%;
+  resize: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+
+.cr-widget__textarea:focus {
+  outline: none;
+}
+
+/* ---- system status ----------------------------------------------------- */
+.cr-widget__stats {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  overflow: auto;
+}
+
+.cr-widget__stat {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 3px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.cr-widget__stat:last-child {
+  border-bottom: 0;
+}
+
+.cr-widget__stat-label {
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+}
+
+.cr-widget__stat-value {
+  font-size: var(--fs-xs);
+  color: var(--text-primary);
+}
+
+/* ---- music ------------------------------------------------------------- */
+.cr-widget__music {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.cr-widget__music-title {
+  font-size: var(--fs-base);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.cr-widget__music-artist {
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+}
+
+.cr-widget__music-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: auto;
+  font-size: var(--fs-xxs);
+  color: var(--text-muted);
+}
+
+.cr-widget__music-state {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--fs-xxs);
+  color: var(--text-disabled);
+}
+
+/* ---- shortcuts --------------------------------------------------------- */
+.cr-widget__shortcuts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  flex: 1;
+  align-content: start;
+}
+
+.cr-widget__shortcut {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 8px;
+  border-radius: var(--radius-small);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
+  transition: background var(--dur-fast) var(--ease-standard);
+}
+
+.cr-widget__shortcut:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+/* ---- battery ----------------------------------------------------------- */
+.cr-widget__battery {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.cr-widget__battery-level {
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.1;
+}
+
+.cr-widget__battery-state {
+  font-size: var(--fs-sm);
+  color: var(--text-tertiary);
+}
+
+/* ---- tasks widget ------------------------------------------------------ */
+.cr-widget__todo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.cr-widget__todo-add {
+  display: flex;
+  gap: 6px;
+}
+
+.cr-widget__todo-input {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  padding: 0 9px;
+  border-radius: var(--radius-small, 6px);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-sunken);
+  font-size: var(--fs-sm);
+}
+
+.cr-widget__todo-input:focus-visible {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent-primary) 55%, transparent);
+}
+
+.cr-widget__todo-submit {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-small, 6px);
+  background: color-mix(in srgb, var(--accent-primary) 18%, transparent);
+  color: var(--text-primary);
+}
+
+.cr-widget__todo-submit:hover {
+  background: color-mix(in srgb, var(--accent-primary) 30%, transparent);
+}
+
+.cr-widget__todo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.cr-widget__todo-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 4px;
+  border-radius: var(--radius-small, 6px);
+}
+
+.cr-widget__todo-item:hover {
+  background: var(--surface-hover);
+}
+
+.cr-widget__todo-check {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-small);
+  border: 1.5px solid var(--border-strong);
+  color: var(--accent-on-muted, #fff);
+}
+
+.cr-widget__todo-item[data-done="true"] .cr-widget__todo-check {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+.cr-widget__todo-text {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-sm);
+}
+
+.cr-widget__todo-item[data-done="true"] .cr-widget__todo-text {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.cr-widget__todo-remove {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-small);
+  color: var(--text-muted);
+  opacity: 0;
+}
+
+.cr-widget__todo-item:hover .cr-widget__todo-remove {
+  opacity: 1;
+}
+
+.cr-widget__todo-remove:hover {
+  background: var(--surface-3);
+  color: var(--text-primary);
+}
+
+/* ---- files widget ------------------------------------------------------ */
+.cr-widget__files {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  justify-content: space-between;
+  height: 100%;
+}
+
+/* ---- timer widget ------------------------------------------------------ */
+.cr-widget__countdown {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 100%;
+}
+
+.cr-widget__countdown-time {
+  font-family: var(--font-display);
+  font-size: 44px;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  color: var(--text-primary);
+}
+
+.cr-widget__countdown-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cr-widget__countdown-min {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--border-subtle);
+  font-size: 16px;
+  color: var(--text-secondary);
+}
+
+.cr-widget__countdown-min:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.cr-widget__countdown-min:disabled {
+  opacity: 0.4;
+}

@@ -1,0 +1,418 @@
+/* ==========================================================================
+   CrystalOS — design tokens
+
+   Everything in the OS resolves through these variables. Themes, accent
+   changes and OS scale all work by overriding tokens here, never by touching
+   component styles.
+
+   Depth is a system, not a shadow. Each layer has one purpose:
+     desk      the wallpaper, dimmed — the background
+     chrome    panel and dock, floating above the desk
+     panel     popovers attached to the chrome
+     window    application windows, above the desk, below overlays
+     modal     blocking dialogs, above everything
+   Each level has its own material, border, inner highlight and elevation, and
+   the levels are deliberately not interchangeable.
+   ========================================================================== */
+
+:root {
+  /* ---- base surfaces --------------------------------------------------- */
+  --bg-root: #08090b;
+  --bg-desktop: #0b0d10;
+
+  --surface-0: #101216;
+  --surface-1: #14171c;
+  --surface-2: #191c22;
+  --surface-3: #20242b;
+  --surface-hover: #252a32;
+  --surface-active: #2b3039;
+  --surface-sunken: #0c0e11;
+
+  /* ---- text ------------------------------------------------------------ */
+  --text-primary: #f4f5f7;
+  --text-secondary: #c4c8cf;
+  --text-tertiary: #8e949e;
+  --text-muted: #656b75;
+  --text-disabled: #464b54;
+  --text-on-accent: #ffffff;
+
+  /* ---- borders --------------------------------------------------------- */
+  --border-subtle: rgba(255, 255, 255, 0.055);
+  --border-default: rgba(255, 255, 255, 0.085);
+  --border-strong: rgba(255, 255, 255, 0.13);
+  --border-focus: rgba(255, 255, 255, 0.2);
+
+  /* ---- lighting --------------------------------------------------------
+     Directional light comes from above: a hairline of light on the top edge of
+     a raised surface, a soft shadow inside a recessed one. */
+  --inner-highlight: rgba(255, 255, 255, 0.055);
+  --edge-light: rgba(255, 255, 255, 0.14);
+  --inset-highlight: inset 0 1px 0 var(--inner-highlight);
+  --inset-sunken: inset 0 1px 2px rgba(0, 0, 0, 0.32);
+
+  /* ---- accents ---------------------------------------------------------
+     The system accent is deliberately not a fully saturated blue: at 100%
+     saturation it is the colour every generated interface reaches for, and it
+     dominates everything it touches. Same hue, a couple of steps calmer. */
+  --accent-primary: #5b8ce8;
+  --accent-primary-hover: #6f9aeb;
+  --accent-primary-active: #4f7fd9;
+  --accent-primary-muted: rgba(91, 140, 232, 0.16);
+  --accent-on-muted: #b5cbf5;
+
+  --accent-success: #42d879;
+  --accent-warning: #f4c95d;
+  --accent-danger: #ff5f57;
+  --accent-info: #62b0ff;
+
+  /* ---- window controls ------------------------------------------------- */
+  --traffic-red: #ff5f57;
+  --traffic-yellow: #febc2e;
+  --traffic-green: #28c840;
+
+  /* ---- elevation -------------------------------------------------------
+     Named levels. A theme replaces these wholesale, which is how Graphite can
+     be matte while Midnight sits in a deep pool of light. */
+  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px rgba(0, 0, 0, 0.22);
+  --shadow-popover: 0 18px 40px -12px rgba(0, 0, 0, 0.58), 0 4px 12px rgba(0, 0, 0, 0.38);
+  --shadow-window: 0 28px 60px -18px rgba(0, 0, 0, 0.62), 0 5px 14px rgba(0, 0, 0, 0.38);
+  --shadow-tint: #000000;
+  --shadow-window-focused: 0 32px 72px -18px color-mix(in srgb, var(--shadow-tint) 74%, transparent),
+    0 3px 10px color-mix(in srgb, var(--shadow-tint) 42%, transparent);
+
+  /* ---- elevation ladder ------------------------------------------------
+     Three named levels, so a surface says how high it floats instead of
+     picking a shadow. Levels 2 and 3 are derived from the theme's own tint,
+     which keeps every theme in its own lighting family: a matte theme stays
+     matte, a deep one keeps pooling light.
+
+       1  resting   a field or a card sitting on a surface
+       2  raised    chrome that floats: panels, toolbars, a lifted card
+       3  floating  overlays: menus, popovers, toasts
+
+     Windows are the deepest objects on screen and use --shadow-window; an
+     unfocused window drops to --shadow-window-idle, never to a card's level. */
+  --shadow-1: var(--shadow-soft);
+  --shadow-2: 0 2px 4px -1px color-mix(in srgb, var(--shadow-tint) 30%, transparent),
+    0 8px 18px -6px color-mix(in srgb, var(--shadow-tint) 32%, transparent),
+    0 18px 36px -20px color-mix(in srgb, var(--shadow-tint) 28%, transparent);
+  --shadow-3: var(--shadow-popover);
+  --shadow-window-idle: 0 14px 32px -14px color-mix(in srgb, var(--shadow-tint) 42%, transparent),
+    0 2px 7px color-mix(in srgb, var(--shadow-tint) 26%, transparent);
+
+  /* ---- depth -----------------------------------------------------------
+     One lamp, one direction. Light comes from above, so a raised surface has a
+     lit top edge, a shaded bottom edge and a contact shadow; a recessed one
+     inverts that. Keeping each of those in a token — rather than letting every
+     component invent its own box-shadow — is what makes a flat row of panels
+     read as one lit scene.
+
+       --surface-sheen   the top-lit gradient painted over a raised fill
+       --surface-recess  the inverted gradient painted over a sunken fill
+       --shade-bottom    the dark hairline along a raised edge
+
+     --lift-1/2/3 wrap the whole model for the three heights the OS uses:
+     a control, a floating panel, and a dialog. */
+  --shade-bottom: rgba(0, 0, 0, 0.26);
+  --surface-sheen: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.07) 0%,
+    rgba(255, 255, 255, 0.02) 34%,
+    rgba(255, 255, 255, 0) 62%
+  );
+  --surface-recess: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.16) 0%,
+    rgba(0, 0, 0, 0.03) 42%,
+    rgba(0, 0, 0, 0) 70%
+  );
+  --lift-1: var(--inset-highlight), inset 0 -1px 0 var(--shade-bottom),
+    0 1px 1px -0.5px color-mix(in srgb, var(--shadow-tint) 30%, transparent),
+    0 2px 6px -2px color-mix(in srgb, var(--shadow-tint) 30%, transparent);
+  --lift-2: var(--inset-highlight),
+    0 2px 4px -1px color-mix(in srgb, var(--shadow-tint) 26%, transparent),
+    0 10px 22px -8px color-mix(in srgb, var(--shadow-tint) 36%, transparent);
+  /* A text field is the one control pressed into the surface it sits on: the
+     recess shadow above, and the far edge catching a little light below. */
+  --field-shadow: var(--inset-sunken),
+    inset 0 -1px 0 color-mix(in srgb, var(--edge-light) 14%, transparent);
+
+  /* ---- chrome materials ------------------------------------------------ */
+  --panel-bg: #0e1014;
+  --dock-bg: #14171c;
+  --window-bg: var(--surface-0);
+  --modal-bg: var(--surface-1);
+  --chrome-bar: var(--surface-1);
+
+  /* ---- overlays ---------------------------------------------------------- */
+  --launcher-scrim: rgba(4, 5, 8, 0.42);
+
+  /* ---- icon treatment -------------------------------------------------- */
+  --icon-surface: #1b1f26;
+  --icon-surface-strong: #23282f;
+
+  /* ---- document tints (desktop + file artwork) ------------------------- */
+  --file-text: #6fa8ff;
+  --file-image: #8b7bff;
+  --file-audio: #4fc8a8;
+  --file-video: #e0864f;
+  --file-archive: #d8a94a;
+  --file-file: #9aa4b2;
+
+  /* ---- radii -----------------------------------------------------------
+     A concentric scale. An element takes the step below the container it sits
+     in, so a control inside a card inside a window never reads as three
+     unrelated roundings stacked on top of each other. */
+  --radius-xs: 4px;
+  --radius-small: 7px;
+  --radius-medium: 11px;
+  --radius-large: 15px;
+  --radius-window: 16px;
+  --radius-pill: 999px;
+
+  /* ---- spacing ---------------------------------------------------------
+     One 4px-based scale for padding, gaps and insets. Component density still
+     differs — a menu row is not a widget — but the numbers all come from here
+     instead of every rule inventing its own. */
+  --space-1: 4px;
+  --space-2: 6px;
+  --space-3: 8px;
+  --space-4: 12px;
+  --space-5: 16px;
+  --space-6: 20px;
+  --space-7: 24px;
+  --space-8: 32px;
+
+  /* ---- motion ---------------------------------------------------------- */
+  --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-snappy: cubic-bezier(0.16, 1, 0.3, 1);
+  /* Slight overshoot, for pointer feedback that should feel springy. */
+  --ease-overshoot: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur-instant: 90ms;
+  --dur-fast: 140ms;
+  --dur-normal: 200ms;
+  --dur-slow: 280ms;
+  --motion-scale: 1;
+
+  /* ---- typography ------------------------------------------------------ */
+  --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
+    Inter, system-ui, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", "SFMono-Regular", "SF Mono", Consolas,
+    "Liberation Mono", monospace;
+  --font-display: var(--font-ui);
+
+  --fs-xxs: 10.5px;
+  --fs-xs: 11.5px;
+  --fs-sm: 12.5px;
+  --fs-base: 13.5px;
+  --fs-md: 15px;
+  --fs-lg: 18px;
+  --fs-xl: 22px;
+  --fs-2xl: 28px;
+
+  /* ---- shell geometry (user adjustable) -------------------------------- */
+  /* UI scale: root-level CSS zoom, so every element of the OS — panel, dock,
+     windows, widgets, desktop icons, text — magnifies together. Standardised
+     zoom divides the viewport in CSS px, which keeps window drag/resize math,
+     snap zones and body-portaled menus in one consistent coordinate space.
+     Rewritten on :root by themes/apply.ts. */
+  --os-scale: 1;
+  zoom: var(--os-scale);
+  --panel-height: 38px;
+  --panel-font-size: 12.5px;
+  /* Top bar geometry (Settings → Shell → Top bar), rewritten on :root by
+     themes/apply.ts. The defaults mirror the dock layout, so the first paint
+     already matches the default setting. */
+  --panel-top: 10px;
+  --panel-inset: 10px;
+  --panel-bottom: calc(var(--panel-top) + var(--panel-height));
+  --panel-radius: 14px;
+  --titlebar-height: 40px;
+  --dock-icon-size: 42px;
+  --dock-menu-icon-size: 46px;
+  --dock-gap: 6px;
+  --dock-padding: 6px;
+  --dock-radius: 13px;
+  --dock-offset: 8px;
+
+  /* ---- desktop layers -------------------------------------------------- */
+  --z-wallpaper: 0;
+  --z-widgets: 10;
+  --z-desktop-icons: 50;
+  --z-windows: 100;
+  --z-panel: 6000;
+  --z-dock: 6000;
+  --z-overlay: 7000;
+  --z-notifications: 8000;
+  --z-context: 9000;
+  --z-lock: 9500;
+
+  /* ---- derived --------------------------------------------------------- */
+  --wallpaper-dim: 0.28;
+  --wallpaper-blur: 0px;
+}
+
+/* --------------------------------------------------------------------------
+   Scale settle — the UI scale slider rewrites :root zoom on every tick, which
+   relayouts the whole page and re-fits every window to the new viewport. Those
+   are programmatic moves, not user gestures, so animating them makes the
+   desktop appear to dance. While the flag is up every transition and animation
+   is suspended and each intermediate frame lands instantly. It is raised by
+   App.tsx while a scale change settles and dropped once it has.
+   -------------------------------------------------------------------------- */
+:root[data-scaling="true"],
+:root[data-scaling="true"] *,
+:root[data-scaling="true"] *::before,
+:root[data-scaling="true"] *::after {
+  transition: none !important;
+  animation: none !important;
+}
+
+/* --------------------------------------------------------------------------
+   Reduce transparency — Settings → Appearance
+
+   Themes supply materials with their own alpha, which is what makes the chrome
+   read as glass. This preference drops the frost and composites each material
+   onto the desktop colour, turning a translucent theme into an opaque one
+   without needing a second set of tokens: the tint stays the theme's own, only
+   the alpha is resolved.
+   -------------------------------------------------------------------------- */
+:root[data-transparency="reduced"] .cr-panel,
+:root[data-transparency="reduced"] .cr-taskbar__strip,
+:root[data-transparency="reduced"] .cr-popover,
+:root[data-transparency="reduced"] .cr-modal,
+:root[data-transparency="reduced"] .cr-window,
+:root[data-transparency="reduced"] .cr-window__titlebar,
+:root[data-transparency="reduced"] .cr-surface {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+:root[data-transparency="reduced"] .cr-panel {
+  background: linear-gradient(var(--panel-bg), var(--panel-bg)) var(--bg-desktop);
+}
+
+:root[data-transparency="reduced"] .cr-taskbar__strip {
+  background: linear-gradient(var(--dock-bg), var(--dock-bg)) var(--bg-desktop);
+}
+
+:root[data-transparency="reduced"] .cr-window,
+:root[data-transparency="reduced"] .cr-window__titlebar {
+  background: linear-gradient(var(--window-bg), var(--window-bg)) var(--bg-desktop);
+}
+
+:root[data-transparency="reduced"] .cr-modal {
+  background: linear-gradient(var(--modal-bg), var(--modal-bg)) var(--bg-root);
+}
+
+/* --------------------------------------------------------------------------
+   Motion presets — performance mode and reduced-motion collapse these.
+   -------------------------------------------------------------------------- */
+:root[data-motion="reduced"] {
+  --dur-instant: 0ms;
+  --dur-fast: 0ms;
+  --dur-normal: 0ms;
+  --dur-slow: 0ms;
+}
+
+:root[data-motion="subtle"] {
+  --dur-instant: 60ms;
+  --dur-fast: 90ms;
+  --dur-normal: 120ms;
+  --dur-slow: 160ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="full"]) {
+    --dur-instant: 0ms;
+    --dur-fast: 0ms;
+    --dur-normal: 0ms;
+    --dur-slow: 0ms;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Light appearance baseline. Themes override all of this, but the tokens are
+   correct even before a theme is applied.
+   -------------------------------------------------------------------------- */
+:root[data-appearance="light"] {
+  --bg-root: #e9ebee;
+  --bg-desktop: #dfe2e7;
+
+  --surface-0: #ffffff;
+  --surface-1: #f7f8fa;
+  --surface-2: #eef0f3;
+  --surface-3: #e4e7eb;
+  --surface-hover: #e7eaee;
+  --surface-active: #dcdfe4;
+  --surface-sunken: #f2f3f6;
+
+  --text-primary: #16181c;
+  --text-secondary: #3d434c;
+  --text-tertiary: #626974;
+  --text-muted: #878e99;
+  --text-disabled: #adb3bc;
+
+  --border-subtle: rgba(0, 0, 0, 0.06);
+  --border-default: rgba(0, 0, 0, 0.12);
+  --border-strong: rgba(0, 0, 0, 0.18);
+  --border-focus: rgba(0, 0, 0, 0.28);
+
+  --inner-highlight: rgba(255, 255, 255, 0.9);
+  --edge-light: rgba(255, 255, 255, 0.9);
+  --inset-sunken: inset 0 1px 2px rgba(20, 24, 32, 0.08);
+
+  /* A light theme draws depth with shadow and a soft bottom edge rather than
+     with a bright wash, which would simply disappear on a white surface. */
+  --shade-bottom: rgba(20, 24, 32, 0.06);
+  --surface-sheen: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.55) 0%,
+    rgba(255, 255, 255, 0.14) 38%,
+    rgba(255, 255, 255, 0) 66%
+  );
+  --surface-recess: linear-gradient(
+    180deg,
+    rgba(20, 24, 32, 0.07) 0%,
+    rgba(20, 24, 32, 0.015) 44%,
+    rgba(20, 24, 32, 0) 72%
+  );
+
+  --panel-bg: #f7f8fa;
+  --dock-bg: #ffffff;
+  --modal-bg: #ffffff;
+  --chrome-bar: #f7f8fa;
+
+  --icon-surface: #ffffff;
+  --icon-surface-strong: #eef0f3;
+
+  --shadow-soft: 0 1px 2px rgba(20, 24, 32, 0.06), 0 2px 6px rgba(20, 24, 32, 0.08);
+  --shadow-popover: 0 16px 34px -12px rgba(20, 24, 32, 0.22), 0 3px 10px rgba(20, 24, 32, 0.12);
+  --shadow-window: 0 24px 50px -18px rgba(20, 24, 32, 0.26), 0 4px 12px rgba(20, 24, 32, 0.12);
+  --shadow-tint: #1b2330;
+  --shadow-window-focused: 0 30px 60px -18px color-mix(in srgb, var(--shadow-tint) 26%, transparent),
+    0 3px 10px color-mix(in srgb, var(--shadow-tint) 14%, transparent);
+
+  --wallpaper-dim: 0.06;
+  --launcher-scrim: rgba(0, 0, 0, 0.32);
+}
+
+/* --------------------------------------------------------------------------
+   High contrast bonus flag — applies on top of whatever theme is active.
+   -------------------------------------------------------------------------- */
+:root[data-contrast="high"] {
+  --border-subtle: rgba(255, 255, 255, 0.18);
+  --border-default: rgba(255, 255, 255, 0.28);
+  --border-strong: rgba(255, 255, 255, 0.42);
+  --inner-highlight: rgba(255, 255, 255, 0.2);
+  --edge-light: rgba(255, 255, 255, 0.34);
+  --text-secondary: #dfe2e7;
+  --text-tertiary: #b9bec7;
+  --text-muted: #9aa0aa;
+}
+
+:root[data-contrast="high"][data-appearance="light"] {
+  --border-subtle: rgba(0, 0, 0, 0.2);
+  --border-default: rgba(0, 0, 0, 0.32);
+  --border-strong: rgba(0, 0, 0, 0.46);
+}

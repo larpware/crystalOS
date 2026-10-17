@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192" role="img" aria-label="CrystalOS">
+  <defs>
+    <linearGradient id="faceTopMask" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#eef2f7" />
+      <stop offset="1" stop-color="#c3cedb" />
+    </linearGradient>
+    <linearGradient id="faceRightMask" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#93a4b8" />
+      <stop offset="1" stop-color="#5f6f82" />
+    </linearGradient>
+    <linearGradient id="faceLeftMask" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6b7b8e" />
+      <stop offset="1" stop-color="#3d4856" />
+    </linearGradient>
+  </defs>
+  <rect width="192" height="192" fill="#0a0b0d" />
+  <path d="M96 34 145 67 96 160 47 67Z" fill="none" stroke="rgba(226,234,244,0.5)" stroke-width="2" stroke-linejoin="round" />
+  <path d="M96 34 145 67 96 92 47 67Z" fill="url(#faceTopMask)" />
+  <path d="M145 67 96 92v68Z" fill="url(#faceRightMask)" />
+  <path d="M47 67 96 92v68Z" fill="url(#faceLeftMask)" />
+</svg>

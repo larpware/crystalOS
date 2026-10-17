@@ -1,0 +1,316 @@
+/* ==========================================================================
+   Proxied application surface (Drive, Spotify, Audiomack)
+
+   The surrounding chrome follows CrystalOS elevation; the proxied document
+   inside keeps its own look, which is the honest thing for a remote site.
+   ========================================================================== */
+
+.cr-proxy {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  background: var(--window-bg);
+}
+
+/* ---- toolbar ----------------------------------------------------------- */
+
+.cr-proxy__bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  flex: none;
+  background: var(--chrome-bar);
+  border-bottom: 1px solid var(--border-default);
+  box-shadow: var(--inset-highlight);
+}
+
+.cr-proxy__nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+}
+
+.cr-proxy__address {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: var(--radius-medium);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--inset-sunken);
+  color: var(--text-secondary);
+}
+
+.cr-proxy__address:focus-within {
+  border-color: var(--accent-primary-muted);
+  background: var(--surface-0);
+}
+
+.cr-proxy__address-icon {
+  flex: none;
+  color: var(--text-tertiary);
+}
+
+.cr-proxy__address input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--fs-sm);
+  outline: none;
+}
+
+.cr-proxy__address-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+}
+
+/* ---- status ------------------------------------------------------------ */
+
+.cr-proxy__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  height: 24px;
+  padding: 0 9px 0 8px;
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-xs);
+  letter-spacing: .01em;
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--inset-highlight);
+}
+
+.cr-proxy__status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-tertiary);
+  flex: none;
+}
+
+.cr-proxy__status[data-tone="ok"] {
+  color: var(--accent-on-muted);
+  background: var(--accent-primary-muted);
+  border-color: color-mix(in srgb, var(--accent-primary) 26%, transparent);
+}
+
+.cr-proxy__status[data-tone="ok"] .cr-proxy__status-dot {
+  background: var(--accent-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-primary) 22%, transparent);
+}
+
+.cr-proxy__status[data-tone="busy"] {
+  color: var(--text-secondary);
+}
+
+.cr-proxy__status[data-tone="busy"] .cr-proxy__status-dot {
+  background: var(--accent-warning);
+  animation: cr-proxy-pulse 1.4s var(--ease-standard) infinite;
+}
+
+.cr-proxy__status[data-tone="bad"] {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--accent-danger) 18%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--accent-danger) 34%, transparent);
+}
+
+.cr-proxy__status[data-tone="bad"] .cr-proxy__status-dot {
+  background: var(--accent-danger);
+}
+
+.cr-proxy__retry {
+  margin-left: 4px;
+  border: 0;
+  padding: 0 6px;
+  height: 18px;
+  border-radius: var(--radius-small);
+  background: var(--surface-3);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--fs-xxs);
+  cursor: pointer;
+}
+
+.cr-proxy__retry:hover {
+  background: var(--surface-hover);
+}
+
+/* ---- per-application proxy switch --------------------------------------
+   Same square icon button the Browser toolbar uses: the state is carried by
+   the icon and the tooltip, not by a label that has to be read on every glance.
+   It keeps the toolbar's 24px control height, so the row stays aligned. */
+
+.cr-proxy__toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-small, 6px);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard);
+}
+
+.cr-proxy__toggle:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.cr-proxy__toggle[data-on="true"] {
+  color: var(--accent-on-muted);
+  background: var(--accent-primary-muted);
+  border-color: color-mix(in srgb, var(--accent-primary) 26%, transparent);
+}
+
+.cr-proxy__toggle[data-on="true"]:hover {
+  background: color-mix(in srgb, var(--accent-primary-muted) 70%, var(--surface-hover));
+}
+
+/* The window asks for the proxy but the backend cannot serve it. */
+.cr-proxy__toggle[data-tone="bad"] {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--accent-danger) 18%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--accent-danger) 34%, transparent);
+}
+
+@keyframes cr-proxy-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .35; }
+}
+
+/* ---- viewport ---------------------------------------------------------- */
+
+.cr-proxy__viewport {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  background: var(--surface-sunken);
+}
+
+.cr-proxy__frame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+  background: #fff;
+}
+
+.cr-proxy__overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 32px;
+  text-align: center;
+  background: var(--surface-0);
+  color: var(--text-primary);
+}
+
+.cr-proxy__overlay[data-kind="error"] {
+  background: var(--surface-sunken);
+}
+
+.cr-proxy__overlay h3 {
+  margin: 4px 0 0;
+  font-size: var(--fs-md);
+  font-weight: 600;
+}
+
+.cr-proxy__overlay p {
+  margin: 0;
+  max-width: 46ch;
+  font-size: var(--fs-sm);
+  color: var(--text-tertiary);
+  line-height: 1.55;
+}
+
+.cr-proxy__overlay-note {
+  font-size: var(--fs-xs) !important;
+}
+
+.cr-proxy__overlay-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: var(--radius-large);
+  color: var(--accent-danger);
+  background: color-mix(in srgb, var(--accent-danger) 14%, var(--surface-2));
+  border: 1px solid color-mix(in srgb, var(--accent-danger) 26%, transparent);
+  box-shadow: var(--inset-highlight);
+}
+
+.cr-proxy__overlay-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.cr-proxy__spinner {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid var(--border-default);
+  border-top-color: var(--accent-primary);
+  animation: cr-proxy-spin 900ms linear infinite;
+}
+
+@keyframes cr-proxy-spin {
+  to { transform: rotate(360deg); }
+}
+
+:root[data-motion="reduced"] .cr-proxy__spinner,
+:root[data-motion="reduced"] .cr-proxy__status-dot {
+  animation: none;
+}
+
+/* ---- direct mode -------------------------------------------------------
+   Shown when an application loads its destination without Scramjet: the
+   warning strip that keeps the page inside this window and offers the proxy. */
+.cr-proxy__direct-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--accent-warning) 12%, transparent);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.cr-proxy__direct-bar > svg {
+  flex: none;
+  color: var(--accent-warning);
+}
+
+.cr-proxy__direct-bar > span {
+  flex: 1;
+  min-width: 0;
+}

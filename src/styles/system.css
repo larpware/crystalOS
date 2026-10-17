@@ -1,0 +1,767 @@
+/* ==========================================================================
+   Lock screen and first-run setup
+   ========================================================================== */
+
+/* ---- boot screen ------------------------------------------------------- *
+ * Shown while the shell is doing real startup work. It is built from the theme
+ * like any other surface, so a boot on Ivy is green and a boot on Daylight is
+ * light — the first thing the OS draws already belongs to the chosen theme.
+ */
+.cr-boot {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-lock);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 26px;
+  background: radial-gradient(120% 100% at 50% 0%, var(--surface-1) 0%, var(--bg-root) 62%);
+  color: var(--text-primary);
+  animation: cr-fade-in 260ms var(--ease-standard);
+}
+
+.cr-boot__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.cr-boot__mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 78px;
+  height: 78px;
+  border-radius: 22px;
+  background: var(--icon-surface);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--inset-highlight), var(--shadow-1);
+  color: #fff;
+  animation: cr-boot-mark 520ms var(--ease-snappy) both;
+}
+
+@keyframes cr-boot-mark {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.cr-boot__wordmark {
+  font-size: var(--fs-md);
+  font-weight: 550;
+  letter-spacing: -0.01em;
+}
+
+.cr-boot__wordmark span {
+  color: var(--text-tertiary);
+  font-weight: 450;
+}
+
+.cr-boot__track {
+  width: 184px;
+  height: 3px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--surface-active);
+}
+
+.cr-boot__fill {
+  display: block;
+  height: 100%;
+  transform-origin: left center;
+  transform: scaleX(0);
+  background: var(--accent-primary);
+  transition: transform 420ms var(--ease-standard);
+}
+
+.cr-boot__step {
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+  min-height: 1.4em;
+}
+
+.cr-boot__footer {
+  position: absolute;
+  bottom: 22px;
+  display: flex;
+  gap: 10px;
+  font-size: var(--fs-xxs);
+  color: var(--text-muted);
+}
+
+/* ---- lock screen ------------------------------------------------------- */
+.cr-lock {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-lock);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  overflow: hidden;
+  /* Lock text is white over a photograph because that is the only thing that
+     is reliably legible over an arbitrary picture. On a solid theme background
+     there is no picture to fight, so the theme's own text colours take over. */
+  --lock-fg: #fff;
+  --lock-fg-soft: rgba(255, 255, 255, 0.72);
+  --lock-fg-dim: rgba(255, 255, 255, 0.6);
+  animation: cr-fade-in 320ms var(--ease-standard);
+}
+
+.cr-lock[data-bg="solid"] {
+  --lock-fg: var(--text-primary);
+  --lock-fg-soft: var(--text-secondary);
+  --lock-fg-dim: var(--text-tertiary);
+}
+
+.cr-lock[data-blur="true"] .cr-wallpaper__image,
+.cr-lock[data-blur="true"] .cr-wallpaper__canvas {
+  filter: blur(14px) saturate(0.9);
+  transform: scale(1.06);
+}
+
+/* A "solid" lock background drops the wallpaper entirely, so the lock screen
+   is legible over any theme without depending on the picture behind it. */
+.cr-lock[data-bg="solid"] .cr-wallpaper {
+  opacity: 0;
+}
+
+.cr-lock[data-bg="solid"] {
+  background: var(--bg-root);
+}
+
+.cr-lock__depth {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(4, 5, 8, 0.32) 0%, rgba(4, 5, 8, 0.62) 100%);
+  opacity: var(--lock-depth, 1);
+}
+
+/* The "dark" background style deepens the veil without hiding the picture. */
+.cr-lock[data-bg="dark"] .cr-lock__depth {
+  background: linear-gradient(180deg, rgba(4, 5, 8, 0.58) 0%, rgba(4, 5, 8, 0.86) 100%);
+  opacity: 1;
+}
+
+/* The user-chosen extra darkening sits above the wallpaper and below the UI. */
+.cr-lock__dim {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  pointer-events: none;
+}
+
+.cr-lock__content {
+  position: relative;
+  width: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 46px;
+  padding: 40px 24px;
+  transition: align-items var(--dur-normal) var(--ease-standard),
+    justify-content var(--dur-normal) var(--ease-standard);
+}
+
+.cr-lock__clock {
+  text-align: center;
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.5);
+}
+
+.cr-lock__clock[data-align="left"] {
+  text-align: left;
+}
+
+.cr-lock__clock[data-align="right"] {
+  text-align: right;
+}
+
+.cr-lock__date {
+  font-size: var(--fs-md);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--lock-fg-soft);
+}
+
+.cr-lock__time {
+  font-size: calc(84px * var(--lock-clock-scale, 1));
+  font-weight: 300;
+  letter-spacing: -0.045em;
+  line-height: 1.05;
+  color: var(--lock-fg);
+}
+
+.cr-lock[data-bg="solid"] .cr-lock__clock {
+  text-shadow: none;
+}
+
+.cr-lock[data-bg="solid"] .cr-lock__time {
+  font-weight: 250;
+}
+
+.cr-lock__clock[data-style="compact"] .cr-lock__time {
+  font-size: calc(56px * var(--lock-clock-scale, 1));
+  font-weight: 400;
+}
+
+.cr-lock__message {
+  margin-top: 6px;
+  font-size: var(--fs-sm);
+  color: var(--lock-fg-soft);
+}
+
+/* The identity block sits on its own themed surface rather than floating on the
+   picture: the sign-in field, the error text and the hint all need a stable
+   ground under them, and that ground should be the active theme's, not a
+   hard-coded dark card. */
+.cr-lock__identity {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: min(420px, 100%);
+  padding: 22px 20px;
+  border-radius: 22px;
+  border: 1px solid color-mix(in srgb, var(--edge-light) 45%, transparent);
+  background: linear-gradient(
+    color-mix(in srgb, var(--modal-bg) 82%, transparent),
+    color-mix(in srgb, var(--modal-bg) 72%, transparent)
+  );
+  box-shadow: var(--shadow-2), var(--inset-highlight);
+}
+
+@media not (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="reduced"]):not([data-transparency="reduced"]) .cr-lock__identity {
+    backdrop-filter: blur(24px) saturate(1.25);
+    -webkit-backdrop-filter: blur(24px) saturate(1.25);
+  }
+}
+
+:root[data-transparency="reduced"] .cr-lock__identity {
+  background: var(--modal-bg);
+}
+
+.cr-lock[data-bg="solid"] .cr-lock__identity {
+  background: var(--surface-1);
+  border-color: var(--border-default);
+}
+
+.cr-lock__identity[data-shake="true"] {
+  animation: cr-shake 400ms var(--ease-standard);
+}
+
+@keyframes cr-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-7px);
+  }
+  40% {
+    transform: translateX(6px);
+  }
+  60% {
+    transform: translateX(-4px);
+  }
+  80% {
+    transform: translateX(2px);
+  }
+}
+
+.cr-lock__avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background: var(--icon-surface);
+  border: 1px solid var(--border-default);
+  box-shadow: var(--inset-highlight);
+  color: var(--text-secondary);
+  overflow: hidden;
+}
+
+.cr-lock__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cr-lock__name {
+  font-size: var(--fs-lg);
+  font-weight: 550;
+  color: var(--text-primary);
+}
+
+.cr-lock__form {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.cr-lock__field {
+  flex: 1;
+  height: 36px;
+  background: var(--surface-sunken);
+  border-color: var(--border-default);
+  color: var(--text-primary);
+}
+
+.cr-lock__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.cr-lock__error {
+  font-size: var(--fs-sm);
+  color: var(--accent-danger);
+  text-align: center;
+}
+
+.cr-lock__hint {
+  font-size: var(--fs-xs);
+  color: var(--lock-fg-dim);
+  text-align: center;
+  max-width: 320px;
+  line-height: 1.5;
+}
+
+.cr-lock__power {
+  position: relative;
+  display: flex;
+  gap: 6px;
+  padding: 0 0 26px;
+}
+
+.cr-lock__power-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 14px;
+  border-radius: var(--radius-medium);
+  border: 1px solid transparent;
+  font-size: var(--fs-xs);
+  color: var(--lock-fg-soft);
+  transition: background var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard);
+}
+
+.cr-lock__power-button:hover {
+  background: color-mix(in srgb, var(--lock-fg) 12%, transparent);
+  border-color: color-mix(in srgb, var(--lock-fg) 18%, transparent);
+  color: var(--lock-fg);
+}
+
+/* ---- setup wizard ------------------------------------------------------ */
+.cr-setup {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-lock);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 22px;
+  background: radial-gradient(120% 100% at 50% 0%, var(--surface-1) 0%, var(--bg-root) 70%);
+}
+
+.cr-setup__panel {
+  display: flex;
+  width: min(1020px, 100%);
+  height: min(660px, 100%);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-large);
+  background: var(--surface-0);
+  box-shadow: var(--shadow-3);
+  overflow: hidden;
+}
+
+.cr-setup__rail {
+  display: flex;
+  flex-direction: column;
+  width: 236px;
+  flex: none;
+  padding: 20px 16px;
+  border-right: 1px solid var(--border-subtle);
+  background: var(--surface-1);
+}
+
+.cr-setup__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 26px;
+  color: var(--accent-primary);
+}
+
+.cr-setup__brand-name {
+  font-size: var(--fs-md);
+  font-weight: 650;
+  color: var(--text-primary);
+  letter-spacing: -0.015em;
+}
+
+.cr-setup__brand-sub {
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+}
+
+.cr-setup__steps {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cr-setup__steps li {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 8px;
+  border-radius: var(--radius-small);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
+.cr-setup__steps li[data-active="true"] {
+  background: var(--accent-primary-muted);
+  color: var(--text-primary);
+  font-weight: 550;
+}
+
+.cr-setup__steps li[data-done="true"] {
+  color: var(--text-tertiary);
+}
+
+.cr-setup__step-index {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--border-default);
+  font-size: var(--fs-xxs);
+  color: var(--text-tertiary);
+}
+
+.cr-setup__steps li[data-active="true"] .cr-setup__step-index {
+  border-color: transparent;
+  background: var(--accent-primary);
+  color: var(--text-on-accent);
+}
+
+.cr-setup__rail-foot {
+  margin-top: auto;
+  font-size: var(--fs-xxs);
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.cr-setup__body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.cr-setup__content {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 30px 34px 18px;
+}
+
+.cr-setup__title {
+  font-size: var(--fs-2xl);
+  letter-spacing: -0.03em;
+}
+
+.cr-setup__lead {
+  margin-top: 7px;
+  max-width: 62ch;
+  font-size: var(--fs-base);
+  color: var(--text-tertiary);
+  line-height: 1.55;
+}
+
+.cr-setup__content-body {
+  margin-top: 24px;
+}
+
+.cr-setup__cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.cr-setup__cards--stack {
+  grid-template-columns: 1fr;
+}
+
+.cr-setup__card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 18px;
+  border-radius: var(--radius-medium);
+  border: 1px solid var(--border-default);
+  background: var(--surface-1);
+  color: var(--text-secondary);
+  text-align: left;
+  transition: border-color var(--dur-fast) var(--ease-standard),
+    background var(--dur-fast) var(--ease-standard);
+}
+
+.cr-setup__card:hover {
+  background: var(--surface-2);
+}
+
+.cr-setup__card[data-active="true"] {
+  border-color: color-mix(in srgb, var(--accent-primary) 55%, transparent);
+  background: var(--accent-primary-muted);
+}
+
+.cr-setup__card-title {
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.cr-setup__card-desc {
+  font-size: var(--fs-sm);
+  color: var(--text-tertiary);
+  line-height: 1.5;
+}
+
+.cr-setup__card-check {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent-primary);
+  color: var(--text-on-accent);
+}
+
+.cr-setup__note {
+  margin-top: 14px;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+.cr-setup__impact .cr-row__label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.cr-setup__themes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.cr-setup__theme {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border-radius: var(--radius-medium);
+  border: 1px solid var(--border-default);
+  background: var(--surface-1);
+  text-align: left;
+}
+
+.cr-setup__theme[data-active="true"] {
+  border-color: color-mix(in srgb, var(--accent-primary) 55%, transparent);
+  background: var(--accent-primary-muted);
+}
+
+.cr-setup__theme-preview {
+  position: relative;
+  display: block;
+  height: 52px;
+  border-radius: var(--radius-small);
+  border: 1px solid var(--border-subtle);
+  overflow: hidden;
+}
+
+.cr-setup__theme-preview span {
+  position: absolute;
+  border-radius: var(--radius-xs);
+}
+
+.cr-setup__theme-preview span:first-child {
+  left: 7px;
+  top: 8px;
+  width: 46px;
+  height: 22px;
+}
+
+.cr-setup__theme-preview span:last-child {
+  right: 8px;
+  bottom: 8px;
+  width: 24px;
+  height: 8px;
+}
+
+.cr-setup__theme-name {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.cr-setup__theme-desc {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.cr-setup__accent-row,
+.cr-setup__scale {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.cr-setup__scale input[type="range"] {
+  flex: 1;
+  accent-color: var(--accent-primary);
+}
+
+.cr-setup__accents {
+  display: flex;
+  gap: 6px;
+}
+
+.cr-setup__accent {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text-tertiary);
+}
+
+.cr-setup__accent[data-active="true"] {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-primary) 60%, transparent);
+}
+
+.cr-setup__form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 420px;
+}
+
+.cr-setup__guest {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px;
+  border-radius: var(--radius-medium);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-1);
+}
+
+.cr-setup__summary {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.cr-setup__summary li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--fs-base);
+  color: var(--text-tertiary);
+}
+
+.cr-setup__summary strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.cr-setup__checklist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.cr-setup__check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 9px;
+  border-radius: var(--radius-small);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-1);
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+}
+
+.cr-setup__check svg {
+  color: var(--accent-success);
+}
+
+.cr-setup__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex: none;
+  padding: 14px 24px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--surface-1);
+}
+
+.cr-setup__footer-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cr-setup__step-count {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
+@media (max-width: 900px) {
+  .cr-setup__rail {
+    display: none;
+  }
+  .cr-setup__content {
+    padding: 22px 20px 14px;
+  }
+  .cr-setup__title {
+    font-size: var(--fs-xl);
+  }
+}

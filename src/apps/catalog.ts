@@ -1,0 +1,402 @@
+import type { AppCapability, AppCategory } from "@/types";
+import type { IconName } from "@/icons/icons";
+
+/* ==========================================================================
+   Application catalogue
+
+   Metadata only — no React imports — so the launcher, store, dock and the
+   `openApp` service can all read it without pulling in application code.
+   Components are attached in `registry.tsx`.
+
+   `system: true` means the application ships with CrystalOS and always
+   exists in this build: it never appears in the Store as something to install
+   or remove. Applications without the flag are bundled but optional, and those
+   are the ones the Store manages.
+   ========================================================================== */
+
+export interface AppMeta {
+  id: string;
+  name: string;
+  summary: string;
+  icon: IconName;
+  category: AppCategory;
+  defaultSize: { width: number; height: number };
+  minSize: { width: number; height: number };
+  resizable?: boolean;
+  /** Reuse a single window instead of allowing several instances. */
+  singleton?: boolean;
+  /** Show in the dock by default for new profiles. */
+  pinnedByDefault?: boolean;
+  /** Ships with the OS; cannot be removed and is not listed in the Store. */
+  system?: boolean;
+  /** Bundled but optional: the Store can disable and re-enable it. */
+  optional?: boolean;
+  capabilities?: AppCapability[];
+  version: string;
+  /** Feature bullets used by the store detail view. */
+  features: string[];
+}
+
+export const appCatalog: AppMeta[] = [
+  {
+    id: "browser",
+    name: "CrystalOS Browser",
+    summary: "Tabbed browsing where every tab is proxied by Scramjet.",
+    icon: "browser",
+    category: "internet",
+    defaultSize: { width: 1080, height: 720 },
+    minSize: { width: 480, height: 380 },
+    pinnedByDefault: true,
+    system: true,
+    capabilities: ["network", "storage"],
+    version: "2.0.0",
+    features: [
+      "Each tab owns a Scramjet frame with its own history",
+      "Bookmarks, history and download records",
+      "Per-tab proxied navigation through the shared proxy service",
+      "Honest failure states when the proxy or a site refuses to load",
+    ],
+  },
+  {
+    id: "crystalvpn",
+    name: "CrystalVPN",
+    summary: "One-click, account-free VPN — the CrystalOS Browser uses it by default.",
+    icon: "shield",
+    category: "internet",
+    defaultSize: { width: 760, height: 680 },
+    minSize: { width: 460, height: 440 },
+    singleton: true,
+    system: true,
+    capabilities: ["network"],
+    version: "1.0.0",
+    features: [
+      "Quick connect finds a working public proxy automatically — no host, port or account to enter",
+      "Connects through a proxy endpoint you name, when you would rather choose one",
+      "Tests the endpoint with a real CONNECT before connecting, instead of fetching a server list",
+      "Protects the Scramjet/Wisp traffic path, and blocks it rather than leaking when it cannot",
+      "States which traffic paths are protected and which are not, path by path",
+    ],
+  },
+  {
+    id: "drive",
+    name: "Drive",
+    summary: "Google Drive through the Scramjet proxy, in a CrystalOS window.",
+    icon: "drive",
+    category: "internet",
+    defaultSize: { width: 1080, height: 720 },
+    minSize: { width: 480, height: 400 },
+    pinnedByDefault: true,
+    system: true,
+    capabilities: ["network"],
+    version: "1.0.0",
+    features: [
+      "Loads the real drive.google.com through Scramjet",
+      "Sign-in and file handling stay on Google's own pages",
+      "Navigation and loading state reported by the proxy",
+    ],
+  },
+  {
+    id: "discord",
+    name: "Discord",
+    summary: "Discord in a CrystalOS window, proxied by Scramjet.",
+    icon: "discord",
+    category: "internet",
+    defaultSize: { width: 1080, height: 720 },
+    minSize: { width: 480, height: 400 },
+    pinnedByDefault: true,
+    optional: true,
+    capabilities: ["network"],
+    version: "1.0.0",
+    features: [
+      "Loads discord.com/app through the shared Scramjet service",
+      "Sign-in, servers and messages are handled by Discord",
+      "Navigation and loading state reported by the proxy",
+    ],
+  },
+  {
+    id: "spotify",
+    name: "Spotify",
+    summary: "The Spotify web player, proxied by Scramjet.",
+    icon: "spotify",
+    category: "media",
+    defaultSize: { width: 1080, height: 720 },
+    minSize: { width: 480, height: 400 },
+    pinnedByDefault: true,
+    optional: true,
+    capabilities: ["network"],
+    version: "1.0.0",
+    features: [
+      "Loads open.spotify.com through the shared Scramjet service",
+      "Playback and account state are Spotify's own",
+    ],
+  },
+  {
+    id: "audiomack",
+    name: "Audiomack",
+    summary: "Audiomack through the Scramjet proxy.",
+    icon: "audiomack",
+    category: "media",
+    defaultSize: { width: 1080, height: 720 },
+    minSize: { width: 480, height: 400 },
+    pinnedByDefault: true,
+    optional: true,
+    capabilities: ["network"],
+    version: "1.0.0",
+    features: [
+      "Loads audiomack.com through the shared Scramjet service",
+      "Streaming and sign-in are Audiomack's own",
+    ],
+  },
+  {
+    id: "qmovies",
+    name: "QMovies",
+    summary: "A movie and series app: the local QMovies project, in a window of its own.",
+    icon: "qmovies",
+    category: "media",
+    defaultSize: { width: 1160, height: 740 },
+    minSize: { width: 520, height: 400 },
+    pinnedByDefault: true,
+    optional: true,
+    capabilities: ["network"],
+    version: "1.2.0",
+    features: [
+      "Runs the local QMovies project from the QMovies workspace on this machine",
+      "Loads it directly in this window, or through Scramjet with the toolbar button",
+      "Browsing, search and playback are QMovies' own service",
+    ],
+  },
+  {
+    id: "messages",
+    name: "Chat",
+    summary: "Friend codes, direct messages and servers on the local mesh.",
+    icon: "messages",
+    category: "internet",
+    defaultSize: { width: 960, height: 640 },
+    minSize: { width: 520, height: 400 },
+    pinnedByDefault: true,
+    system: true,
+    capabilities: ["network", "microphone", "camera", "notifications"],
+    version: "1.2.0",
+    features: [
+      "A stable friend code per account, with copy and lookup",
+      "Friend requests with real pending, accepted and duplicate states",
+      "Direct messages, groups and servers on the documented local transport",
+      "WebRTC voice and video calls with real media streams",
+    ],
+  },
+  {
+    id: "music",
+    name: "Music",
+    summary: "Your own audio files. The library starts empty.",
+    icon: "music",
+    category: "media",
+    defaultSize: { width: 900, height: 600 },
+    minSize: { width: 520, height: 400 },
+    pinnedByDefault: true,
+    system: true,
+    capabilities: ["storage"],
+    version: "2.0.0",
+    features: [
+      "Add Music: pick local MP3 files from this device",
+      "Queue, seek, shuffle, repeat and volume",
+      "Nothing is uploaded; files stay in this browser profile",
+    ],
+  },
+  {
+    id: "terminal",
+    name: "CrystalOS Terminal",
+    summary: "Command line for the OS, shell and filesystem.",
+    icon: "terminal",
+    category: "system",
+    defaultSize: { width: 760, height: 460 },
+    minSize: { width: 420, height: 260 },
+    pinnedByDefault: true,
+    system: true,
+    capabilities: ["filesystem"],
+    version: "1.3.0",
+    features: [
+      "Structured parser with history and tab completion",
+      "Filesystem commands mapped to the virtual filesystem",
+      "Shell commands: open, cat, ls, notify, lock, hz",
+    ],
+  },
+  {
+    id: "settings",
+    name: "Settings",
+    summary: "Configure the shell, appearance, applications and system.",
+    icon: "settings",
+    category: "system",
+    defaultSize: { width: 1000, height: 660 },
+    minSize: { width: 560, height: 420 },
+    pinnedByDefault: true,
+    system: true,
+    singleton: true,
+    version: "2.0.0",
+    features: [
+      "Sectioned settings with search across every page",
+      "Themes, wallpapers, icons, dock, widgets and tab identity",
+      "Performance, privacy, accounts and system diagnostics",
+    ],
+  },
+  {
+    id: "wallpaper",
+    name: "Wallpaper Library",
+    summary: "Browse, apply and import wallpapers and live scenes.",
+    icon: "wallpaper",
+    category: "system",
+    defaultSize: { width: 1000, height: 660 },
+    minSize: { width: 520, height: 400 },
+    system: true,
+    singleton: true,
+    capabilities: ["storage"],
+    version: "1.3.0",
+    features: [
+      "Built-in photographic and gradient sets",
+      "Import images and video wallpapers locally",
+      "Live scene controls with quality settings",
+    ],
+  },
+  {
+    id: "store",
+    name: "CrystalOS Store",
+    summary: "Enable or remove the optional applications bundled with the OS.",
+    icon: "store",
+    category: "utilities",
+    defaultSize: { width: 920, height: 620 },
+    minSize: { width: 520, height: 400 },
+    system: true,
+    singleton: true,
+    version: "2.0.0",
+    features: [
+      "Optional applications only — system apps are never listed",
+      "Enable and remove optional applications for this profile",
+      "Version state read from the real registry",
+    ],
+  },
+  {
+    id: "games",
+    name: "CrystalOS Games",
+    summary: "A large browser game catalogue with a native player.",
+    icon: "games",
+    category: "games",
+    defaultSize: { width: 1080, height: 700 },
+    minSize: { width: 560, height: 420 },
+    system: true,
+    capabilities: ["network"],
+    version: "2.2.0",
+    features: [
+      "Curated catalogue with categories and search",
+      "Favourites, recently played and play sessions",
+      "Fullscreen player with keyboard capture",
+    ],
+  },
+  {
+    id: "trash",
+    name: "Trash",
+    summary: "Review deleted files, restore them or empty the trash.",
+    icon: "trash",
+    category: "system",
+    defaultSize: { width: 860, height: 560 },
+    minSize: { width: 460, height: 340 },
+    system: true,
+    singleton: true,
+    capabilities: ["filesystem"],
+    version: "1.2.0",
+    features: ["Restore individual items", "Empty trash with confirmation"],
+  },
+  {
+    id: "library",
+    name: "Game Library",
+    summary: "Collection-first view of everything you can launch.",
+    icon: "library",
+    category: "games",
+    defaultSize: { width: 1000, height: 660 },
+    minSize: { width: 520, height: 400 },
+    singleton: true,
+    optional: true,
+    version: "1.1.0",
+    features: [
+      "Grid and list library views",
+      "Collections by category and play history",
+      "Installed versus available state, no invented progress",
+    ],
+  },
+  {
+    id: "notes",
+    name: "Notes",
+    summary: "Plain text notes stored in the CrystalOS filesystem.",
+    icon: "notes",
+    category: "productivity",
+    defaultSize: { width: 780, height: 540 },
+    minSize: { width: 420, height: 320 },
+    optional: true,
+    capabilities: ["filesystem"],
+    version: "1.1.0",
+    features: [
+      "Notes are real files in ~/Documents/Notes",
+      "Autosave with a change indicator",
+      "Open a text file from the desktop straight into Notes",
+    ],
+  },
+  {
+    id: "media",
+    name: "Media",
+    summary: "Video and audio player for local files.",
+    icon: "media",
+    category: "media",
+    defaultSize: { width: 920, height: 620 },
+    minSize: { width: 480, height: 360 },
+    optional: true,
+    capabilities: ["storage"],
+    version: "1.1.0",
+    features: ["Local video playback", "Playlist from recent media", "Keyboard transport controls"],
+  },
+  {
+    id: "calculator",
+    name: "Calculator",
+    summary: "Keyboard-driven calculator with expression history.",
+    icon: "calculator",
+    category: "utilities",
+    defaultSize: { width: 340, height: 500 },
+    minSize: { width: 300, height: 460 },
+    resizable: false,
+    optional: true,
+    version: "1.1.0",
+    features: ["Standard and scientific modes", "Session history with reuse"],
+  },
+  {
+    id: "updates",
+    name: "Update Log",
+    summary: "Release notes for the OS and bundled applications.",
+    icon: "updates",
+    category: "system",
+    defaultSize: { width: 800, height: 620 },
+    minSize: { width: 460, height: 360 },
+    singleton: true,
+    optional: true,
+    version: "1.1.0",
+    features: ["Expandable release notes from the real version manifest"],
+  },
+];
+
+export function metaFor(appId: string): AppMeta | undefined {
+  return appCatalog.find((app) => app.id === appId);
+}
+
+/** Applications the Store manages: bundled, optional, never system apps. */
+export function optionalApps(): AppMeta[] {
+  return appCatalog.filter((meta) => !meta.system);
+}
+
+export function systemApps(): AppMeta[] {
+  return appCatalog.filter((meta) => meta.system);
+}
+
+/*
+ * Note: this module deliberately imports nothing from ./registry. Registry
+ * imports the catalogue, so a catalogue that imported registry back would form
+ * a cycle — and a cycle like that is only one entry-point reorder away from
+ * evaluating the registry before `appCatalog` exists, which is a blank desktop
+ * with a ReferenceError in the console. "Which apps are implemented" belongs to
+ * the registry, and lives there (`implementedApps`).
+ */

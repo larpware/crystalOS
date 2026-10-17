@@ -1,0 +1,46 @@
+{
+  "name": "crystalos",
+  "private": true,
+  "version": "1.2.0",
+  "type": "module",
+  "description": "CrystalOS - a browser-based desktop environment",
+  "scripts": {
+    "dev": "node server/dev.mjs",
+    "dev:vite": "vite",
+    "dev:all": "node server/dev.mjs",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"server/**/*.test.mjs\" \"src/**/*.test.mjs\"",
+    "test:accounts": "node --test server/accounts/api.test.mjs",
+    "test:health": "node --test server/health.test.mjs",
+    "test:units": "node --test \"src/**/*.test.mjs\"",
+    "preview": "vite preview",
+    "lint": "eslint src --max-warnings 0",
+    "scramjet": "node server/scramjet/index.js",
+    "start": "node server/scramjet/index.js",
+    "vpn": "node server/vpn/cli.mjs"
+  },
+  "dependencies": {
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "zustand": "^5.0.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "@mercuryworkshop/libcurl-transport": "^2.0.5",
+    "@mercuryworkshop/proxy-bootstrap": "^0.0.5",
+    "@mercuryworkshop/scramjet": "^2.0.67-alpha.2",
+    "@mercuryworkshop/scramjet-controller": "^0.0.14",
+    "@mercuryworkshop/scramjet-utils": "^0.0.3",
+    "@types/node": "^22.10.5",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "eslint": "^9.17.0",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "globals": "^15.14.0",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.19.0",
+    "vite": "^6.0.7"
+  }
+}

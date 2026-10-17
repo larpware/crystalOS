@@ -1,0 +1,15 @@
+node_modules/
+dist/
+
+# Accounts database (SQLite + WAL sidecars) — created at runtime, never committed.
+server/accounts/data/
+
+# Proton VPN session (uid + tokens) — owner-only, created at runtime, never committed.
+server/vpn/data/
+dist-ssr/
+*.local
+.DS_Store
+*.log
+npm-debug.log*
+.vite/
+coverage/

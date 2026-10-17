@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" width="192" height="192" role="img" aria-label="CrystalOS">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#15181d" />
+      <stop offset="1" stop-color="#090a0c" />
+    </linearGradient>
+    <linearGradient id="faceTop" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#eef2f7" />
+      <stop offset="1" stop-color="#c3cedb" />
+    </linearGradient>
+    <linearGradient id="faceRight" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#93a4b8" />
+      <stop offset="1" stop-color="#5f6f82" />
+    </linearGradient>
+    <linearGradient id="faceLeft" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6b7b8e" />
+      <stop offset="1" stop-color="#3d4856" />
+    </linearGradient>
+  </defs>
+  <rect width="192" height="192" rx="44" fill="url(#bg)" />
+  <rect x="0.75" y="0.75" width="190.5" height="190.5" rx="43.25" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="1.5" />
+  <path d="M96 28 152 66 96 170 40 66Z" fill="none" stroke="rgba(226,234,244,0.5)" stroke-width="2.2" stroke-linejoin="round" />
+  <path d="M96 28 152 66 96 94 40 66Z" fill="url(#faceTop)" />
+  <path d="M152 66 96 94v76Z" fill="url(#faceRight)" />
+  <path d="M40 66 96 94v76Z" fill="url(#faceLeft)" />
+</svg>

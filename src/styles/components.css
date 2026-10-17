@@ -1,0 +1,1092 @@
+/* ==========================================================================
+   CrystalOS — component primitives
+   ========================================================================== */
+
+/* ---- button ------------------------------------------------------------ */
+.cr-btn {
+  --btn-bg: var(--surface-2);
+  --btn-bg-hover: var(--surface-hover);
+  --btn-fg: var(--text-primary);
+  --btn-border: var(--border-default);
+  --btn-sheen: var(--surface-sheen);
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: var(--radius-small);
+  border: 1px solid var(--btn-border);
+  background-color: var(--btn-bg);
+  /* A button is a small raised surface: a lit top edge, a shaded bottom edge
+     and a contact shadow underneath. --lift-1 is that whole model in one
+     token, and --surface-sheen is the light washing down its face. */
+  background-image: var(--btn-sheen);
+  color: var(--btn-fg);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  user-select: none;
+  box-shadow: var(--lift-1);
+  transition: background-color var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard),
+    box-shadow var(--dur-fast) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard), opacity var(--dur-fast) var(--ease-standard);
+}
+
+.cr-btn:hover:not(:disabled) {
+  background-color: var(--btn-bg-hover);
+}
+
+/* Pressing inverts the lighting: the surface reads as pushed into the panel. */
+.cr-btn:active:not(:disabled) {
+  box-shadow: var(--inset-sunken);
+  transform: translateY(0.5px);
+}
+
+.cr-btn:disabled {
+  opacity: 0.45;
+}
+
+.cr-btn--primary {
+  --btn-bg: var(--accent-primary);
+  --btn-bg-hover: var(--accent-primary-hover);
+  --btn-fg: var(--text-on-accent);
+  --btn-border: transparent;
+  font-weight: 550;
+  /* The accent also lights what it stands on. */
+  box-shadow: var(--lift-1),
+    0 4px 14px -6px color-mix(in srgb, var(--accent-primary) 70%, transparent);
+}
+
+.cr-btn--secondary {
+  --btn-bg: transparent;
+  --btn-bg-hover: var(--surface-2);
+  --btn-sheen: none;
+}
+
+.cr-btn--ghost {
+  --btn-bg: transparent;
+  --btn-bg-hover: var(--surface-2);
+  --btn-border: transparent;
+  --btn-fg: var(--text-secondary);
+  --btn-sheen: none;
+}
+
+/* A transparent button only gains its lit face once hover gives it a fill. */
+.cr-btn--secondary:hover:not(:disabled),
+.cr-btn--ghost:hover:not(:disabled) {
+  background-image: var(--surface-sheen);
+}
+
+.cr-btn--danger {
+  --btn-bg: color-mix(in srgb, var(--accent-danger) 16%, transparent);
+  --btn-bg-hover: color-mix(in srgb, var(--accent-danger) 26%, transparent);
+  --btn-fg: #ffb4af;
+  --btn-border: color-mix(in srgb, var(--accent-danger) 30%, transparent);
+}
+
+.cr-btn--sm {
+  height: 26px;
+  padding: 0 9px;
+  font-size: var(--fs-xs);
+}
+
+.cr-btn--lg {
+  height: 36px;
+  padding: 0 16px;
+  font-size: var(--fs-base);
+  /* A taller button needs a softer corner or it reads as a slab. */
+  border-radius: var(--radius-medium);
+}
+
+.cr-btn--icon {
+  width: 30px;
+  padding: 0;
+}
+
+.cr-btn--sm.cr-btn--icon {
+  width: 26px;
+}
+
+.cr-btn--lg.cr-btn--icon {
+  width: 36px;
+}
+
+.cr-btn--block {
+  width: 100%;
+}
+
+/* ---- icon button (bare) ------------------------------------------------ */
+.cr-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-small);
+  color: var(--text-tertiary);
+  transition: background var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard);
+}
+
+.cr-icon-btn:hover {
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+
+.cr-icon-btn:active {
+  background: var(--surface-3);
+}
+
+.cr-icon-btn[aria-pressed="true"] {
+  background: var(--accent-primary-muted);
+  color: var(--accent-on-muted);
+}
+
+/* ---- input ------------------------------------------------------------- */
+.cr-input,
+.cr-select,
+.cr-textarea {
+  width: 100%;
+  min-width: 0;
+  background-color: var(--surface-sunken);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-small);
+  color: var(--text-primary);
+  font-size: var(--fs-sm);
+  height: 30px;
+  padding: 0 10px;
+  /* A field is the one control pressed *into* the surface it sits on, so its
+     lighting is inverted: shadowed along the top edge, faintly lit along the
+     far one. */
+  box-shadow: var(--field-shadow);
+  transition: border-color var(--dur-fast) var(--ease-standard),
+    background-color var(--dur-fast) var(--ease-standard),
+    box-shadow var(--dur-fast) var(--ease-standard);
+}
+
+.cr-textarea {
+  height: auto;
+  min-height: 74px;
+  padding: 8px 10px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.cr-input::placeholder,
+.cr-textarea::placeholder {
+  color: var(--text-muted);
+}
+
+.cr-input:hover,
+.cr-select:hover,
+.cr-textarea:hover {
+  border-color: var(--border-strong);
+}
+
+.cr-input:focus,
+.cr-select:focus,
+.cr-textarea:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: var(--field-shadow), 0 0 0 3px var(--accent-primary-muted);
+}
+
+.cr-input:disabled,
+.cr-select:disabled {
+  opacity: 0.5;
+}
+
+.cr-input--invalid {
+  border-color: var(--accent-danger);
+}
+
+.cr-input--invalid:focus {
+  box-shadow: var(--field-shadow),
+    0 0 0 3px color-mix(in srgb, var(--accent-danger) 18%, transparent);
+}
+
+.cr-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.cr-field__label {
+  font-size: var(--fs-xs);
+  font-weight: 550;
+  color: var(--text-secondary);
+}
+
+.cr-field__hint {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
+.cr-field__error {
+  font-size: var(--fs-xs);
+  color: #ff9a94;
+}
+
+.cr-input-group {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.cr-input-group > .cr-input {
+  padding-left: 30px;
+}
+
+.cr-input-group__icon {
+  position: absolute;
+  left: 8px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.cr-input-group__action {
+  position: absolute;
+  right: 4px;
+}
+
+/* ---- select ------------------------------------------------------------ */
+.cr-select {
+  appearance: none;
+  padding-right: 24px;
+  /* A muted caret. Drawn in the foreground colour it read as content competing
+     with the value sitting next to it; a tertiary grey reads as the affordance
+     it actually is. */
+  background-image: linear-gradient(45deg, transparent 50%, var(--text-tertiary) 50%),
+    linear-gradient(135deg, var(--text-tertiary) 50%, transparent 50%);
+  background-position: calc(100% - 12px) 13px, calc(100% - 8px) 13px;
+  background-size: 4px 4px, 4px 4px;
+  background-repeat: no-repeat;
+  color: var(--text-primary);
+}
+
+.cr-select option {
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+
+/* ---- switch ------------------------------------------------------------ */
+.cr-switch {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  width: 42px;
+  height: 24px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  border: 1px solid var(--border-default);
+  /* The track is a channel the thumb runs in, so it takes the recessed
+     lighting rather than the raised one. */
+  box-shadow: var(--inset-sunken),
+    inset 0 -1px 0 color-mix(in srgb, var(--edge-light) 12%, transparent);
+  transition: background var(--dur-normal) var(--ease-standard),
+    border-color var(--dur-normal) var(--ease-standard),
+    box-shadow var(--dur-normal) var(--ease-standard);
+}
+
+.cr-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+  /* The thumb is a physical object: lit on top, casting onto the track. */
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--shadow-tint) 45%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  transition: transform var(--dur-normal) var(--ease-snappy),
+    background var(--dur-normal) var(--ease-standard);
+}
+
+.cr-switch[aria-checked="true"] {
+  background: var(--accent-primary);
+  border-color: transparent;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.cr-switch[aria-checked="true"]::after {
+  transform: translateX(18px);
+  background: #fff;
+}
+
+.cr-switch:disabled {
+  opacity: 0.45;
+}
+
+/* ---- slider ------------------------------------------------------------ */
+.cr-slider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.cr-slider__track {
+  position: relative;
+  flex: 1;
+  height: 18px;
+  display: flex;
+  align-items: center;
+}
+
+.cr-slider input[type="range"] {
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--surface-3);
+  cursor: pointer;
+}
+
+.cr-slider input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--text-primary);
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  transition: transform var(--dur-fast) var(--ease-standard);
+}
+
+.cr-slider input[type="range"]:hover::-webkit-slider-thumb {
+  transform: scale(1.12);
+}
+
+.cr-slider input[type="range"]::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--text-primary);
+  border: 1px solid rgba(0, 0, 0, 0.35);
+}
+
+.cr-slider input[type="range"]:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 3px;
+}
+
+.cr-slider__value {
+  width: 38px;
+  text-align: right;
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+}
+
+/* ---- segmented --------------------------------------------------------- */
+.cr-segmented {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  /* A segmented control is a recessed track with one raised thumb in it. */
+  background-color: var(--surface-sunken);
+  background-image: var(--surface-recess);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-small);
+  box-shadow: var(--inset-sunken);
+}
+
+.cr-segmented__item {
+  padding: 4px 12px;
+  border-radius: calc(var(--radius-small) - 2px);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  color: var(--text-tertiary);
+  transition: background-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard),
+    box-shadow var(--dur-fast) var(--ease-standard);
+}
+
+.cr-segmented__item:hover {
+  color: var(--text-primary);
+}
+
+.cr-segmented__item[aria-pressed="true"] {
+  background-color: var(--surface-3);
+  background-image: var(--surface-sheen);
+  color: var(--text-primary);
+  box-shadow: var(--lift-1);
+}
+
+/* ---- inline code -------------------------------------------------------
+   A code token inside a sentence: a real value quoted from the system, drawn in
+   the monospace face on a sunken chip so it does not read as prose. */
+.cr-code {
+  display: inline-block;
+  max-width: 100%;
+  padding: 1px 6px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border-subtle);
+  background-color: var(--surface-sunken);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  vertical-align: baseline;
+}
+
+/* ---- badge / chip ------------------------------------------------------ */
+.cr-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 7px;
+  /* Squared rather than a capsule, and flat rather than outlined. A status tag
+     is a label printed on a surface; the rounded, bordered sticker is the shape
+     that made every one of them look bolted on. */
+  border-radius: var(--radius-xs);
+  font-size: var(--fs-xxs);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  background: color-mix(in srgb, var(--surface-3) 70%, transparent);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.cr-badge--accent {
+  background: var(--accent-primary-muted);
+  color: var(--accent-on-muted);
+}
+
+.cr-badge--success {
+  background: color-mix(in srgb, var(--accent-success) 15%, transparent);
+  color: color-mix(in srgb, var(--accent-success) 64%, var(--text-primary));
+}
+
+.cr-badge--warning {
+  background: color-mix(in srgb, var(--accent-warning) 15%, transparent);
+  color: color-mix(in srgb, var(--accent-warning) 64%, var(--text-primary));
+}
+
+.cr-badge--danger {
+  background: color-mix(in srgb, var(--accent-danger) 15%, transparent);
+  color: color-mix(in srgb, var(--accent-danger) 60%, var(--text-primary));
+}
+
+.cr-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--radius-small);
+  border: 1px solid var(--border-subtle);
+  background-color: var(--surface-1);
+  background-image: var(--surface-sheen);
+  color: var(--text-tertiary);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  box-shadow: var(--lift-1);
+  transition: background-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard),
+    box-shadow var(--dur-fast) var(--ease-standard);
+}
+
+.cr-chip:hover {
+  background-color: var(--surface-2);
+  color: var(--text-primary);
+}
+
+.cr-chip[aria-pressed="true"] {
+  background-color: var(--accent-primary-muted);
+  border-color: color-mix(in srgb, var(--accent-primary) 28%, transparent);
+  color: var(--accent-on-muted);
+}
+
+/* ---- surface containers ------------------------------------------------
+   Named `cr-surface` on purpose: `cr-panel` is the shell's top panel, and a
+   stray all-sides border/radius here used to leak onto it. */
+.cr-surface {
+  background-color: var(--surface-1);
+  background-image: var(--surface-sheen);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-medium);
+  box-shadow: var(--lift-2);
+}
+
+/* Glass themes make panels and modals translucent. The effect is disabled
+   when transparency is reduced or contrast is high. */
+:root[data-glass="true"]:not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-surface,
+:root[data-glass="true"]:not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-popover {
+  background-color: color-mix(in srgb, var(--surface-1) 82%, transparent);
+  backdrop-filter: blur(14px) saturate(1.1);
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+}
+
+.cr-popover {
+  background-color: var(--surface-1);
+  background-image: var(--surface-sheen);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-medium);
+  box-shadow: var(--shadow-popover), var(--inset-highlight);
+  overflow: hidden;
+  animation: cr-pop-in var(--dur-normal) var(--ease-snappy);
+}
+
+@keyframes cr-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.cr-popover__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.cr-popover__title {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.cr-popover__body {
+  padding: 10px 12px;
+}
+
+/* ---- modal ------------------------------------------------------------- */
+.cr-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 5, 7, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: cr-fade-in var(--dur-normal) var(--ease-standard);
+}
+
+@keyframes cr-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.cr-modal {
+  width: 100%;
+  max-width: 480px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--surface-1);
+  background-image: var(--surface-sheen);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-large);
+  /* The highest thing on the desk: the floating level plus a lit top edge. */
+  box-shadow: var(--shadow-3), var(--inset-highlight);
+  overflow: hidden;
+  animation: cr-modal-in var(--dur-normal) var(--ease-snappy);
+}
+
+@keyframes cr-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.cr-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.cr-modal__title {
+  font-size: var(--fs-md);
+  font-weight: 600;
+}
+
+.cr-modal__body {
+  padding: 16px;
+  overflow: auto;
+  color: var(--text-secondary);
+  font-size: var(--fs-base);
+}
+
+.cr-modal__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--surface-0);
+}
+
+/* ---- settings-style rows ---------------------------------------------- */
+.cr-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.cr-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 46px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.cr-row:last-child {
+  border-bottom: 0;
+}
+
+.cr-row__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.cr-row__label {
+  /* These are used as both <div> and <span>; a label and its description must
+     always stack, otherwise an inline pair runs together on one line. */
+  display: block;
+  font-size: var(--fs-base);
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.cr-row__desc {
+  display: block;
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+  margin-top: 1px;
+  line-height: 1.4;
+}
+
+.cr-row__control {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cr-row--stack {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.cr-section {
+  margin-bottom: 30px;
+}
+
+/* Section headers are sentence-case with a hairline running to the edge of the
+   column. It gives a long settings page a spine to scan down, instead of a
+   stack of shouty uppercase labels that all look identical. */
+.cr-section__title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: var(--fs-base);
+  font-weight: 600;
+  letter-spacing: -0.008em;
+  color: var(--text-primary);
+  margin-bottom: 3px;
+}
+
+.cr-section__title::after {
+  content: "";
+  flex: 1;
+  min-width: 12px;
+  height: 1px;
+  background: var(--border-subtle);
+}
+
+.cr-section__desc {
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+  margin-bottom: 12px;
+  max-width: 74ch;
+  line-height: 1.55;
+}
+
+/* ---- list -------------------------------------------------------------- */
+.cr-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.cr-list-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: var(--radius-small);
+  text-align: left;
+  color: var(--text-secondary);
+  transition: background var(--dur-instant) var(--ease-standard),
+    color var(--dur-instant) var(--ease-standard);
+}
+
+.cr-list-item:hover {
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+
+.cr-list-item[aria-selected="true"],
+.cr-list-item[data-active="true"] {
+  background: var(--accent-primary-muted);
+  color: var(--text-primary);
+}
+
+/* ---- empty state ------------------------------------------------------- */
+.cr-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 42px 24px;
+  text-align: center;
+  color: var(--text-tertiary);
+}
+
+.cr-empty__icon {
+  color: var(--text-disabled);
+  margin-bottom: 4px;
+}
+
+.cr-empty__title {
+  font-size: var(--fs-base);
+  font-weight: 550;
+  color: var(--text-secondary);
+}
+
+.cr-empty__hint {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  max-width: 320px;
+  line-height: 1.5;
+}
+
+/* ---- spinner / skeleton / progress ------------------------------------ */
+.cr-spinner {
+  display: inline-block;
+  width: 15px;
+  height: 15px;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--text-secondary);
+  border-radius: 50%;
+  animation: cr-spin 640ms linear infinite;
+}
+
+@keyframes cr-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+:root[data-motion="reduced"] .cr-spinner {
+  animation-duration: 1400ms;
+}
+
+.cr-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--surface-2) 25%,
+    var(--surface-3) 37%,
+    var(--surface-2) 63%
+  );
+  background-size: 400% 100%;
+  border-radius: var(--radius-small);
+  animation: cr-shimmer 1.6s ease-in-out infinite;
+}
+
+@keyframes cr-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
+.cr-progress {
+  height: 4px;
+  width: 100%;
+  background: var(--surface-3);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.cr-progress__fill {
+  height: 100%;
+  background: var(--accent-primary);
+  border-radius: 2px;
+  transition: width var(--dur-normal) var(--ease-standard);
+}
+
+/* ---- tooltip ----------------------------------------------------------- */
+.cr-tooltip {
+  position: fixed;
+  z-index: var(--z-context);
+  padding: 4px 8px;
+  background: var(--surface-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-small);
+  font-size: var(--fs-xs);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-2);
+  pointer-events: none;
+  animation: cr-fade-in var(--dur-fast) var(--ease-standard);
+}
+
+/* ---- context menu ------------------------------------------------------ */
+.cr-menu {
+  position: fixed;
+  z-index: var(--z-context);
+  min-width: 196px;
+  padding: 5px;
+  background-color: var(--surface-1);
+  background-image: var(--surface-sheen);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-medium);
+  /* A menu floats well clear of the desk, so it takes the deepest level and a
+     lit top edge to say it is the thing nearest the pointer. */
+  box-shadow: var(--shadow-popover), var(--inset-highlight);
+  animation: cr-pop-in var(--dur-fast) var(--ease-snappy);
+}
+
+.cr-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 6px 9px;
+  border-radius: var(--radius-small);
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+  text-align: left;
+  transition: background var(--dur-instant) var(--ease-standard);
+}
+
+.cr-menu__item:hover:not(:disabled) {
+  background: var(--surface-3);
+  color: var(--text-primary);
+}
+
+.cr-menu__item:disabled {
+  color: var(--text-disabled);
+}
+
+.cr-menu__item--danger {
+  color: #ff9d97;
+}
+
+.cr-menu__item--danger:hover {
+  background: color-mix(in srgb, var(--accent-danger) 16%, transparent);
+  color: #ffc0bb;
+}
+
+.cr-menu__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cr-menu__hint {
+  font-size: var(--fs-xxs);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.cr-menu__sep {
+  height: 1px;
+  margin: 5px 4px;
+  background: var(--border-subtle);
+}
+
+/* ---- tabs -------------------------------------------------------------- */
+.cr-tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 0 10px;
+}
+
+.cr-tabs__tab {
+  position: relative;
+  padding: 9px 10px;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: var(--text-tertiary);
+  transition: color var(--dur-fast) var(--ease-standard);
+}
+
+.cr-tabs__tab:hover {
+  color: var(--text-primary);
+}
+
+.cr-tabs__tab[aria-selected="true"] {
+  color: var(--text-primary);
+}
+
+.cr-tabs__tab[aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: -1px;
+  height: 2px;
+  background: var(--accent-primary);
+  border-radius: 2px 2px 0 0;
+}
+
+/* ---- app chrome -------------------------------------------------------- */
+.cr-app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--window-bg);
+  color: var(--text-primary);
+}
+
+.cr-app__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  background-color: var(--surface-1);
+  background-image: var(--surface-sheen);
+}
+
+.cr-app__title {
+  font-size: var(--fs-base);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.cr-app__body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.cr-app__sidebar {
+  flex: none;
+  width: 200px;
+  border-right: 1px solid var(--border-subtle);
+  background: var(--surface-0);
+  overflow: auto;
+  padding: 8px;
+}
+
+.cr-split {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.cr-pad {
+  padding: 14px 16px;
+}
+
+.cr-divider {
+  height: 1px;
+  background: var(--border-subtle);
+}
+
+/* ---- error boundary ---------------------------------------------------- */
+.cr-crash {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 100%;
+  padding: 30px;
+  text-align: center;
+}
+
+.cr-crash__title {
+  font-size: var(--fs-md);
+  font-weight: 600;
+}
+
+.cr-crash__detail {
+  max-width: 520px;
+  max-height: 160px;
+  overflow: auto;
+  padding: 9px 11px;
+  border-radius: var(--radius-small);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+  text-align: left;
+  white-space: pre-wrap;
+}
+
+/* ---- account form ------------------------------------------------------ */
+
+.cr-account-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 360px;
+}
+
+.cr-account-form .cr-segmented {
+  align-self: flex-start;
+}
+
+.cr-account-form .cr-btn--primary {
+  align-self: flex-start;
+}
+
+.cr-account-form .cr-row__desc {
+  margin: 0;
+}
+
+.cr-friend-code {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cr-friend-code .cr-btn {
+  flex: none;
+}

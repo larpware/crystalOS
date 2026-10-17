@@ -1,0 +1,27 @@
+{
+  "name": "CrystalOS",
+  "short_name": "CrystalOS",
+  "description": "A browser-based desktop environment: window manager, applications, themes and wallpapers.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "background_color": "#08090b",
+  "theme_color": "#0b0d10",
+  "orientation": "any",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/icons/crystal.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/crystal-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

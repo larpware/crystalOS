@@ -1,0 +1,520 @@
+/* ==========================================================================
+   VPN — CrystalVPN's one surface
+
+   Both applications present the same thing: one tunnel, what state it is in,
+   and which traffic CrystalOS can and cannot carry. They share this stylesheet
+   so the two read as one product line rather than two separate designs.
+
+   The centrepiece is the connection deck. Its tint, its shield ring and its
+   headline all answer to the real state of the tunnel, so the answer to "am I
+   protected" is legible before a single word is read. Everything below it is
+   detail — endpoint, coverage, verification — and the prose folds away when it
+   is not being read.
+
+   Nothing here claims a state the backend did not report: the colours are the
+   only thing the state drives, and the copy comes from the store.
+   ========================================================================== */
+
+.cr-vpn {
+  /* One place decides the colour of the current state; the deck wash, the
+     shield ring and the card edge all read from it. */
+  --state-tint: var(--text-tertiary);
+  --state-wash: color-mix(in srgb, var(--state-tint) 15%, transparent);
+
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  height: 100%;
+  min-height: 0;
+  padding: 18px 20px 26px;
+  overflow-y: auto;
+  background: var(--window-bg);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: var(--fs-base);
+}
+
+.cr-vpn[data-status="connected"] {
+  --state-tint: var(--accent-success);
+}
+
+.cr-vpn[data-status="error"] {
+  --state-tint: var(--accent-danger);
+}
+
+.cr-vpn[data-status="connecting"],
+.cr-vpn[data-status="working"] {
+  --state-tint: var(--accent-warning);
+}
+
+/* ---- the connection deck ------------------------------------------------ */
+
+.cr-vpn__hero {
+  position: relative;
+  isolation: isolate;
+  /* A column flex child shrinks by default. Everything in this app is a fixed
+     block in a scrolling column, so none of it may compress — without this the
+     deck collapsed under its own `overflow: hidden` and clipped its contents. */
+  flex: none;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  padding: 18px 20px;
+  border-radius: var(--radius-large);
+  border: 1px solid var(--border-subtle);
+  background-color: var(--surface-1);
+  background-image: var(--surface-sheen);
+  box-shadow: var(--lift-2);
+  overflow: hidden;
+}
+
+/* A corner glow in the colour of whatever the tunnel is doing. It is the first
+   thing the eye lands on, and it changes before the text does. */
+.cr-vpn__hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background: radial-gradient(120% 130% at 0% 0%, var(--state-wash) 0%, transparent 58%);
+  transition: background var(--dur-normal) var(--ease-standard);
+}
+
+/* The card's edge picks up the state colour, but only when there is a state
+   worth reporting — an idle tunnel keeps a neutral hairline. */
+.cr-vpn__hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--state-tint) 24%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-normal) var(--ease-standard);
+}
+
+.cr-vpn[data-status="connected"] .cr-vpn__hero::after,
+.cr-vpn[data-status="error"] .cr-vpn__hero::after {
+  opacity: 1;
+}
+
+.cr-vpn__hero-main {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+
+.cr-vpn__shield {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  color: var(--text-secondary);
+  /* A plate with the light on it, not a hole: a sunken disc in a dark deck read
+     as an empty place where a control should be. */
+  background-color: var(--surface-2);
+  background-image: var(--surface-sheen);
+  border: 1px solid var(--border-default);
+  box-shadow: var(--lift-1);
+  transition: color var(--dur-normal) var(--ease-standard),
+    border-color var(--dur-normal) var(--ease-standard),
+    background-color var(--dur-normal) var(--ease-standard),
+    box-shadow var(--dur-normal) var(--ease-standard);
+}
+
+/* A ring that only lights up when there is something to report. */
+.cr-vpn__shield::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 1px solid transparent;
+  transition: border-color var(--dur-normal) var(--ease-standard);
+}
+
+.cr-vpn__shield[data-on="true"] {
+  color: var(--accent-success);
+  border-color: color-mix(in srgb, var(--accent-success) 52%, transparent);
+  background-color: color-mix(in srgb, var(--accent-success) 16%, var(--surface-2));
+  box-shadow: var(--lift-1),
+    0 0 0 4px color-mix(in srgb, var(--accent-success) 10%, transparent);
+}
+
+.cr-vpn__shield[data-on="true"]::after {
+  border-color: color-mix(in srgb, var(--accent-success) 26%, transparent);
+}
+
+.cr-vpn__hero-text {
+  min-width: 0;
+}
+
+.cr-vpn__hero-title {
+  margin: 0;
+  font-size: var(--fs-xl);
+  font-weight: 600;
+  letter-spacing: -0.022em;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+
+.cr-vpn__hero-sub {
+  margin: 5px 0 0;
+  max-width: 62ch;
+  font-size: var(--fs-sm);
+  line-height: 1.55;
+  color: var(--text-tertiary);
+}
+
+.cr-vpn__hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.cr-vpn__hero-actions .cr-btn--lg {
+  height: 38px;
+  padding: 0 18px;
+}
+
+.cr-vpn__hero-actions .cr-vpn__country {
+  width: 178px;
+  flex: none;
+}
+
+/* ---- banners -----------------------------------------------------------
+   A left accent rule rather than a border in the accent colour all the way
+   round: a full coloured box competes with the deck, which is the thing that
+   is supposed to own the colour. */
+
+.cr-vpn__banner {
+  --banner-tint: var(--border-default);
+  display: flex;
+  align-items: flex-start;
+  flex: none;
+  gap: 10px;
+  margin: 0;
+  padding: 11px 14px;
+  border-radius: var(--radius-medium);
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--banner-tint);
+  background-color: var(--surface-1);
+  background-image: var(--surface-sheen);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.cr-vpn__banner svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--banner-tint);
+}
+
+.cr-vpn__banner strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.cr-vpn__banner[data-tone="info"] {
+  --banner-tint: var(--accent-info);
+}
+
+.cr-vpn__banner[data-tone="warning"] {
+  --banner-tint: var(--accent-warning);
+}
+
+.cr-vpn__banner[data-tone="danger"] {
+  --banner-tint: var(--accent-danger);
+}
+
+/* ---- grouped panels ----------------------------------------------------
+   Detail lives in cards under the deck, not in one endless form. */
+
+.cr-vpn .cr-section {
+  flex: none;
+  margin: 0;
+  padding: 16px 18px 18px;
+  border-radius: var(--radius-large);
+  border: 1px solid var(--border-subtle);
+  background-color: var(--surface-1);
+  background-image: var(--surface-sheen);
+  box-shadow: var(--lift-1);
+}
+
+/* A card heading, not a page heading: smaller than the deck and quieter than a
+   body label, with its rule carried in the default border colour so it reads as
+   a divider rather than a stray line. */
+.cr-vpn .cr-section__title {
+  font-size: var(--fs-base);
+}
+
+.cr-vpn .cr-section__title::after {
+  background: var(--border-default);
+}
+
+.cr-vpn .cr-section__desc {
+  margin-bottom: 14px;
+  max-width: 72ch;
+}
+
+/* Rows inside a card are quieter than rows inside a settings page: no rule on
+   the last one, and a tighter vertical rhythm. */
+.cr-vpn .cr-row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.cr-vpn__note {
+  flex: none;
+  margin: 0 0 14px;
+  font-size: var(--fs-sm);
+  line-height: 1.55;
+  color: var(--text-tertiary);
+}
+
+.cr-vpn__muted {
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+}
+
+/* ---- endpoint form -----------------------------------------------------
+   Two fields to a line: seven full-width inputs with a hint under each is a
+   column of prose pretending to be a form. */
+
+.cr-vpn__form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.cr-vpn__form-wide {
+  grid-column: 1 / -1;
+}
+
+.cr-vpn__form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+@media (max-width: 640px) {
+  .cr-vpn__form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cr-vpn__hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cr-vpn__hero-actions {
+    justify-content: flex-start;
+  }
+}
+
+/* ---- the folded explanation --------------------------------------------
+   The transport explained in eight paragraphs is reference material, not an
+   interface. It sits behind a summary the way a spec sheet does. */
+
+.cr-vpn__more {
+  flex: none;
+  margin: 0;
+  padding: 16px 18px 18px;
+  border-radius: var(--radius-large);
+  border: 1px solid var(--border-subtle);
+  background-color: var(--surface-1);
+  background-image: var(--surface-sheen);
+  box-shadow: var(--lift-1);
+}
+
+.cr-vpn__more > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  letter-spacing: -0.008em;
+  color: var(--text-primary);
+}
+
+.cr-vpn__more > summary::-webkit-details-marker {
+  display: none;
+}
+
+/* The disclosure caret, drawn rather than shipped as an icon. */
+.cr-vpn__more > summary::before {
+  content: "";
+  flex: none;
+  width: 0;
+  height: 0;
+  border-left: 4px solid currentColor;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  opacity: 0.5;
+  transition: transform var(--dur-fast) var(--ease-standard);
+}
+
+.cr-vpn__more[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+/* The hairline that runs to the edge of the card, matching a section header. */
+.cr-vpn__more > summary::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border-subtle);
+}
+
+.cr-vpn__list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+  color: var(--text-tertiary);
+}
+
+.cr-vpn__list li {
+  position: relative;
+  padding-left: 16px;
+}
+
+.cr-vpn__list li::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 0.62em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent-primary) 70%, transparent);
+}
+
+.cr-vpn__list strong,
+.cr-vpn__list em {
+  color: var(--text-secondary);
+}
+
+.cr-vpn__foot-note {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
+/* The app's own Select needs to be wide enough for a server name. */
+.cr-vpn .cr-select {
+  max-width: 320px;
+}
+
+/* ---- status pill in other surfaces ------------------------------------- */
+
+.cr-vpn-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 9px;
+  border-radius: var(--radius-medium);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.cr-vpn-pill[data-tone="ok"] {
+  color: var(--accent-success);
+  border-color: color-mix(in srgb, var(--accent-success) 45%, var(--border-subtle));
+}
+
+.cr-vpn-pill[data-tone="busy"] {
+  color: var(--accent-warning);
+  border-color: color-mix(in srgb, var(--accent-warning) 45%, var(--border-subtle));
+}
+
+.cr-vpn-pill[data-tone="bad"] {
+  color: var(--accent-danger);
+  border-color: color-mix(in srgb, var(--accent-danger) 45%, var(--border-subtle));
+}
+
+/* The Browser toolbar's VPN button mirrors its proxy button. */
+.cr-browser__vpn {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-medium);
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+  transition: color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard);
+}
+
+.cr-browser__vpn:hover {
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+.cr-browser__vpn[data-tone="ok"] {
+  color: var(--accent-success);
+  border-color: color-mix(in srgb, var(--accent-success) 50%, var(--border-subtle));
+}
+
+.cr-browser__vpn[data-tone="busy"] {
+  color: var(--accent-warning);
+  border-color: color-mix(in srgb, var(--accent-warning) 50%, var(--border-subtle));
+}
+
+.cr-browser__vpn[data-tone="bad"] {
+  color: var(--accent-danger);
+  border-color: color-mix(in srgb, var(--accent-danger) 50%, var(--border-subtle));
+}
+
+/* Shown instead of a directly-loaded pane while the VPN forbids one. */
+.cr-browser__vpn-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 100%;
+  padding: 32px;
+  text-align: center;
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+}
+
+.cr-browser__vpn-block h3 {
+  margin: 0;
+  font-size: var(--fs-lg);
+  color: var(--text-primary);
+}
+
+.cr-browser__vpn-block p {
+  margin: 0;
+  max-width: 46ch;
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+}
+
+.cr-browser__vpn-block-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}

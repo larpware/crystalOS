@@ -1,0 +1,76 @@
+/* ==========================================================================
+   Trash
+
+   A table, not a grid of cards: one row per deleted item, columns that line up
+   down the whole list, and the selection checkbox in the gutter where a table
+   puts it.
+   ========================================================================== */
+
+.cr-trash {
+  background: var(--window-bg);
+}
+
+.cr-trash__summary {
+  padding: 9px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  background-color: var(--surface-1);
+  background-image: var(--surface-sheen);
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Rows run edge to edge: a rounded, inset hover fill on a list this dense reads
+   as a column of buttons. */
+.cr-trash .cr-list-item {
+  gap: 10px;
+  padding: 9px 16px;
+  border-radius: 0;
+}
+
+.cr-trash .cr-list li + li {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.cr-trash__row {
+  cursor: default;
+}
+
+.cr-trash__row input[type="checkbox"] {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--accent-primary);
+  cursor: default;
+}
+
+.cr-trash__name {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: var(--fs-sm);
+}
+
+.cr-trash__origin {
+  flex: none;
+  width: 30%;
+  font-size: var(--fs-xxs);
+  color: var(--text-muted);
+}
+
+.cr-trash__meta {
+  flex: none;
+  min-width: 66px;
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-align: right;
+}
+
+@media (max-width: 620px) {
+  .cr-trash__origin {
+    display: none;
+  }
+}

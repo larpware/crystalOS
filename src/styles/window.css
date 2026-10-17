@@ -1,0 +1,415 @@
+/* ==========================================================================
+   Windows
+   ========================================================================== */
+
+.cr-window-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.cr-window {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 240px;
+  min-height: 160px;
+  background: var(--window-bg);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-window);
+  /* The deepest object on the desk: its own window shadow, plus a lit top edge
+     so the frame reads as a lit solid rather than a flat rectangle. */
+  box-shadow: var(--shadow-window), var(--inset-highlight);
+  overflow: hidden;
+  pointer-events: auto;
+  will-change: transform, opacity;
+  /* Transform-only movement keeps dragging on the compositor. */
+  transition: box-shadow var(--dur-normal) var(--ease-standard),
+    border-color var(--dur-normal) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-standard),
+    opacity var(--dur-normal) var(--ease-standard),
+    scale var(--dur-normal) var(--ease-standard),
+    translate var(--dur-normal) var(--ease-standard),
+    visibility 0s linear;
+  animation: cr-window-in var(--dur-normal) var(--ease-standard);
+}
+
+/* Glass themes apply frosted glass to windows and app surfaces. The effect is
+   disabled when transparency is reduced, contrast is high, or the user disables
+   it via settings. */
+:root[data-glass="true"]:not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-window {
+  backdrop-filter: blur(22px) saturate(1.2);
+  -webkit-backdrop-filter: blur(22px) saturate(1.2);
+}
+
+:root[data-glass="true"]:not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-window__titlebar {
+  backdrop-filter: blur(18px) saturate(1.15);
+  -webkit-backdrop-filter: blur(18px) saturate(1.15);
+}
+
+/* Opening, closing and minimizing use the independent `scale`/`translate`
+   properties. Animating `transform` here would override the inline transform
+   that positions the window, so every window would fly in from the top-left
+   corner before snapping to where it belongs. */
+@keyframes cr-window-in {
+  from {
+    opacity: 0;
+    scale: 0.94;
+    translate: 0 10px;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+    translate: 0 0;
+  }
+}
+
+@keyframes cr-window-out {
+  from {
+    opacity: 1;
+    scale: 1;
+    translate: 0 0;
+  }
+  to {
+    opacity: 0;
+    scale: 0.94;
+    translate: 0 10px;
+  }
+}
+
+/* Minimizing is the closing gesture aimed at the taskbar, and it is reversible:
+   the window stops painting only once the fade has finished, which is why the
+   visibility step is delayed here and not on the way back. */
+.cr-window[data-minimized="true"] {
+  transition: opacity var(--dur-fast) var(--ease-standard),
+    scale var(--dur-normal) var(--ease-standard),
+    translate var(--dur-normal) var(--ease-standard),
+    visibility 0s linear var(--dur-normal);
+}
+
+.cr-window--closing {
+  animation: cr-window-out var(--dur-fast) var(--ease-standard) forwards;
+  pointer-events: none;
+}
+
+.cr-window[data-motion="off"] {
+  transition: none;
+  animation: none;
+  opacity: 1;
+}
+
+.cr-window[data-motion="off"].cr-window--closing {
+  opacity: 0;
+}
+
+.cr-window[data-focused="true"] {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-window-focused), var(--inset-highlight);
+}
+
+/* An inactive window is a quieter object, not a flat one: it keeps its own
+   (shallower) window shadow instead of dropping to a card's. */
+.cr-window[data-focused="false"] {
+  border-color: var(--border-subtle);
+  box-shadow: var(--shadow-window-idle), var(--inset-highlight);
+}
+
+.cr-window[data-interacting="true"] {
+  /* Prevent the compositor from animating the box shadow mid-drag. */
+  transition: none;
+}
+
+/**
+ * While the user drags or resizes, embedded frames must not steal pointer
+ * events — otherwise a cross-origin iframe captures the pointer and the
+ * window sticks to the cursor. Pointer events are restored immediately after.
+ */
+.cr-window[data-interacting="true"] iframe,
+.cr-window[data-interacting="true"] video {
+  pointer-events: none;
+}
+
+.cr-window__titlebar {
+  position: relative;
+  display: grid;
+  /* Three named tracks, placed explicitly below. Relying on source order broke
+     whenever a control group was absent: with the controls on the right the
+     title slid into the first track and the controls took the flexible one. */
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  height: var(--titlebar-height);
+  padding: 0 10px;
+  /* Titlebar material: a lighter raised strip with a lit top edge, so a window
+     has a defined top even when its content is dark. */
+  background-image: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--edge-light) 42%, transparent) 0%,
+    transparent 58%
+  );
+  background-color: var(--surface-1);
+  box-shadow: var(--inset-highlight);
+  border-bottom: 1px solid var(--border-subtle);
+  cursor: default;
+  user-select: none;
+  touch-action: none;
+}
+
+.cr-window__titlebar > .cr-window__controls {
+  grid-column: 1;
+}
+
+.cr-window[data-controls="right"] .cr-window__titlebar > .cr-window__controls {
+  grid-column: 3;
+}
+
+/* Glass titlebars pull the wallpaper through. Non-glass themes keep the solid
+   surface for fidelity and performance. */
+:root[data-glass="true"]:not([data-transparency="reduced"]):not([data-contrast="high"]) .cr-window__titlebar {
+  background-color: color-mix(in srgb, var(--surface-1) 78%, transparent);
+  border-bottom-color: color-mix(in srgb, var(--border-subtle) 60%, transparent);
+}
+
+.cr-window[data-focused="false"] .cr-window__titlebar {
+  background-image: none;
+  background-color: var(--surface-0);
+  box-shadow: none;
+}
+
+/* An inactive window is quieter but still a real object: dim its content
+   slightly instead of removing its borders entirely. */
+.cr-window[data-focused="false"] .cr-window__body {
+  opacity: 0.94;
+}
+
+/* The middle track: application chrome if it has claimed the bar, the window's
+   own title if it has not. */
+.cr-window__lead {
+  grid-column: 2;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  height: 100%;
+}
+
+.cr-window__chrome {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  flex: 1;
+  height: 100%;
+}
+
+.cr-window__chrome:empty {
+  display: none;
+}
+
+.cr-window__title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-sm);
+  font-weight: 550;
+  letter-spacing: -0.008em;
+  color: var(--text-secondary);
+}
+
+.cr-window[data-focused="true"] .cr-window__title {
+  color: var(--text-primary);
+}
+
+.cr-window__title-icon {
+  color: var(--text-tertiary);
+  flex: none;
+}
+
+.cr-window__controls {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: none;
+}
+
+.cr-window[data-controls="right"] .cr-window__controls {
+  flex-direction: row-reverse;
+}
+
+/* Window controls. Each control keeps its own colour at all times and its
+   glyph is drawn from the start, so the cluster is legible without the pointer
+   having to hunt for it. Hover simply brightens and enlarges it — no state
+   leaves a control sitting dark on a dark titlebar. */
+.cr-window__control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.26);
+  color: #000;
+  /* A control with a glossy top, a shaded base and a contact shadow reads as a
+     physical button rather than a flat dot. */
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.42),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.2),
+    0 1px 1px rgba(0, 0, 0, 0.22);
+  transition: background var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard),
+    filter var(--dur-fast) var(--ease-standard),
+    scale var(--dur-fast) var(--ease-overshoot);
+}
+
+.cr-window__control--close {
+  background: var(--traffic-red);
+}
+
+.cr-window__control--minimize {
+  background: var(--traffic-yellow);
+}
+
+.cr-window__control--maximize {
+  background: var(--traffic-green);
+}
+
+/* The glyph reads at rest and sharpens under the pointer. */
+.cr-window__control svg {
+  opacity: 0.62;
+  transform: scale(0.86);
+  transition: opacity var(--dur-fast) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-overshoot);
+}
+
+.cr-window__controls:hover .cr-window__control svg {
+  opacity: 1;
+  transform: none;
+}
+
+.cr-window__control:hover {
+  scale: 1.16;
+  filter: brightness(1.14);
+}
+
+/* An inactive window keeps its controls visible, just quieter — until the
+   pointer is actually on one, which should still light up. */
+.cr-window[data-focused="false"] .cr-window__control:not(:hover) {
+  filter: saturate(0.5) brightness(0.88);
+}
+
+.cr-window__body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--window-bg);
+}
+
+.cr-window__content {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ---- resize handles --------------------------------------------------- */
+.cr-window__resize {
+  position: absolute;
+  touch-action: none;
+  z-index: 3;
+}
+
+/* Wider than the visual edge on purpose: a 4–6px target is the usual reason a
+   resize feels like it "does not work". These grab a comfortable 10–16px while
+   staying invisible. */
+.cr-window__resize--n {
+  top: -3px;
+  left: 12px;
+  right: 12px;
+  height: 10px;
+}
+
+.cr-window__resize--s {
+  bottom: -3px;
+  left: 12px;
+  right: 12px;
+  height: 10px;
+}
+
+.cr-window__resize--w {
+  left: -3px;
+  top: 12px;
+  bottom: 12px;
+  width: 10px;
+}
+
+.cr-window__resize--e {
+  right: -3px;
+  top: 12px;
+  bottom: 12px;
+  width: 10px;
+}
+
+.cr-window__resize--nw,
+.cr-window__resize--ne,
+.cr-window__resize--sw,
+.cr-window__resize--se {
+  width: 18px;
+  height: 18px;
+}
+
+.cr-window__resize--nw {
+  top: -3px;
+  left: -3px;
+}
+
+.cr-window__resize--ne {
+  top: -3px;
+  right: -3px;
+}
+
+.cr-window__resize--sw {
+  bottom: -3px;
+  left: -3px;
+}
+
+.cr-window__resize--se {
+  bottom: -3px;
+  right: -3px;
+}
+
+/* ---- snap preview ----------------------------------------------------- */
+.cr-snap-preview {
+  position: absolute;
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 60%, transparent);
+  background: color-mix(in srgb, var(--accent-primary) 12%, transparent);
+  border-radius: var(--radius-window);
+  pointer-events: none;
+  z-index: 99;
+  animation: cr-preview-in var(--dur-fast) var(--ease-standard);
+  backdrop-filter: none;
+}
+
+@keyframes cr-preview-in {
+  from {
+    opacity: 0;
+    transform: scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+:root[data-motion="reduced"] .cr-snap-preview {
+  animation: none;
+}
+
+/* ---- window content shells ------------------------------------------- */
+.cr-window__content > * {
+  height: 100%;
+}
