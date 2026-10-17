@@ -843,3 +843,112 @@
   cursor: default;
   pointer-events: none;
 }
+
+/* ---- plugins ------------------------------------------------------------
+ * A plugin is one card: what it is, what it asked for, and what can be done
+ * with it. Permissions are chips rather than prose so two plugins can be
+ * compared at a glance. */
+
+.cr-plugin-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.cr-plugin {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-medium);
+  background: var(--surface-2);
+}
+
+.cr-plugin--offer {
+  background: var(--surface-1);
+}
+
+/* Off is a real state, not a hidden one: the card stays legible and says so. */
+.cr-plugin[data-disabled="true"] .cr-plugin__title,
+.cr-plugin[data-disabled="true"] .cr-plugin__desc {
+  opacity: 0.65;
+}
+
+.cr-plugin__head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cr-plugin__title {
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.cr-plugin__meta {
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+}
+
+.cr-plugin__desc {
+  margin: 2px 0 0;
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+}
+
+.cr-plugin__permissions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.cr-plugin__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.cr-plugin__actions .cr-plugin__meta {
+  margin-right: auto;
+}
+
+.cr-plugin-consent {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-medium);
+  background: var(--surface-2);
+}
+
+.cr-plugin__lead {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+}
+
+.cr-plugin__commands,
+.cr-plugin__limits,
+.cr-plugin__errors {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+}
+
+.cr-plugin__errors {
+  margin-top: 10px;
+  color: var(--accent-danger);
+}
+
+.cr-plugin__file {
+  display: none;
+}

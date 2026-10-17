@@ -28,6 +28,7 @@ import {
 } from "./pages/system";
 import { AccountsPage, MessagingPage, PrivacyPage } from "./pages/account";
 import { CreditsPage } from "./pages/credits";
+import { PluginsPage } from "./pages/plugins";
 import { VpnPage } from "./pages/vpn";
 
 /* ==========================================================================
@@ -222,6 +223,14 @@ const pages: SettingsPage[] = [
     group: "System",
     keywords: ["messaging", "chat", "calls", "webrtc", "transport", "relay", "friends"],
     Component: MessagingPage,
+  },
+  {
+    id: "plugins",
+    label: "Plugins",
+    icon: "layers",
+    group: "System",
+    keywords: ["plugin", "extension", "add-on", "manifest", "permission", "install", "recipe", "automation"],
+    Component: PluginsPage,
   },
   {
     id: "advanced",

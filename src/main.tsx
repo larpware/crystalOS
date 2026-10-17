@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import { AppErrorBoundary } from "./components/ErrorBoundary";
 import { initSystemRegistry } from "./shell/systemCommands";
+import { startPluginCommands } from "./services/plugins/registry";
 
 /* Stylesheets are imported in cascade order: tokens first, then base, shared
    primitives, shell chrome, then per-application styles. */
@@ -41,6 +42,12 @@ if (!container) {
    the palette, the Settings → Keyboard list and the keydown dispatcher all see
    the same set from the very first frame. Registration is idempotent. */
 initSystemRegistry();
+
+/* Installed plugins add their commands to that same registry, under their own
+   owner ids, so removing a plugin takes away exactly its own commands and
+   nothing else. Applying them here — after the built-ins and before the first
+   render — means the palette never shows a half-populated list. */
+startPluginCommands();
 
 /* The desktop is wrapped in the same boundary the window manager puts around
    each application. Without one, a crash anywhere in the root tree — a bad

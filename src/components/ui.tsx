@@ -8,6 +8,7 @@ import {
   type InputHTMLAttributes,
   type ReactNode,
   type SelectHTMLAttributes,
+  type TextareaHTMLAttributes,
 } from "react";
 import { createPortal } from "react-dom";
 import { Icon, type IconName } from "@/icons/Icon";
@@ -153,6 +154,30 @@ export const TextInput = forwardRef<HTMLInputElement, TextInputProps>(function T
       {input}
       {trailing && <span className="cr-input-group__action">{trailing}</span>}
     </div>
+  );
+});
+
+interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
+  invalid?: boolean;
+}
+
+/**
+ * The multiline counterpart of TextInput, for text that gets pasted rather than
+ * typed — a manifest, a long note. Same field styling, so it reads as the same
+ * kind of control as every other input.
+ */
+export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function Textarea(
+  { invalid, className, ...rest },
+  ref,
+) {
+  return (
+    <textarea
+      ref={ref}
+      className={["cr-textarea", invalid && "cr-input--invalid", className]
+        .filter(Boolean)
+        .join(" ")}
+      {...rest}
+    />
   );
 });
 
