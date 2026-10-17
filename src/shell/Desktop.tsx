@@ -18,6 +18,7 @@ import { NotificationCenter, ToastStack } from "./Notifications";
 import { WidgetLayer } from "./WidgetLayer";
 import { DesktopIcons } from "./DesktopIcons";
 import { HzReadout } from "./HzReadout";
+import { OFFLINE_BANNER_HEIGHT, OfflineBanner } from "./OfflineBanner";
 import { panelReservedTop, useShellStore } from "@/state/shell";
 import { useSystemStore } from "@/state/system";
 import { usePlaybackStore } from "@/state/playback";
@@ -37,6 +38,7 @@ import {
 } from "@/services/os";
 import { metaFor } from "@/apps/catalog";
 import { useViewport } from "@/hooks/useUi";
+import { useOffline } from "@/hooks/useOffline";
 
 /* ==========================================================================
    Desktop shell
@@ -59,6 +61,7 @@ export function Desktop() {
   const dim = usePlaybackStore((state) => state.dim);
   const viewport = useViewport();
   const setWorkArea = useWindowStore((state) => state.setWorkArea);
+  const offline = useOffline();
 
   /* ---- layout contract -------------------------------------------------
      Laid out before paint: the reserved strip has to be in the store in the
@@ -67,7 +70,11 @@ export function Desktop() {
   useLayoutEffect(() => {
     // The top edge is reserved by the panel itself: its own height, plus the
     // gap it floats above and below when it is a dock.
-    const top = panelReservedTop(panelScale, panelStyle);
+    const panelTop = panelReservedTop(panelScale, panelStyle);
+    // While the offline notice is up it is chrome too, so it reserves as well.
+    // Reserving rather than floating is what keeps it from covering a window
+    // that is already maximized; the store re-fits tiled windows on change.
+    const top = panelTop + (offline.offline ? OFFLINE_BANNER_HEIGHT : 0);
     // The taskbar is a bottom strip and reports the box it occupies, so the
     // work area is inset by exactly the height it covers on that edge.
     const thickness = dockSize.height > 0 ? dockSize.height : dock.iconSize + 12;
@@ -89,6 +96,7 @@ export function Desktop() {
   }, [
     dock.iconSize,
     dockSize.height,
+    offline.offline,
     panelScale,
     panelStyle,
     setSafeArea,
@@ -307,6 +315,7 @@ export function Desktop() {
       )}
 
       <TopPanel />
+      <OfflineBanner offset={panelReservedTop(panelScale, panelStyle)} />
       <Taskbar />
 
       <Launcher />

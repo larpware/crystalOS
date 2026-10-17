@@ -6,6 +6,17 @@ import type { ProxyMode } from "@/state/browser";
 export type MotionOverride = "system" | "full" | "subtle" | "reduced";
 export type HzDisplay = "off" | "panel" | "corner";
 
+/**
+ * Whether CrystalOS attempts network requests at all.
+ *
+ * `auto` follows the browser. `forced` is the user saying "work offline":
+ * every request the OS would make is refused immediately, with the same honest
+ * offline answer the UI already knows how to show, instead of being left to sit
+ * through a timeout. There is deliberately no "force online" — the OS cannot
+ * make a connection exist, and a switch that claimed to would be a lie.
+ */
+export type OfflineMode = "auto" | "forced";
+
 /** How a proxied application resolves against the OS-wide proxy switch. */
 export type { ProxyMode };
 
@@ -45,6 +56,8 @@ export interface SystemState {
    * transport. The Browser keeps its own override on top of this.
    */
   proxyEnabled: boolean;
+  /** Auto follows the browser; forced is the user asking to work offline. */
+  offlineMode: OfflineMode;
   /**
    * Each single-destination application's own stance on the proxy, keyed by
    * its destination (which is one entry per application: Drive, Spotify,
@@ -72,6 +85,7 @@ export interface SystemState {
   setBackgroundWidgetUpdates: (enabled: boolean) => void;
   setRemoveExtraBootAnimation: (enabled: boolean) => void;
   setProxyEnabled: (enabled: boolean) => void;
+  setOfflineMode: (mode: OfflineMode) => void;
   /** Sets one application's proxy stance. Keyed by its destination. */
   setProxyMode: (key: string, mode: ProxyMode) => void;
   setHzDisplay: (display: HzDisplay) => void;
@@ -96,6 +110,7 @@ export const useSystemStore = create<SystemState>()(
       backgroundWidgetUpdates: true,
       removeExtraBootAnimation: false,
       proxyEnabled: true,
+      offlineMode: "auto",
       proxyModes: {},
       sessionStartedAt: Date.now(),
 
@@ -109,6 +124,7 @@ export const useSystemStore = create<SystemState>()(
       setRemoveExtraBootAnimation: (removeExtraBootAnimation) =>
         set({ removeExtraBootAnimation }),
       setProxyEnabled: (proxyEnabled) => set({ proxyEnabled }),
+      setOfflineMode: (offlineMode) => set({ offlineMode }),
       setProxyMode: (key, mode) =>
         set((state) => ({ proxyModes: { ...state.proxyModes, [key]: mode } })),
       setHzDisplay: (hzDisplay) => set({ hzDisplay }),
@@ -133,6 +149,7 @@ export const useSystemStore = create<SystemState>()(
         backgroundWidgetUpdates: state.backgroundWidgetUpdates,
         removeExtraBootAnimation: state.removeExtraBootAnimation,
         proxyEnabled: state.proxyEnabled,
+        offlineMode: state.offlineMode,
         proxyModes: state.proxyModes,
       }) as SystemState,
     },

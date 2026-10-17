@@ -14,6 +14,7 @@ import { WIDGET_CELL, useWidgetStore } from "@/state/widgets";
 import { useWindowStore } from "@/state/windows";
 import { useNotificationStore } from "@/state/notifications";
 import { openApp } from "@/services/os";
+import { isOfflineNow } from "@/services/offline";
 import { byteSize } from "@/services/storage";
 import { clamp } from "@/utils/format";
 import { deviceMemoryGb, logicalProcessors } from "@/services/system";
@@ -403,6 +404,12 @@ function WeatherWidget() {
   const load = useCallback(async () => {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
       setState({ status: "error", message: "This browser has no location service." });
+      return;
+    }
+    /* Weather is fetched from the internet, so an offline OS should say that
+       rather than ask for a location it cannot use. */
+    if (isOfflineNow()) {
+      setState({ status: "error", message: "CrystalOS is offline, so there is no weather to fetch." });
       return;
     }
     setState({ status: "loading" });

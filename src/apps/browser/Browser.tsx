@@ -3,6 +3,8 @@ import { createPortal } from "react-dom";
 import { Badge, Button, EmptyState, IconButton, Menu, Tooltip, type MenuItem } from "@/components/ui";
 import { Icon } from "@/icons/Icon";
 import { notify, openApp } from "@/services/os";
+import { offlineExplanation } from "@/services/offline";
+import { useOffline } from "@/hooks/useOffline";
 import { deriveCoverage, isVpnLocked, providerAppId, providerName } from "@/services/vpn/coverage";
 import { useVpnSnapshot, useVpnStore } from "@/state/vpn";
 import { useScramjetState, useProxiedFrame } from "@/services/scramjet/useProxiedFrame";
@@ -30,6 +32,7 @@ import { WindowChromeContext, WindowTitlebarChrome } from "@/window-manager/titl
 export function Browser({ args }: AppProps) {
   const store = useBrowserStore();
   const proxy = useScramjetState();
+  const offline = useOffline();
   const tabIdentity = useTabIdentityStore((state) => state.enabled);
   const account = useAuthStore((state) => state.account);
   const addBinary = useFsStore((state) => state.addBinary);
@@ -126,6 +129,16 @@ export function Browser({ args }: AppProps) {
         title: "Download blocked by the VPN",
         body: "A download is fetched by this page, which the VPN cannot protect. Connect, or turn the VPN off, to download.",
         icon: "warning",
+      });
+      return;
+    }
+    // The same rule applies to an OS that is not attempting network requests:
+    // refusing at once is clearer than a fetch that fails on its own terms.
+    if (offline.offline) {
+      notify({
+        title: "Download not attempted",
+        body: `${offlineExplanation(offline)}`,
+        icon: "wifi-off",
       });
       return;
     }

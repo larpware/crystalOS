@@ -15,6 +15,14 @@ import {
 import { Icon } from "@/icons/Icon";
 import { useBattery, useRefreshRate } from "@/hooks/useBattery";
 import { useNetworkStatus } from "@/hooks/useNetwork";
+import { useOffline } from "@/hooks/useOffline";
+import { apiRequest } from "@/services/api";
+import {
+  OFFLINE_AVAILABLE,
+  OFFLINE_UNAVAILABLE,
+  offlineExplanation,
+  offlineHeadline,
+} from "@/services/offline";
 import { openApp } from "@/services/os";
 import { byteSize, isPersistenceAvailable, listKeys, loadJSON, saveJSON } from "@/services/storage";
 import {
@@ -540,16 +548,105 @@ export function TabIdentityPage() {
 
 export function NetworkPage() {
   const status = useNetworkStatus();
+  const offline = useOffline();
+  const offlineMode = useSystemStore((state) => state.offlineMode);
+  const setOfflineMode = useSystemStore((state) => state.setOfflineMode);
   const [storage, setStorage] = useState<{ usage: number; quota: number } | null>(null);
   const [measured, setMeasured] = useState<NetworkStatus | null>(null);
+  const [probe, setProbe] = useState<{ running: boolean; message: string | null }>({
+    running: false,
+    message: null,
+  });
 
   useEffect(() => {
     void estimateStorage().then(setStorage);
     setMeasured(readNetwork());
   }, []);
 
+  /* One real request, through the same client every other surface uses, so the
+     answer describes the OS rather than a special case invented for this page.
+     While offline mode is on the client refuses before it reaches the network,
+     which is why the button becomes "go back online" instead. */
+  const runProbe = async () => {
+    setProbe({ running: true, message: null });
+    const result = await apiRequest<{ server?: boolean; user?: unknown }>("/me", {
+      timeoutMs: 6_000,
+    });
+    setProbe({
+      running: false,
+      message: result.ok
+        ? "The CrystalOS server answered."
+        : `No answer: ${result.error.message}`,
+    });
+  };
+
   return (
     <>
+      <Section
+        title="Offline mode"
+        description="While CrystalOS believes it has no network it refuses each request at once, instead of letting every one of them sit until it times out."
+      >
+        <Row
+          label="Work offline"
+          description={offlineExplanation(offline)}
+          control={
+            <Switch
+              label="Work offline"
+              checked={offlineMode === "forced"}
+              onChange={(checked) => setOfflineMode(checked ? "forced" : "auto")}
+            />
+          }
+        />
+        <Row
+          label="State"
+          control={
+            <Badge tone={offline.offline ? "danger" : "success"} icon={offline.offline ? "wifi-off" : "wifi"}>
+              {offlineHeadline(offline)}
+            </Badge>
+          }
+        />
+        {!offline.offline && (
+          <Row
+            label="Connection test"
+            description={
+              probe.running
+                ? "Asking the CrystalOS server…"
+                : (probe.message ??
+                  "Sends one real request through the same client every other surface uses.")
+            }
+            control={
+              <Button size="sm" icon="refresh" disabled={probe.running} onClick={runProbe}>
+                Check now
+              </Button>
+            }
+          />
+        )}
+      </Section>
+
+      <Section
+        title="What that means in practice"
+        description="Listed rather than implied, so the OS is not vague about what still works."
+      >
+        <div className="cr-offline-lists">
+          <div>
+            <h4>Not available offline</h4>
+            <ul>
+              {OFFLINE_UNAVAILABLE.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <h4>Still works offline</h4>
+            <ul>
+              {OFFLINE_AVAILABLE.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </Section>
+
       <Section
         title="Connection"
         description="Read from the browser's Network Information API. Browsers deliberately round these values."

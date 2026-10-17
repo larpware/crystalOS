@@ -15,6 +15,8 @@
    JavaScript and `credentials: "same-origin"` is all the client needs.
    ========================================================================== */
 
+import { currentOffline, offlineExplanation } from "@/services/offline";
+
 export const ACCOUNTS_BASE = "/api/accounts";
 
 export interface ApiErrorShape {
@@ -58,6 +60,16 @@ export interface RequestOptions {
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<ApiResult<T>> {
   const { method = "GET", body, signal, timeoutMs = 12_000, base = ACCOUNTS_BASE } = options;
+
+  /* While the OS is offline the answer is already known, so nothing is
+     attempted: waiting out a twelve-second timeout only to report the same
+     thing is a worse way of saying it. Every caller already handles this error
+     shape, so the whole OS reports the state consistently. */
+  const offline = currentOffline();
+  if (offline.offline) {
+    return failure(null, "OFFLINE", offlineExplanation(offline), true);
+  }
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   const abort = () => controller.abort();

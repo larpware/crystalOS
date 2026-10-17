@@ -262,6 +262,19 @@
   border-left: 1px solid var(--border-subtle);
 }
 
+/* The network indicator is the one that can be pressed: pressing it opens the
+   page that explains the state. Reset, because it is a button among spans. */
+.cr-panel__indicator--action {
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.cr-panel__indicator--action:hover {
+  color: var(--text-primary);
+}
+
 .cr-panel__indicator--value {
   font-variant-numeric: tabular-nums;
 }
@@ -303,6 +316,50 @@
   height: 5px;
   border-radius: 50%;
   background: var(--accent-primary);
+}
+
+/* ---- offline notice ----------------------------------------------------
+ * A full-width strip under the top bar. It is chrome, not an overlay: the
+ * desktop reserves exactly this height while it is showing (see
+ * OFFLINE_BANNER_HEIGHT) so it can never sit on top of a window. */
+
+.cr-offline {
+  position: absolute;
+  left: var(--space-4);
+  right: var(--space-4);
+  z-index: var(--z-panel);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-medium);
+  background-color: var(--surface-1);
+  background-image: var(--surface-sheen);
+  box-shadow: var(--shadow-1), var(--inset-highlight);
+  color: var(--text-secondary);
+  font-size: var(--fs-xs);
+  overflow: hidden;
+}
+
+.cr-offline__title {
+  flex: none;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.cr-offline__why {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.cr-offline__actions {
+  flex: none;
+  display: flex;
+  gap: var(--space-2);
+  margin-left: auto;
 }
 
 /* ---- refresh rate readout --------------------------------------------- */

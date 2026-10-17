@@ -4,13 +4,15 @@ import { AppIcon, Icon } from "@/icons/Icon";
 import { metaFor } from "@/apps/catalog";
 import { useClock } from "@/hooks/useClock";
 import { useBattery } from "@/hooks/useBattery";
+import { useOffline } from "@/hooks/useOffline";
+import { offlineExplanation, offlineHeadline } from "@/services/offline";
+import { openApp } from "@/services/os";
 import { useShellStore } from "@/state/shell";
 import { useSystemStore } from "@/state/system";
 import { useNotificationStore } from "@/state/notifications";
 import { useWindowStore } from "@/state/windows";
 import { formatDateLong, formatTime } from "@/utils/format";
 import { HzReadout } from "./HzReadout";
-import { useNetworkStatus } from "@/hooks/useNetwork";
 
 /* ==========================================================================
    Top panel
@@ -39,7 +41,7 @@ export function TopPanel() {
   const focusedApp = focusedWindow ? metaFor(focusedWindow.appId) : undefined;
 
   const battery = useBattery();
-  const network = useNetworkStatus();
+  const offline = useOffline();
 
   /* Published as a custom property the same way the taskbar does it: the theme
      supplies the material, this only scales how much of it is opaque. */
@@ -100,9 +102,18 @@ export function TopPanel() {
         {hzDisplay === "panel" && <HzReadout />}
         <div className="cr-panel__tray" role="group" aria-label="System indicators">
           {panel.showNetwork && (
-            <span className="cr-panel__indicator" title={network.online ? "Connected" : "Offline"}>
-              <Icon name={network.online ? "wifi" : "wifi-off"} size={14} />
-            </span>
+            <button
+              type="button"
+              className="cr-panel__indicator cr-panel__indicator--action"
+              title={
+                offline.offline
+                  ? `${offlineHeadline(offline)} — ${offlineExplanation(offline)}`
+                  : "Connected"
+              }
+              onClick={() => openApp("settings", { args: { section: "network" } })}
+            >
+              <Icon name={offline.offline ? "wifi-off" : "wifi"} size={14} />
+            </button>
           )}
           {panel.showVolume && (
             <span className="cr-panel__indicator" title="System volume">

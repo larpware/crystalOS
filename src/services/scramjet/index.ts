@@ -1,4 +1,5 @@
 import type { ScramjetController, ScramjetFrame, ScramjetPlugin } from "./types";
+import { currentOffline, offlineExplanation, offlineHeadline } from "@/services/offline";
 
 /* ==========================================================================
    Shared Scramjet service
@@ -113,11 +114,22 @@ interface BackendStatus {
 /**
  * Asks the backend for its real status before touching the service worker, so a
  * missing backend produces one clear message instead of a broken frame.
+ *
+ * When the OS is working offline the request is refused rather than attempted
+ * by API convention further up; either way the answer is the same, so this only
+ * has to name it.
  */
 async function probeBackend(): Promise<BackendStatus> {
   const response = await fetch("/api/proxy-status", { cache: "no-store" });
   if (!response.ok) throw new Error(`Backend status ${response.status}`);
   return (await response.json()) as BackendStatus;
+}
+
+/** Why the proxy cannot start, said in the terms the user is actually in. */
+function backendUnavailableHelp(): string {
+  const report = currentOffline();
+  if (!report.offline) return BACKEND_HELP;
+  return `${offlineHeadline(report)}. ${offlineExplanation(report)} Proxied pages need the Scramjet backend, which needs the network.`;
 }
 
 async function createController(): Promise<ScramjetController> {
@@ -128,9 +140,10 @@ async function createController(): Promise<ScramjetController> {
     backend = await probeBackend();
     publish({ assets: backend.assets ?? null });
   } catch {
+    const help = backendUnavailableHelp();
     // Whatever the previous probe said about the files is no longer true.
-    publish({ status: "error", error: BACKEND_HELP, backendReachable: false, assets: null });
-    throw new Error(BACKEND_HELP);
+    publish({ status: "error", error: help, backendReachable: false, assets: null });
+    throw new Error(help);
   }
 
   try {
