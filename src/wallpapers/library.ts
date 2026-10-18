@@ -25,6 +25,73 @@ function unsplash(id: string, width = 3840): string {
   return `https://images.unsplash.com/${id}?auto=format&w=${width}&q=85`;
 }
 
+/* ---- display-sized requests --------------------------------------------- *
+ * The manifest asks for the largest size Unsplash serves, which is the right
+ * answer for a 4K panel and the wrong one for everything else. A photograph is
+ * decoded into a full bitmap before it is painted, so the 3840px entry is a
+ * ~39MB decode held for the lifetime of the view that asked for it — and the
+ * wallpaper grid asks for one per tile, at 200px each. This desktop is meant for
+ * low-powered machines, where that is a lot of work for pixels nobody sees.
+ *
+ * So the display names the width it will paint and gets the smallest request
+ * that covers it, rounded up to a cache-friendly step. The manifest URL is
+ * still the ceiling: a request is never enlarged, and a URL that is not ours is
+ * never rewritten at all.
+ */
+
+/** Below this a photograph starts to look soft on a hidpi panel. */
+export const minDisplayWidth = 640;
+
+/** Unsplash sizes are cached per width, so requests land on round numbers. */
+export const displayWidthStep = 160;
+
+/**
+ * The same photograph at a width that covers `cssWidth` at `pixelRatio`.
+ *
+ * `zoom` is the wallpaper's framing zoom. A zoomed picture is painted larger
+ * than the layer measures, so the request covers the zoom too — bucketed to
+ * whole steps, so dragging the zoom slider asks for at most three sizes rather
+ * than one per tick. A zoom of 1 or less never reduces the request below what
+ * the layer itself paints.
+ *
+ * Returns `url` untouched when it is not an Unsplash photo, when it carries no
+ * readable width, or when it is already small enough.
+ */
+export function wallpaperUrlForDisplay(
+  url: string,
+  cssWidth: number,
+  pixelRatio = 1,
+  zoom = 1,
+): string {
+  if (!url.includes("images.unsplash.com")) return url;
+  const requested = unsplashWidth(url);
+  if (requested === null) return url;
+
+  const ratio = Number.isFinite(pixelRatio) && pixelRatio > 0 ? pixelRatio : 1;
+  const css = Number.isFinite(cssWidth) && cssWidth > 0 ? cssWidth : minDisplayWidth;
+  const zoomFactor = Math.max(1, Math.ceil(Number.isFinite(zoom) && zoom > 0 ? zoom : 1));
+  const needed = Math.ceil((css * ratio * zoomFactor) / displayWidthStep) * displayWidthStep;
+  const width = Math.min(requested, Math.max(minDisplayWidth, needed));
+  if (width >= requested) return url;
+
+  try {
+    const parsed = new URL(url);
+    parsed.searchParams.set("w", String(width));
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
+
+function unsplashWidth(url: string): number | null {
+  try {
+    const value = Number(new URL(url).searchParams.get("w"));
+    return Number.isFinite(value) && value > 0 ? value : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Neutral gradient used when a photographic wallpaper cannot be fetched. */
 const photoFallback =
   "linear-gradient(160deg, #10131a 0%, #0d1017 45%, #090b10 100%)";

@@ -248,6 +248,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  position: relative;
   width: 13px;
   height: 13px;
   border-radius: 50%;
@@ -262,6 +263,18 @@
     border-color var(--dur-fast) var(--ease-standard),
     filter var(--dur-fast) var(--ease-standard),
     scale var(--dur-fast) var(--ease-overshoot);
+}
+
+/* The dot stays small, but the target does not have to be 13px. Aiming at a
+   13px circle is how a close miss lands on the window behind instead — which
+   raises that window rather than closing anything. The hit area is grown to
+   19px with a pseudo-element: the size, the spacing and the layout are
+   untouched, and 3px of slop still leaves a 1px gutter between the dots. */
+.cr-window__control::before {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
 }
 
 .cr-window__control--close {

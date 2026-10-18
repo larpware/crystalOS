@@ -223,3 +223,80 @@ export function constrainToWorkArea(rect: Rect, workArea: Rect): Rect {
     y: Math.round(clamp(rect.y, workArea.y, maxY)),
   };
 }
+
+/* ---- desktop placement --------------------------------------------------
+ * Two windows at the same coordinates are one window as far as the pointer is
+ * concerned: the person sees a single titlebar, clicks its close button, and
+ * closes whichever of the two happens to be in front. When that one goes, the
+ * other appears in the very same place, which reads as "the window came back
+ * instead of closing".
+ *
+ * This is not a hypothetical. A new window is centred and then clamped, and
+ * `tiledRect` clamps every window again whenever the work area shrinks, so on a
+ * narrow desk — a laptop, a Chromebook, a browser window dragged to half the
+ * screen — several windows clamp towards the same corner and end up stacked to
+ * the pixel. `separateRects` is the rule that keeps a desk from becoming a pile.
+ */
+
+/** How far apart two windows are kept when they would otherwise share a spot. */
+export const placementStep = 26;
+
+/** Two positions this close are the same position: the lower window is hidden. */
+function sameSpot(a: Rect, b: Rect, step: number): boolean {
+  return Math.abs(a.x - b.x) < step && Math.abs(a.y - b.y) < step;
+}
+
+/**
+ * Nudges rects that would land on top of an earlier one, in the order given.
+ *
+ * The first rects keep their place — the caller lists the windows that are
+ * already where they should be, then the one that has to make way. A window
+ * that has to move steps down and right by `placementStep`, wrapping back to the
+ * left edge and starting a new row, which is the walk a cascade makes. Sizes are
+ * never touched, movement is bounded, and if a work area is genuinely too small
+ * to hold the desk the last candidate is returned rather than looping.
+ */
+export function separateRects(rects: Rect[], workArea: Rect, step = placementStep): Rect[] {
+  if (rects.length < 2) return rects.map((rect) => ({ ...rect }));
+
+  const placed: Rect[] = [];
+  for (const rect of rects) {
+    const candidate = constrainToWorkArea({ ...rect }, workArea);
+    if (!placed.some((other) => sameSpot(other, candidate, step))) {
+      placed.push(candidate);
+      continue;
+    }
+    placed.push(nextFreeSpot(candidate, placed, workArea, step));
+  }
+  return placed;
+}
+
+function nextFreeSpot(base: Rect, placed: Rect[], workArea: Rect, step: number): Rect {
+  /*
+   * The walk starts at the work-area corner rather than at the window's own
+   * position. A relative walk fails exactly when it is needed: a window already
+   * against the right edge cannot be nudged further out, so every step clamps
+   * back onto the window it is trying to avoid.
+   */
+  const columns = Math.max(
+    1,
+    Math.floor(Math.max(0, workArea.width - Math.min(base.width, 140)) / step) + 1,
+  );
+  const rows = Math.max(1, Math.floor(Math.max(0, workArea.height - 44) / step) + 1);
+  const tries = Math.min(columns * rows, 64);
+
+  for (let attempt = 1; attempt <= tries; attempt += 1) {
+    const candidate = constrainToWorkArea(
+      {
+        ...base,
+        x: workArea.x + (attempt % columns) * step,
+        y: workArea.y + Math.floor(attempt / columns) * step,
+      },
+      workArea,
+    );
+    if (!placed.some((other) => sameSpot(other, candidate, step))) return candidate;
+  }
+
+  // A work area with no room left: reachable beats unreachable.
+  return constrainToWorkArea({ ...base, x: base.x + step, y: base.y + step }, workArea);
+}

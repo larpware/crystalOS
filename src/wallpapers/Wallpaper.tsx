@@ -10,11 +10,17 @@ import { Button, Segmented, Slider } from "@/components/ui";
 import { Icon } from "@/icons/Icon";
 import { useAppearanceStore } from "@/state/appearance";
 import { useSystemStore } from "@/state/system";
-import { findBuiltInWallpaper } from "./library";
+import { findBuiltInWallpaper, wallpaperUrlForDisplay } from "./library";
 import { findCustomWallpaper, resolveWallpaperUrl } from "./custom";
 import { liveScenes } from "./liveScenes";
+import { useElementBox } from "@/hooks/useUi";
 import { prefersReducedMotion } from "@/services/system";
 import type { LiveSceneId, WallpaperSource } from "@/types";
+
+/** The display's pixel density, in the shape the sizing helper wants. */
+function devicePixelRatio(): number {
+  return typeof window === "undefined" ? 1 : window.devicePixelRatio || 1;
+}
 
 /* ==========================================================================
    Wallpaper rendering
@@ -195,14 +201,34 @@ export function WallpaperLayer({ target, dimmed }: WallpaperLayerProps) {
   const performanceMode = useSystemStore((state) => state.performanceMode);
   const [imageReady, setImageReady] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
+  // The layer fills the viewport, so its box is the size the picture is
+  // painted at — and therefore the size worth requesting. Measured rather than
+  // assumed: the desktop and the lock screen are not the same size, and a
+  // window can be any size at all.
+  const [layerRef, layerBox] = useElementBox<HTMLDivElement>();
 
   const id = target === "lock" ? wallpaper.lockId : wallpaper.desktopId;
   const resolved = useResolvedWallpaper(id);
 
+  /* Framing: the fit mode decides how the picture meets the viewport, then the
+     user's zoom pushes in or pulls back about the centre, and the offsets slide
+     it. Blur is compensated for here rather than in the stylesheet so the
+     transform stays a single value and cannot fight with a hover rule. */
+  const zoom = Number.isFinite(wallpaper.zoom) ? wallpaper.zoom : 1;
+
+  /* A zoom pushes the picture past the viewport, so the request covers what is
+     painted rather than what the layer measures; `wallpaperUrlForDisplay` takes
+     the zoom and buckets it, so dragging the slider asks for at most three
+     sizes instead of one per tick. */
+  const imageUrl =
+    resolved.url && layerBox.width > 0
+      ? wallpaperUrlForDisplay(resolved.url, layerBox.width, devicePixelRatio(), zoom)
+      : undefined;
+
   useEffect(() => {
     setImageReady(false);
     setImageFailed(false);
-  }, [resolved.url]);
+  }, [imageUrl]);
 
   // Procedural live scenes only; imported videos are handled above.
   const liveActive =
@@ -213,11 +239,6 @@ export function WallpaperLayer({ target, dimmed }: WallpaperLayerProps) {
     wallpaper.scale === "contain" ? "contain" : wallpaper.scale === "fill" ? "fill" : "cover";
   const isVideo = resolved.isCustom && resolved.kind === "live";
 
-  /* Framing: the fit mode decides how the picture meets the viewport, then the
-     user's zoom pushes in or pulls back about the centre, and the offsets slide
-     it. Blur is compensated for here rather than in the stylesheet so the
-     transform stays a single value and cannot fight with a hover rule. */
-  const zoom = Number.isFinite(wallpaper.zoom) ? wallpaper.zoom : 1;
   const offsetX = Number.isFinite(wallpaper.offsetX) ? wallpaper.offsetX : 0;
   const offsetY = Number.isFinite(wallpaper.offsetY) ? wallpaper.offsetY : 0;
   const blurComp = wallpaper.blur > 0 ? 1 + wallpaper.blur / 120 : 1;
@@ -231,14 +252,15 @@ export function WallpaperLayer({ target, dimmed }: WallpaperLayerProps) {
   return (
     <div
       className="cr-wallpaper"
+      ref={layerRef}
       style={{ background: resolved.fallback }}
       data-target={target}
       aria-hidden="true"
     >
-      {resolved.url && resolved.kind === "image" && !imageFailed && (
+      {imageUrl && resolved.kind === "image" && !imageFailed && (
         <img
           className="cr-wallpaper__image"
-          src={resolved.url}
+          src={imageUrl}
           alt=""
           draggable={false}
           decoding="async"
@@ -297,17 +319,26 @@ export function WallpaperPreview({
   const resolved = useResolvedWallpaper(id);
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
+  // A tile is small; asking for the 3840px original means the grid decodes one
+  // full-size photograph per wallpaper to draw each at a couple of hundred
+  // pixels. The tile measures itself and asks for what it shows.
+  const [previewRef, previewBox] = useElementBox<HTMLDivElement>();
 
   const isVideo = resolved.isCustom && resolved.kind === "live";
+  const imageUrl =
+    resolved.url && previewBox.width > 0
+      ? wallpaperUrlForDisplay(resolved.url, previewBox.width, devicePixelRatio())
+      : undefined;
 
   return (
     <div
       className={className}
+      ref={previewRef}
       style={{ background: resolved.fallback, borderRadius: radius, overflow: "hidden" }}
     >
-      {resolved.url && !isVideo && !failed && (
+      {imageUrl && !isVideo && !failed && (
         <img
-          src={resolved.url}
+          src={imageUrl}
           alt=""
           loading="lazy"
           decoding="async"

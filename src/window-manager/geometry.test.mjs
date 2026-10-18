@@ -19,6 +19,7 @@ import {
   fractionOf,
   isMaximizeZone,
   rectFromFraction,
+  separateRects,
   viewportInOsSpace,
   zoneRect,
 } from "./geometry.ts";
@@ -258,5 +259,79 @@ describe("constrainToWorkArea", () => {
   test("a window already inside the work area is not moved", () => {
     const inside = { x: 200, y: 200, width: 500, height: 400 };
     assert.deepEqual(constrainToWorkArea(inside, WORK), inside);
+  });
+});
+
+describe("separateRects (a desk is not a pile)", () => {
+  /* The desk that produced the bug in the report: a narrow work area, and the
+     two windows a shrunken viewport clamps towards the same corner. */
+  const NARROW = { x: 0, y: 58, width: 800, height: 516 };
+  const VPN = { x: 0, y: 58, width: 760, height: 440 };
+  const BROWSER = { x: 0, y: 58, width: 776, height: 440 };
+
+  const need = (a, b) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
+
+  test("a lone window keeps its geometry exactly", () => {
+    assert.deepEqual(separateRects([VPN], NARROW), [VPN]);
+  });
+
+  test("a window with room of its own is not moved", () => {
+    const a = { x: 0, y: 58, width: 300, height: 300 };
+    const b = { x: 400, y: 200, width: 300, height: 300 };
+    assert.deepEqual(separateRects([a, b], NARROW), [a, b]);
+  });
+
+  test("two windows clamped to the same corner are pulled apart, first one kept", () => {
+    const [first, second] = separateRects([VPN, BROWSER], NARROW);
+    assert.deepEqual(first, VPN, "the window already in front keeps its place");
+    assert.ok(need(first, second) >= 26, `expected at least 26px apart, got ${need(first, second)}`);
+  });
+
+  test("every window on a piled desk ends up with its own spot", () => {
+    const pile = [VPN, BROWSER, { ...BROWSER }, { ...BROWSER }];
+    const spread = separateRects(pile, NARROW);
+    for (let i = 0; i < spread.length; i += 1) {
+      for (let j = i + 1; j < spread.length; j += 1) {
+        assert.ok(
+          need(spread[i], spread[j]) >= 26,
+          `windows ${i} and ${j} are still on top of each other`,
+        );
+      }
+    }
+  });
+
+  test("moving a window never changes its size or makes its titlebar unreachable", () => {
+    const pile = [VPN, BROWSER, { ...BROWSER }];
+    for (const rect of separateRects(pile, NARROW)) {
+      assert.ok(rect.width > 0 && rect.height > 0);
+      assert.ok(rect.x >= NARROW.x && rect.y >= NARROW.y, "never pushed off the top or left");
+      assert.ok(rect.x + 140 <= NARROW.x + NARROW.width, "keeps a grabbable left edge on the desk");
+      assert.ok(rect.y + 44 <= NARROW.y + NARROW.height, "keeps its titlebar on the desk");
+    }
+    const sizes = separateRects(pile, NARROW).map((rect) => `${rect.width}x${rect.height}`);
+    assert.deepEqual(sizes, pile.map((rect) => `${rect.width}x${rect.height}`));
+  });
+
+  test("the result is deterministic, so a reload does not reshuffle the desk", () => {
+    const pile = [VPN, BROWSER, { ...BROWSER }];
+    assert.deepEqual(separateRects(pile, NARROW), separateRects(pile, NARROW));
+  });
+
+  test("a desk with no room left returns the window reachable rather than looping", () => {
+    const tiny = { x: 0, y: 0, width: 140, height: 44 };
+    const one = { x: 0, y: 0, width: 140, height: 44 };
+    const two = separateRects([one, { ...one }], tiny);
+    assert.equal(two.length, 2);
+    for (const rect of two) {
+      assert.equal(rect.x, tiny.x);
+      assert.equal(rect.y, tiny.y);
+    }
+  });
+
+  test("the input rects are not mutated", () => {
+    const pile = [VPN, BROWSER];
+    const snapshot = pile.map((rect) => ({ ...rect }));
+    separateRects(pile, NARROW);
+    assert.deepEqual(pile, snapshot);
   });
 });

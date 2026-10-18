@@ -51,7 +51,7 @@ registerHooks({
   },
 });
 
-const { builtInWallpapers, gradientWallpapers, liveWallpapers, builtInWallpaperIds, findBuiltInWallpaper } =
+const { builtInWallpapers, gradientWallpapers, liveWallpapers, builtInWallpaperIds, findBuiltInWallpaper, wallpaperUrlForDisplay } =
   await import("@/wallpapers/library");
 const { liveScenes, liveSceneLabels } = await import("@/wallpapers/liveScenes");
 
@@ -126,6 +126,84 @@ describe("wallpaper library", () => {
     const offered = new Set(liveWallpapers.map((wallpaper) => wallpaper.scene));
     for (const scene of Object.keys(liveScenes)) {
       assert.ok(offered.has(scene), `scene ${scene} is implemented but has no wallpaper`);
+    }
+  });
+});
+
+describe("wallpaperUrlForDisplay", () => {
+  const PHOTO = "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&w=3840&q=85";
+  const width = (url) => Number(new URL(url).searchParams.get("w"));
+
+  test("a desktop-sized request is trimmed to what the display paints", () => {
+    const sized = wallpaperUrlForDisplay(PHOTO, 1280, 1);
+    assert.equal(width(sized), 1280, "a 1280px layer must not decode a 3840px photograph");
+    assert.ok(sized.includes("auto=format"), "the format negotiation is preserved");
+    assert.ok(sized.includes("q=85"), "the quality is preserved");
+  });
+
+  test("a hidpi display still gets the pixels it shows", () => {
+    // A 1440px layer on a 2x panel paints 2880 real pixels.
+    assert.equal(width(wallpaperUrlForDisplay(PHOTO, 1440, 2)), 2880);
+  });
+
+  test("requests are rounded up to a cache step, never down below what is painted", () => {
+    const sized = wallpaperUrlForDisplay(PHOTO, 1000, 1);
+    assert.ok(width(sized) >= 1000, "rounding must not undershoot the layer");
+    assert.equal(width(sized) % 160, 0, "requests should land on round widths");
+  });
+
+  test("the manifest size is a ceiling: a request is never enlarged", () => {
+    assert.equal(wallpaperUrlForDisplay(PHOTO, 3840, 1), PHOTO);
+    assert.equal(wallpaperUrlForDisplay(PHOTO, 6000, 2), PHOTO);
+  });
+
+  test("a small slot never asks for less than a legible photograph", () => {
+    assert.equal(width(wallpaperUrlForDisplay(PHOTO, 120, 1)), 640);
+  });
+
+  test("a zoomed wallpaper is requested at the size it is painted", () => {
+    // Framing zoom 2 paints twice the layer, so the request has to double.
+    assert.equal(width(wallpaperUrlForDisplay(PHOTO, 800, 1, 2)), 1600);
+    // Bucketed to whole steps, so a drag across 1.1..1.9 asks for 2x only once.
+    assert.equal(width(wallpaperUrlForDisplay(PHOTO, 800, 1, 1.1)), 1600);
+    assert.equal(width(wallpaperUrlForDisplay(PHOTO, 800, 1, 1.9)), 1600);
+    assert.equal(width(wallpaperUrlForDisplay(PHOTO, 800, 1, 2.9)), 2400);
+  });
+
+  test("a zoom of one or less never shrinks the request below the layer", () => {
+    for (const zoom of [1, 0.5, 0, -2]) {
+      assert.equal(width(wallpaperUrlForDisplay(PHOTO, 800, 1, zoom)), 800);
+    }
+    assert.equal(width(wallpaperUrlForDisplay(PHOTO, 800, 1, Number.NaN)), 800);
+  });
+
+  test("a very large zoom still stops at the manifest ceiling", () => {
+    assert.equal(width(wallpaperUrlForDisplay(PHOTO, 1440, 2, 3)), 3840);
+  });
+
+  test("a url that is not one of ours is returned untouched", () => {
+    const custom = "blob:http://localhost:5273/8f0a-12b3";
+    assert.equal(wallpaperUrlForDisplay(custom, 900, 1), custom);
+    const otherHost = "https://example.com/photo.jpg?w=3840";
+    assert.equal(wallpaperUrlForDisplay(otherHost, 900, 1), otherHost);
+  });
+
+  test("nonsense dimensions fall back to the legible minimum instead of throwing", () => {
+    for (const bad of [0, -100, Number.NaN, Number.POSITIVE_INFINITY]) {
+      assert.equal(width(wallpaperUrlForDisplay(PHOTO, bad, 1)), 640);
+    }
+    assert.equal(width(wallpaperUrlForDisplay(PHOTO, 1280, Number.NaN)), 1280);
+  });
+
+  test("a url with no readable width is left alone", () => {
+    const noWidth = "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format";
+    assert.equal(wallpaperUrlForDisplay(noWidth, 800, 1), noWidth);
+  });
+
+  test("the manifest urls keep their full size, so a 4K panel is unaffected", () => {
+    for (const wallpaper of all) {
+      if (wallpaper.kind !== "image") continue;
+      assert.equal(width(wallpaper.url), 3840, `${wallpaper.id} should stay at the ceiling`);
     }
   });
 });

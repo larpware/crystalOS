@@ -8,7 +8,7 @@ import type {
   WindowState,
 } from "@/types";
 import { clamp, createId } from "@/utils/format";
-import { fractionOf, rectFromFraction, zoneRect } from "@/window-manager/geometry";
+import { fractionOf, rectFromFraction, separateRects, zoneRect } from "@/window-manager/geometry";
 import { activeWorkspaceId, useWorkspaceStore } from "./workspaces";
 
 export interface OpenWindowInput {
@@ -73,6 +73,26 @@ function rectEqual(a: Rect, b: Rect): boolean {
   return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
 }
 
+/*
+ * The windows a person can actually see at once, in front-to-back order.
+ *
+ * Desktop placement works on this list: a maximized window is the desk, and a
+ * minimized one is not on it, so neither should push the others around.
+ */
+function deskWindows(windows: WindowInstance[], workspaceId?: string): WindowInstance[] {
+  return windows
+    .filter(
+      (window) =>
+        !window.minimized &&
+        window.state !== "maximized" &&
+        (workspaceId === undefined ||
+          window.sticky === true ||
+          !window.workspaceId ||
+          window.workspaceId === workspaceId),
+    )
+    .sort((a, b) => b.z - a.z);
+}
+
 function clampToWorkArea(rect: Rect, workArea: Rect, minSize: { width: number; height: number }): Rect {
   const width = clamp(rect.width, Math.min(minSize.width, workArea.width), workArea.width);
   const height = clamp(rect.height, Math.min(minSize.height, workArea.height), workArea.height);
@@ -133,9 +153,20 @@ export const useWindowStore = create<WindowStore>()((set, get) => ({
     // A window whose geometry did not actually move keeps its identity, so the
     // scale slider — which re-fits on every tick — does not force a re-render
     // of every window when the new work area asks nothing new of it.
+    const fitted = windows.map((window) => tiledRect(window, workArea));
+    // A narrower desk clamps windows towards the same corner; spreading the
+    // ones that landed on top of each other is what stops a resize from
+    // turning the desk into a pile. The window in front keeps its place.
+    const desk = deskWindows(windows);
+    const spread = separateRects(
+      desk.map((window) => tiledRect(window, workArea)),
+      workArea,
+    );
+    const placed = new Map(desk.map((window, position) => [window.id, spread[position]]));
+
     let changed = false;
-    const next = windows.map((window) => {
-      const rect = tiledRect(window, workArea);
+    const next = windows.map((window, index) => {
+      const rect = placed.get(window.id) ?? fitted[index];
       if (rectEqual(window.rect, rect)) return window;
       changed = true;
       return { ...window, rect };
@@ -165,7 +196,18 @@ export const useWindowStore = create<WindowStore>()((set, get) => ({
     const x = Math.round(workArea.x + (workArea.width - width) / 2 + cascadeStep - 78);
     const y = Math.round(workArea.y + (workArea.height - height) / 2 + cascadeStep - 78);
 
-    const rect = clampToWorkArea({ x, y, width, height }, workArea, input.minSize);
+    const workspaceId = input.workspaceId ?? activeWorkspaceId();
+    // The centre of a desk that is barely wider than the window is the same for
+    // every window, so the desk — not the arithmetic — decides whether this one
+    // can have the spot.
+    const placed = separateRects(
+      [
+        ...deskWindows(windows, workspaceId).map((window) => window.rect),
+        clampToWorkArea({ x, y, width, height }, workArea, input.minSize),
+      ],
+      workArea,
+    );
+    const rect = placed[placed.length - 1];
     const z = get().topZ + 1;
 
     const instance: WindowInstance = {
@@ -180,7 +222,7 @@ export const useWindowStore = create<WindowStore>()((set, get) => ({
       minimized: false,
       focused: true,
       args: input.args,
-      workspaceId: input.workspaceId ?? activeWorkspaceId(),
+      workspaceId,
       sticky: input.sticky,
     };
 
@@ -209,6 +251,12 @@ export const useWindowStore = create<WindowStore>()((set, get) => ({
         const z = get().topZ + 1;
         set({
           topZ: z,
+          /* Focus moves with the window: leaving `focusedId` pointing at the
+             window that was just closed makes the desk disagree with itself —
+             the panel keeps showing the closed app as the active one, and the
+             next click that asks "is this already focused?" gets an answer
+             about a window that no longer exists. */
+          focusedId: next.id,
           windows: remaining
             .map((window) =>
               window.id === next.id
@@ -521,39 +569,66 @@ export const useWindowStore = create<WindowStore>()((set, get) => ({
     const known = useWorkspaceStore.getState().workspaces;
     const fallbackWorkspace = useWorkspaceStore.getState().activeId;
     let topZ = state.topZ;
-    const restored: WindowInstance[] = [];
 
-    for (const entry of entries) {
-      topZ += 1;
+    /*
+     * Geometry first. A snapshot is taken from a desk that was clamped to the
+     * size of the viewport at the time, so it can hold several windows sitting
+     * on the same coordinates — restore that verbatim and the pile comes back
+     * with the session. The window that was in front (last in the snapshot,
+     * which is stacked back-to-front) keeps the place it had.
+     */
+    const drafts = entries.map((entry) => {
       // A snapshot can outlive the workspace it was taken on.
       const workspaceId =
         entry.sticky || known.some((workspace) => workspace.id === entry.workspaceId)
           ? entry.workspaceId
           : fallbackWorkspace;
       const snapBox = entry.snapBox;
-      restored.push({
-        id: createId("win"),
-        appId: entry.appId,
-        title: entry.title,
-        icon: entry.icon,
-        z: topZ,
-        state: entry.state,
+      const rect =
+        entry.state === "maximized"
+          ? { ...state.workArea }
+          : snapBox
+            ? rectFromFraction(snapBox, state.workArea)
+            : clampToWorkArea(entry.rect, state.workArea, { width: 280, height: 200 });
+      return {
+        entry,
+        workspaceId,
         snapBox,
-        rect:
-          entry.state === "maximized"
-            ? { ...state.workArea }
-            : snapBox
-              ? rectFromFraction(snapBox, state.workArea)
-              : clampToWorkArea(entry.rect, state.workArea, { width: 280, height: 200 }),
+        rect,
         restoreRect: clampToWorkArea(entry.restoreRect, state.workArea, {
           width: 280,
           height: 200,
         }),
-        minimized: entry.minimized,
+      };
+    });
+
+    const onDesk = drafts.filter(
+      (draft) => !draft.entry.minimized && draft.entry.state !== "maximized",
+    );
+    const priority = [...onDesk].reverse();
+    const spread = separateRects(priority.map((draft) => draft.rect), state.workArea);
+    priority.forEach((draft, position) => {
+      draft.rect = spread[position];
+    });
+
+    const restored: WindowInstance[] = [];
+    for (const draft of drafts) {
+      topZ += 1;
+      restored.push({
+        id: createId("win"),
+        appId: draft.entry.appId,
+        title: draft.entry.title,
+        icon: draft.entry.icon,
+        z: topZ,
+        state: draft.entry.state,
+        snapBox: draft.snapBox,
+        rect: draft.rect,
+        restoreRect: draft.restoreRect,
+        minimized: draft.entry.minimized,
         focused: false,
-        args: entry.args,
-        workspaceId,
-        sticky: entry.sticky,
+        args: draft.entry.args,
+        workspaceId: draft.workspaceId,
+        sticky: draft.entry.sticky,
       });
     }
 
