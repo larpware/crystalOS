@@ -27,6 +27,7 @@ import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { createId } from "./ids.mjs";
 import { formatFriendCode, generateFriendCode } from "./codes.mjs";
+import { rollRarity } from "./rarity.mjs";
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -40,6 +41,8 @@ CREATE TABLE IF NOT EXISTS users (
   kdf            TEXT NOT NULL DEFAULT 'scrypt',
   bio            TEXT,
   avatar         TEXT,
+  rarity         TEXT,
+  rarity_roll    INTEGER,
   created_at     INTEGER NOT NULL,
   last_seen_at   INTEGER NOT NULL DEFAULT 0
 );
@@ -107,6 +110,34 @@ function uniqueViolation(error, column) {
   return message.includes("UNIQUE constraint failed") && message.includes(column);
 }
 
+/**
+ * Adds a column when it is missing. The schema below is applied with
+ * `CREATE TABLE IF NOT EXISTS`, which cannot alter a table that already exists,
+ * so columns introduced after the first release need this instead of a
+ * migration framework.
+ */
+function ensureColumn(db, table, column, definition) {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all();
+  if (columns.some((entry) => entry.name === column)) return;
+  db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+}
+
+/**
+ * Rarity arrived after accounts already existed, so any row without one is
+ * given a genuine draw at the published distribution rather than a default.
+ * Handing every legacy account the same tier would make the guide a lie for
+ * exactly the accounts that predate it.
+ */
+function backfillRarity(db) {
+  const missing = db.prepare("SELECT id FROM users WHERE rarity IS NULL").all();
+  if (missing.length === 0) return;
+  const update = db.prepare("UPDATE users SET rarity = ?, rarity_roll = ? WHERE id = ?");
+  for (const row of missing) {
+    const { rarity, roll } = rollRarity();
+    update.run(rarity, roll, row.id);
+  }
+}
+
 /** Canonical pair ordering, so (a,b) and (b,a) are the same row. */
 export function orderedPair(first, second) {
   return first < second ? [first, second] : [second, first];
@@ -131,6 +162,7 @@ export function publicUser(row, now = Date.now()) {
     friendCode: formatFriendCode(row.friend_code),
     bio: row.bio ?? undefined,
     avatar: row.avatar ?? undefined,
+    rarity: row.rarity ?? undefined,
     createdAt: row.created_at,
     online: row.last_seen_at > now - PRESENCE_WINDOW_MS,
     lastSeenAt: row.last_seen_at,
@@ -152,6 +184,10 @@ export function openAccountsStore(options = {}) {
   db.exec("PRAGMA journal_mode = WAL;");
   db.exec("PRAGMA foreign_keys = ON;");
   db.exec(SCHEMA);
+  // Databases created before rarity existed have no such columns.
+  ensureColumn(db, "users", "rarity", "TEXT");
+  ensureColumn(db, "users", "rarity_roll", "INTEGER");
+  backfillRarity(db);
 
   /** Runs `fn` inside a transaction; rolls back if it throws. */
   function transaction(fn) {
@@ -185,14 +221,18 @@ export function openAccountsStore(options = {}) {
      */
     createUser({ username, displayName, passwordSalt, passwordHash, bio, avatar, createdAt }) {
       const id = createId("usr");
+      // Drawn once, outside the retry loop: a friend-code collision must not
+      // hand the account a second chance at a better tier.
+      const { rarity, roll } = rollRarity();
       for (let attempt = 0; attempt < FRIEND_CODE_ATTEMPTS; attempt += 1) {
         const friendCode = generateFriendCode();
         try {
           db.prepare(
             `INSERT INTO users
                (id, username, username_lower, display_name, friend_code,
-                password_salt, password_hash, bio, avatar, created_at, last_seen_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                password_salt, password_hash, bio, avatar, rarity, rarity_roll,
+                created_at, last_seen_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           ).run(
             id,
             username,
@@ -203,6 +243,8 @@ export function openAccountsStore(options = {}) {
             passwordHash,
             bio ?? null,
             avatar ?? null,
+            rarity,
+            roll,
             createdAt,
             createdAt,
           );
@@ -224,6 +266,15 @@ export function openAccountsStore(options = {}) {
     userByFriendCode: (canonicalCode) =>
       db.prepare("SELECT * FROM users WHERE friend_code = ?").get(canonicalCode) ?? null,
     countUsers: () => Number(db.prepare("SELECT COUNT(*) AS n FROM users").get().n),
+
+    /** How many accounts hold each rarity. Used by tests and diagnostics. */
+    rarityCounts: () =>
+      Object.fromEntries(
+        db
+          .prepare("SELECT rarity, COUNT(*) AS n FROM users GROUP BY rarity")
+          .all()
+          .map((row) => [row.rarity, Number(row.n)]),
+      ),
 
     /** Only these fields are writable; friend codes and ids never are. */
     updateUser(id, patch) {

@@ -30,7 +30,7 @@ export class AppErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
     if (useSystemStore.getState().developerMode) {
-      console.error(`[crescent] ${this.props.appName} crashed`, error, info.componentStack);
+      console.error(`[crystal] ${this.props.appName} crashed`, error, info.componentStack);
     }
   }
 

@@ -388,7 +388,7 @@ function CustomThemeEditor() {
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `${theme.id}.crescent-theme.json`;
+    anchor.download = `${theme.id}.crystal-theme.json`;
     anchor.click();
     URL.revokeObjectURL(url);
   };

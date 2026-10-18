@@ -14,7 +14,18 @@ import { useSystemStore } from "@/state/system";
 import { useWindowStore } from "@/state/windows";
 import { useAuthStore } from "@/state/auth";
 import { useBrowserStore } from "@/state/browser";
+import { useAppsStore } from "@/state/apps";
 import { appCatalog } from "@/apps/catalog";
+import { APP_CATEGORY_LABEL } from "@/types";
+import {
+  appSource,
+  capabilityLabels,
+  isRemovable,
+  resolveApp,
+  searchApps,
+  staleInstalled,
+  type AppResolution,
+} from "./installs";
 import { openApp, openNode } from "@/services/os";
 import { getScramjetState } from "@/services/scramjet";
 import {
@@ -73,7 +84,7 @@ export interface CommandDefinition {
   name: string;
   summary: string;
   usage?: string;
-  group: "files" | "system" | "shell" | "help";
+  group: "files" | "system" | "store" | "shell" | "help";
   run: (args: string[], ctx: CommandContext) => void | Promise<void>;
 }
 
@@ -154,6 +165,49 @@ function shortPath(id: string): string {
   return home !== "/" && full.startsWith(home) ? `~${full.slice(home.length)}` || "~" : full;
 }
 
+/* ---- application install helpers ---------------------------------------- */
+
+/** Catalogue ids the user has explicitly enabled, i.e. installed minus removed. */
+function enabledAppIds(): Set<string> {
+  const store = useAppsStore.getState();
+  const removed = new Set(store.removed);
+  return new Set(store.installed.map((entry) => entry.appId).filter((id) => !removed.has(id)));
+}
+
+/** Prints what a package is before anything is enabled: the store's own metadata. */
+function describeApp(ctx: CommandContext, meta: (typeof appCatalog)[number]): void {
+  ctx.print(line(meta.name, "heading"));
+  ctx.print(line(`  id           ${meta.id}`));
+  ctx.print(line(`  version      ${meta.version}`));
+  ctx.print(line(`  category     ${APP_CATEGORY_LABEL[meta.category]}`));
+  ctx.print(line(`  source       ${appSource(meta)}`));
+  ctx.print(line(`  permissions  ${capabilityLabels(meta).join(", ") || "none declared"}`));
+}
+
+/**
+ * The refusal for a native program. It names the program, says why CrystalOS
+ * cannot install it, and only mentions a CrystalOS application when one covers
+ * some of the same ground — phrased so it is never mistaken for the program the
+ * user asked for.
+ */
+function refuseNative(ctx: CommandContext, resolution: Extract<AppResolution, { kind: "native" }>): void {
+  ctx.print(line(`${resolution.label} is ${resolution.reason}, not a CrystalOS application.`, "error"));
+  if (resolution.closest) {
+    ctx.print(
+      line(
+        `  CrystalOS ships ${resolution.closest.name}, which covers some of the same ground. It is CrystalOS's own application, not ${resolution.label}.`,
+        "muted",
+      ),
+    );
+  }
+  ctx.print(
+    line(
+      "  CrystalOS is a web OS: it enables the web applications bundled with this build. It cannot install Windows software.",
+      "muted",
+    ),
+  );
+}
+
 export const commands: CommandDefinition[] = [
   /* ---- help ------------------------------------------------------------ */
   {
@@ -176,10 +230,11 @@ export const commands: CommandDefinition[] = [
       const groups: Record<CommandDefinition["group"], string> = {
         files: "Filesystem",
         system: "System",
+        store: "Applications",
         shell: "Shell",
         help: "Help",
       };
-      for (const group of ["files", "system", "shell", "help"] as const) {
+      for (const group of ["files", "system", "store", "shell", "help"] as const) {
         const list = commands.filter((command) => command.group === group);
         if (list.length === 0) continue;
         ctx.print(line(groups[group], "heading"));
@@ -246,7 +301,7 @@ export const commands: CommandDefinition[] = [
       const local = byteSize();
       const estimate = await estimateStorage();
       ctx.print(line("filesystem      used", "heading"));
-      ctx.print(line(`crescent-local  ${formatBytes(local)} across ${keys.length} keys`));
+      ctx.print(line(`crystal-local  ${formatBytes(local)} across ${keys.length} keys`));
       if (estimate) {
         ctx.print(line(`browser-quota   ${formatBytes(estimate.usage)} of ${formatBytes(estimate.quota)}`));
       } else {
@@ -565,14 +620,15 @@ export const commands: CommandDefinition[] = [
   },
   {
     name: "apps",
-    summary: "List installed applications.",
+    summary: "List every application in the catalogue.",
     group: "shell",
     run: (_args, ctx) => {
-      ctx.print(line("Installed applications", "heading"));
+      ctx.print(line("Applications in this build", "heading"));
       for (const app of appCatalog) {
         ctx.print(line(`  ${app.id.padEnd(12)} ${app.name}`, "muted"));
       }
       ctx.print(line(`\n${appCatalog.length} applications. Launch one with: open <id>`, "muted"));
+      ctx.print(line("Enable or disable one with: install <id> / remove <id>", "muted"));
     },
   },
   {
@@ -785,6 +841,253 @@ export const commands: CommandDefinition[] = [
     summary: "Clear the terminal.",
     group: "shell",
     run: (_args, ctx) => ctx.clear(),
+  },
+
+  /* ---- applications ---------------------------------------------------- */
+  {
+    name: "search",
+    summary: "Search the application catalogue.",
+    usage: "search <term>",
+    group: "store",
+    run: (args, ctx) => {
+      const term = args.join(" ").trim();
+      if (!term) {
+        ctx.print(line("search: what are you looking for?", "error"));
+        ctx.print(line("  search games · search notes · search internet", "muted"));
+        return;
+      }
+      const results = searchApps(term);
+      if (results.length === 0) {
+        const resolution = resolveApp(term);
+        if (resolution.kind === "native") {
+          refuseNative(ctx, resolution);
+          return;
+        }
+        ctx.print(line(`Nothing in the catalogue matches '${term}'.`, "muted"));
+        ctx.print(line("  List everything with: list available", "muted"));
+        return;
+      }
+      const enabled = enabledAppIds();
+      ctx.print(
+        line(`${results.length} match${results.length === 1 ? "" : "es"} for '${term}'`, "heading"),
+      );
+      for (const meta of results) {
+        ctx.print(
+          line(
+            `  ${meta.id.padEnd(12)} ${meta.name}${enabled.has(meta.id) ? "  ·  enabled" : ""}`,
+            enabled.has(meta.id) ? "accent" : "muted",
+          ),
+        );
+        ctx.print(line(`               ${meta.summary}`, "muted"));
+      }
+      ctx.print(line("Details and install: install <id>", "muted"));
+    },
+  },
+  {
+    name: "install",
+    summary: "Show an application's details and enable it.",
+    usage: "install <app>",
+    group: "store",
+    run: (args, ctx) => {
+      const term = args.join(" ").trim();
+      if (!term) {
+        ctx.print(line("install: which application?", "error"));
+        ctx.print(line("  e.g. install notes · install calc · search <term>", "muted"));
+        return;
+      }
+
+      const resolution = resolveApp(term);
+      if (resolution.kind === "unknown") {
+        ctx.print(line(`install: no application called '${term}'.`, "error"));
+        ctx.print(line("  Find the right name with: search <term>", "muted"));
+        return;
+      }
+      if (resolution.kind === "native") {
+        refuseNative(ctx, resolution);
+        return;
+      }
+
+      const { meta } = resolution;
+      describeApp(ctx, meta);
+      if (resolution.matchedBy === "alias" && resolution.alias) {
+        ctx.print(line(`  matched      '${resolution.alias}' is another name for ${meta.id}`, "muted"));
+      }
+
+      /* A system application is not a package: it is part of the build and the
+         Store never lists it for install or removal. Saying so is more useful
+         than pretending to install it again. */
+      if (!isRemovable(meta)) {
+        ctx.print(line(`${meta.name} is a system application and is always available.`, "success"));
+        ctx.print(line(`  Launch it with: open ${meta.id}`, "muted"));
+        return;
+      }
+
+      if (enabledAppIds().has(meta.id)) {
+        ctx.print(line(`${meta.name} is already enabled.`, "success"));
+        ctx.print(line(`  Launch it with: open ${meta.id}`, "muted"));
+        return;
+      }
+
+      useAppsStore.getState().install(meta.id, meta.version);
+      ctx.print(line(`enabled ${meta.name} ${meta.version}`, "success"));
+      ctx.print(
+        line(
+          "  Nothing was downloaded: the application was already in this build, and installing records that it is enabled.",
+          "muted",
+        ),
+      );
+    },
+  },
+  {
+    name: "remove",
+    summary: "Disable an optional application.",
+    usage: "remove <app>",
+    group: "store",
+    run: (args, ctx) => {
+      const term = args.join(" ").trim();
+      if (!term) {
+        ctx.print(line("remove: which application?", "error"));
+        return;
+      }
+
+      const resolution = resolveApp(term);
+      if (resolution.kind === "unknown") {
+        ctx.print(line(`remove: no application called '${term}'.`, "error"));
+        return;
+      }
+      if (resolution.kind === "native") {
+        refuseNative(ctx, resolution);
+        return;
+      }
+
+      const { meta } = resolution;
+      if (!isRemovable(meta)) {
+        ctx.print(line(`${meta.name} is a system application and cannot be removed.`, "error"));
+        ctx.print(line("  CrystalOS has no mechanism to remove it, so there is nothing to do.", "muted"));
+        return;
+      }
+      if (!enabledAppIds().has(meta.id)) {
+        ctx.print(line(`${meta.name} is not enabled, so there is nothing to remove.`, "muted"));
+        return;
+      }
+
+      useAppsStore.getState().remove(meta.id);
+      ctx.print(line(`disabled ${meta.name}`, "success"));
+
+      const open = useWindowStore.getState().windows.filter((window) => window.appId === meta.id);
+      if (open.length > 0) {
+        ctx.print(
+          line(
+            `  ${open.length} open window${open.length === 1 ? "" : "s"} stay open until you close ${open.length === 1 ? "it" : "them"}.`,
+            "muted",
+          ),
+        );
+      }
+      ctx.print(
+        line(
+          "  The code stays in this build — CrystalOS is a web OS and disabling an application hides it. Re-enable it with: install " +
+            meta.id,
+          "muted",
+        ),
+      );
+    },
+  },
+  {
+    name: "list",
+    summary: "List enabled applications, or everything the catalogue carries.",
+    usage: "list [installed|available]",
+    group: "store",
+    run: (args, ctx) => {
+      const what = (args[0] ?? "installed").toLowerCase();
+      if (what !== "installed" && what !== "available") {
+        ctx.print(line(`list: '${args[0]}' is not a list I have.`, "error"));
+        ctx.print(line("  list installed · list available", "muted"));
+        return;
+      }
+
+      if (what === "available") {
+        ctx.print(line(`${appCatalog.length} applications in this build`, "heading"));
+        for (const meta of appCatalog) {
+          ctx.print(line(`  ${meta.id.padEnd(12)} ${meta.name}  ${meta.version}`, "muted"));
+        }
+        ctx.print(line("Details and install: install <id>", "muted"));
+        return;
+      }
+
+      const store = useAppsStore.getState();
+      const enabled = enabledAppIds();
+      if (enabled.size === 0) {
+        ctx.print(line("No applications are enabled yet.", "muted"));
+        ctx.print(line("  Enable one in the Store, or with: install <id>", "muted"));
+        ctx.print(line("  list available shows everything this build carries", "muted"));
+        return;
+      }
+
+      ctx.print(line(`${enabled.size} enabled`, "heading"));
+      for (const meta of appCatalog) {
+        if (!enabled.has(meta.id)) continue;
+        const entry = store.installed.find((item) => item.appId === meta.id);
+        const drift = entry && entry.version !== meta.version ? `  (recorded ${entry.version})` : "";
+        ctx.print(line(`  ${meta.id.padEnd(12)} ${meta.name}  ${meta.version}${drift}`, "muted"));
+      }
+      ctx.print(
+        line(
+          "Every bundled application is present in All Apps; this is the set recorded as enabled. remove <id> hides one from All Apps.",
+          "muted",
+        ),
+      );
+    },
+  },
+  {
+    name: "update",
+    summary: "Re-check enabled applications against the catalogue.",
+    usage: "update apps | update <app>",
+    group: "store",
+    run: (args, ctx) => {
+      const store = useAppsStore.getState();
+      const target = (args[0] ?? "").toLowerCase();
+
+      if (target && target !== "apps" && target !== "all") {
+        const resolution = resolveApp(args.join(" "));
+        if (resolution.kind === "unknown") {
+          ctx.print(line(`update: no application called '${args.join(" ")}'.`, "error"));
+          return;
+        }
+        if (resolution.kind === "native") {
+          refuseNative(ctx, resolution);
+          return;
+        }
+        const meta = resolution.meta;
+        const entry = store.installed.find((item) => item.appId === meta.id);
+        if (!entry) {
+          ctx.print(line(`${meta.name} is not enabled, so there is nothing to update.`, "muted"));
+          return;
+        }
+        if (entry.version === meta.version) {
+          ctx.print(line(`${meta.name} is already at ${meta.version}.`, "success"));
+          return;
+        }
+        store.install(meta.id, meta.version);
+        ctx.print(line(`${meta.name}  ${entry.version} → ${meta.version}`, "success"));
+        return;
+      }
+
+      const stale = staleInstalled(store.installed);
+      if (stale.length === 0) {
+        ctx.print(line("Every enabled application matches the catalogue's version.", "success"));
+      } else {
+        for (const entry of stale) {
+          store.install(entry.appId, entry.to);
+          ctx.print(line(`${entry.name}  ${entry.from} → ${entry.to}`, "success"));
+        }
+      }
+      ctx.print(
+        line(
+          "  Application code ships with the CrystalOS build itself. There is no download here — this only brings the enabled records back in line with this build.",
+          "muted",
+        ),
+      );
+    },
   },
 ];
 

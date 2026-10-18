@@ -87,7 +87,7 @@ if ("serviceWorker" in navigator && import.meta.env.PROD) {
           registration.installing?.addEventListener("statechange", (event) => {
             const worker = event.target as ServiceWorker;
             if (worker.state === "installed" && navigator.serviceWorker.controller) {
-              worker.postMessage("crescent:skip-waiting");
+              worker.postMessage("crystal:skip-waiting");
             }
           });
         });

@@ -365,6 +365,21 @@ export interface ClipboardState {
    Accounts
    ========================================================================== */
 
+/**
+ * The tiers a friend code can be drawn into, lowest first. Rarity is cosmetic:
+ * it decides how the profile card is painted and nothing else. The weights and
+ * the generation logic live in `server/accounts/rarity.mjs`, which is the only
+ * thing that draws one.
+ */
+export type RarityId =
+  | "basic"
+  | "uncommon"
+  | "rare"
+  | "epic"
+  | "legendary"
+  | "prismatic"
+  | "transcendent";
+
 export interface AccountProfile {
   id: string;
   username: string;
@@ -374,6 +389,11 @@ export interface AccountProfile {
    * immutable afterwards. Absent for guests, who have no server identity.
    */
   friendCode?: string;
+  /**
+   * Drawn by the server alongside the friend code and stored with the account.
+   * Also immutable: no route accepts a rarity, so it can never be re-rolled.
+   */
+  rarity?: RarityId;
   /** Data URL of the avatar image. */
   avatar?: string;
   bio?: string;
@@ -394,6 +414,8 @@ export interface FriendSummary {
   displayName: string;
   friendCode: string;
   avatar?: string;
+  /** The friend's friend-code rarity, as drawn by the server. */
+  rarity?: RarityId;
   /** True when the account was seen within the last minute. */
   online: boolean;
   lastSeenAt: number;

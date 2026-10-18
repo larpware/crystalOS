@@ -48,6 +48,7 @@ import {
 } from "./codes.mjs";
 import { conversationIdFor, openAccountsStore, publicUser } from "./db.mjs";
 import { createId } from "./ids.mjs";
+import { rarityGuide } from "./rarity.mjs";
 
 const DEFAULT_SESSION_DAYS = 30;
 const BODY_LIMIT = AVATAR_MAX_BYTES + 64 * 1024;
@@ -236,6 +237,7 @@ export function createAccountsApi(options = {}) {
       displayName: row.display_name,
       friendCode: formatFriendCode(row.friend_code),
       avatar: row.avatar ?? undefined,
+      rarity: row.rarity ?? undefined,
       online: row.last_seen_at > now - 60_000,
       lastSeenAt: row.last_seen_at,
     };
@@ -701,6 +703,14 @@ export function createAccountsApi(options = {}) {
       // "no session" as an error.
       if (method === "GET" && segments.length === 1 && segments[0] === "me") {
         handleMe(req, res);
+        return true;
+      }
+
+      // GET /api/accounts/rarities — the rarity guide, from the same table the
+      // draw uses. Public on purpose: someone deciding whether to sign up should
+      // be able to read the odds before they have an account.
+      if (method === "GET" && segments.length === 1 && segments[0] === "rarities") {
+        send(res, 200, rarityGuide());
         return true;
       }
 

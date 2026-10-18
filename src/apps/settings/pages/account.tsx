@@ -11,6 +11,7 @@ import {
   TextInput,
 } from "@/components/ui";
 import { AccountForm } from "@/shell/AccountForm";
+import { RarityBadge, RarityGuideModal } from "@/components/rarity";
 import { changePassword, forgetLegacyLocalAccounts, listLegacyLocalAccounts } from "@/services/auth";
 import { mesh } from "@/services/messaging";
 import { useAuthStore } from "@/state/auth";
@@ -34,6 +35,7 @@ export function AccountsPage() {
   const [signOutOpen, setSignOutOpen] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [rarityOpen, setRarityOpen] = useState(false);
   const [legacy, setLegacy] = useState(() => listLegacyLocalAccounts());
   const [copied, setCopied] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -132,6 +134,20 @@ export function AccountsPage() {
                     <span className="cr-code">{account.friendCode ?? "—"}</span>
                     <Button size="sm" icon="copy" onClick={() => void copyFriendCode()}>
                       Copy
+                    </Button>
+                  </div>
+                }
+              />
+            )}
+            {!account.guest && (
+              <Row
+                label="Friend-code rarity"
+                description="Drawn by the server once, alongside your friend code, and stored with the account. Cosmetic only — it carries no permissions and no privileges."
+                control={
+                  <div className="cr-friend-code">
+                    <RarityBadge rarity={account.rarity} showRank />
+                    <Button size="sm" icon="info" onClick={() => setRarityOpen(true)}>
+                      Rarity guide
                     </Button>
                   </div>
                 }
@@ -269,6 +285,7 @@ export function AccountsPage() {
 
       <PasswordModal open={passwordOpen} onClose={() => setPasswordOpen(false)} />
       <DeleteAccountModal open={deleteOpen} onClose={() => setDeleteOpen(false)} />
+      <RarityGuideModal open={rarityOpen} onClose={() => setRarityOpen(false)} />
     </>
   );
 }

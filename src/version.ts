@@ -8,13 +8,32 @@ import type { ReleaseNote, SystemVersion } from "@/types";
    ========================================================================== */
 
 export const SYSTEM_VERSION: SystemVersion = {
-  version: "1.3.0",
-  build: "2026.10.17-crystal.2",
-  releaseDate: "2026-10-17",
+  version: "1.4.0",
+  build: "2026.10.18-crystal.1",
+  releaseDate: "2026-10-18",
   codename: "CrystalOS",
 };
 
 export const releaseNotes: ReleaseNote[] = [
+  {
+    version: "1.4.0",
+    date: "2026-10-18",
+    added: [
+      "Friend-code rarity. Every account is drawn a rarity once, by the server, at the moment the account is created: Basic 60%, Uncommon 22%, Rare 10%, Epic 5%, Legendary 2%, Prismatic 0.9% and Transcendent 0.1%. The draw runs over 1,000 integer shares instead of floating-point percentages, so the number a tier publishes is exactly the number generated, and no route anywhere accepts a rarity — there is nothing to re-roll.",
+      "A rarity guide, reachable from Settings → Accounts. It states the same seven tiers with their exact probabilities and their \"one in N\" equivalent, and says plainly that rarity is cosmetic: it grants no permissions, no moderation rights and no account privileges. The guide is served from the same table the draw uses, so the two cannot drift; when the account server is unreachable the guide says it is showing this build's mirror.",
+      "Rarity badges on the account page and beside friends in Messages. Prismatic and Transcendent carry a slow drift on the badge mark, which the reduced-motion setting and the performance mode both switch off.",
+      "Application commands in the terminal, in a new Applications group under `help`: `search`, `install`, `remove`, `list installed`, `list available` and `update apps`. `install` prints an application's version, category, source and declared capabilities before enabling it and resolves a small table of synonyms (`calc`, `notepad`, `console`, `appstore`). `install firefox` answers with what Firefox is and why a web OS cannot install it, rather than quietly substituting the CrystalOS Browser; `remove` refuses system applications and says why.",
+    ],
+    changed: [
+      "The user-visible \"crescent\" strings are \"crystal\": the developer console handle is `window.crystal`, a saved-settings export is `crystal-settings-<build>.json`, a downloaded theme is `<id>.crystal-theme.json`, the plugin file extension is `.crystal-plugin` (files saved with the old extension still open), the taskbar games artwork is `crystalgames.png`, and the service worker cache is `crystal-v2` with the previous `crescent-*` caches pruned on activate.",
+      "`apps` in the terminal now says it lists the catalogue, which is what it does. `list installed` is the command that reads the enabled set.",
+    ],
+    known: [
+      "Rarity is permanent. Deleting the account and registering again is the only way to see a second draw — deliberately, because a re-roll control would make the published percentages meaningless.",
+      "Internal identifiers from before the rename are unchanged on purpose: the `crescent.` storage namespace, the `crescent-dark` theme id, the `crescent` icon-pack id, the `application/x-crescent-*` drag types and the `crescent:*` window events. Renaming them would strand saved profiles and pinned states for no user-visible gain.",
+      "CrystalOS is a web OS and ships no native installer. The install commands enable the web applications bundled with the build; no command here installs Windows software, and none reports success for something that did not happen.",
+    ],
+  },
   {
     version: "1.3.0",
     date: "2026-10-17",

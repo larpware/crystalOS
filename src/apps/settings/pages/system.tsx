@@ -891,7 +891,7 @@ export function AdvancedPage() {
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `crescent-settings-${SYSTEM_VERSION.build}.json`;
+    anchor.download = `crystal-settings-${SYSTEM_VERSION.build}.json`;
     anchor.click();
     URL.revokeObjectURL(url);
   };
@@ -927,7 +927,7 @@ export function AdvancedPage() {
       <Section title="Developer">
         <Row
           label="Developer mode"
-          description="Exposes live stores and a diagnostics report on window.crescent, and shows extra detail on application error screens."
+          description="Exposes live stores and a diagnostics report on window.crystal, and shows extra detail on application error screens."
           control={
             <Switch label="Developer mode" checked={developerMode} onChange={setDeveloperMode} />
           }
@@ -935,7 +935,7 @@ export function AdvancedPage() {
         <Row
           label="Diagnostics"
           description="Available in the browser console while developer mode is on."
-          control={<span className="cr-row__desc cr-code">window.crescent.report()</span>}
+          control={<span className="cr-row__desc cr-code">window.crystal.report()</span>}
         />
       </Section>
 

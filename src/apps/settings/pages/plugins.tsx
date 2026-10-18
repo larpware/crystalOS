@@ -304,7 +304,7 @@ export function PluginsPage() {
           <input
             ref={fileRef}
             type="file"
-            accept=".json,.crescent-plugin,application/json"
+            accept=".json,.crystal-plugin,.crescent-plugin,application/json"
             className="cr-plugin__file"
             onChange={async (event) => {
               const file = event.target.files?.[0];

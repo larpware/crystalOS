@@ -40,7 +40,7 @@ const taskbarItems: TaskbarItem[] = [
   { appId: "browser", icon: "/icons/taskbar/browser.png" },
   { appId: "drive", icon: "/icons/taskbar/googledrive.png" },
   { appId: "messages", icon: "/icons/taskbar/chat.png" },
-  { appId: "games", icon: "/icons/taskbar/crescentgames.png" },
+  { appId: "games", icon: "/icons/taskbar/crystalgames.png" },
   { appId: "store", icon: "/icons/taskbar/appstore.png" },
   { appId: "terminal", icon: "/icons/taskbar/terminal.png" },
   { appId: "settings", icon: "/icons/taskbar/Settings.png" },

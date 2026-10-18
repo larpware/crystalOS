@@ -16,7 +16,7 @@ import { readNetwork } from "./system";
    Developer diagnostics
 
    Enabled only by Settings → Advanced → Developer mode. Exposes the live
-   stores and a compact report on `window.crescent` so a developer can inspect
+   stores and a compact report on `window.crystal` so a developer can inspect
    the running OS from the browser console. Nothing is exposed by default.
    ========================================================================== */
 
@@ -103,17 +103,17 @@ interface CrystalOSDebugApi {
 
 declare global {
   interface Window {
-    crescent?: CrystalOSDebugApi;
+    crystal?: CrystalOSDebugApi;
   }
 }
 
 export function syncDeveloperMode(enabled: boolean): void {
   if (typeof window === "undefined") return;
   if (!enabled) {
-    delete window.crescent;
+    delete window.crystal;
     return;
   }
-  window.crescent = {
+  window.crystal = {
     report,
     stores: {
       windows: useWindowStore,
@@ -129,5 +129,5 @@ export function syncDeveloperMode(enabled: boolean): void {
     },
   };
   // eslint-disable-next-line no-console
-  console.info("[crescent] developer mode enabled — window.crescent is available");
+  console.info("[crystal] developer mode enabled — window.crystal is available");
 }

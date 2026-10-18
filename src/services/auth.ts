@@ -1,4 +1,5 @@
 import { apiRequest } from "./api";
+import { isRarityId } from "./rarity";
 import { loadJSON, removeKey } from "./storage";
 import type { AccountProfile } from "@/types";
 
@@ -57,6 +58,7 @@ interface ServerUser {
   friendCode: string;
   bio?: string;
   avatar?: string;
+  rarity?: string;
   createdAt: number;
 }
 
@@ -68,6 +70,10 @@ function toProfile(user: ServerUser): AccountProfile {
     friendCode: user.friendCode,
     bio: user.bio,
     avatar: user.avatar,
+    // The rarity is drawn by the server; an unrecognised value is dropped rather
+    // than stored, so a stale cached profile cannot paint a tier that does not
+    // exist in this build's table.
+    rarity: isRarityId(user.rarity) ? user.rarity : undefined,
     createdAt: user.createdAt,
   };
 }

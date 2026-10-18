@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Badge, Button, IconButton, TextInput } from "@/components/ui";
+import { RarityBadge } from "@/components/rarity";
 import { Icon } from "@/icons/Icon";
 import { openApp } from "@/services/os";
 import { useAuthStore } from "@/state/auth";
@@ -117,6 +118,7 @@ export function FriendsPanel() {
                 <div key={request.id} className="cr-messages__request">
                   <div className="cr-messages__request-head">
                     <span className="cr-truncate">{request.from.displayName}</span>
+                    <RarityBadge rarity={request.from.rarity} showLabel={false} />
                     <span className="cr-code cr-code--sm">{request.from.friendCode}</span>
                   </div>
                   <div className="cr-messages__request-actions">
@@ -182,6 +184,7 @@ export function FriendsPanel() {
                   onClick={() => createDirectChannel(toPeer(friend))}
                 >
                   <span className="cr-messages__presence" data-online={friend.online} />
+                  <RarityBadge rarity={friend.rarity} showLabel={false} />
                   <span>{friend.displayName}</span>
                   <span className="cr-code cr-code--sm">{friend.friendCode}</span>
                 </button>

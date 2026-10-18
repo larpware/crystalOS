@@ -23,7 +23,7 @@ try {
   importScripts("/controller/controller.sw.js");
   scramjetReady = typeof $scramjetController?.shouldRoute === "function";
 } catch (error) {
-  console.warn("[crescent] Scramjet controller unavailable:", error);
+  console.warn("[crystal] Scramjet controller unavailable:", error);
 }
 
 self.addEventListener("fetch", (event) => {
@@ -33,11 +33,11 @@ self.addEventListener("fetch", (event) => {
       event.respondWith($scramjetController.route(event));
     }
   } catch (error) {
-    console.warn("[crescent] Scramjet routing failed:", error);
+    console.warn("[crystal] Scramjet routing failed:", error);
   }
 });
 
-const VERSION = "crescent-v2";
+const VERSION = "crystal-v2";
 const SHELL_CACHE = `${VERSION}-shell`;
 const ASSET_CACHE = `${VERSION}-assets`;
 const IMAGE_CACHE = `${VERSION}-images`;
@@ -103,7 +103,7 @@ self.addEventListener("activate", (event) => {
       const keys = await caches.keys();
       await Promise.all(
         keys
-          .filter((key) => key.startsWith("crescent-") && !key.startsWith(VERSION))
+          .filter((key) => (key.startsWith("crystal-") || key.startsWith("crescent-")) && !key.startsWith(VERSION))
           .map((key) => caches.delete(key)),
       );
       await forgetDevelopmentShell();
@@ -214,5 +214,5 @@ self.addEventListener("fetch", (event) => {
 });
 
 self.addEventListener("message", (event) => {
-  if (event.data === "crescent:skip-waiting") self.skipWaiting();
+  if (event.data === "crystal:skip-waiting") self.skipWaiting();
 });
