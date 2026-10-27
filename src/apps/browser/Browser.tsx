@@ -1,4 +1,4 @@
-import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useContext, useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Badge, Button, EmptyState, IconButton, Menu, Tooltip, type MenuItem } from "@/components/ui";
 import { Icon } from "@/icons/Icon";
@@ -8,6 +8,8 @@ import { useOffline } from "@/hooks/useOffline";
 import { deriveCoverage, isVpnLocked, providerAppId, providerName } from "@/services/vpn/coverage";
 import { useVpnSnapshot, useVpnStore } from "@/state/vpn";
 import { useScramjetState, useProxiedFrame } from "@/services/scramjet/useProxiedFrame";
+import { useShield } from "@/services/shield/useShield";
+import { ShieldPanel } from "./ShieldPanel";
 import { useAuthStore } from "@/state/auth";
 import { useSystemStore } from "@/state/system";
 import { prettyTitle, useBrowserStore } from "@/state/browser";
@@ -69,11 +71,18 @@ export function Browser({ args }: AppProps) {
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const [panel, setPanel] = useState<"none" | "bookmarks" | "history" | "downloads">("none");
   const [recent, setRecent] = useState<{ x: number; y: number } | null>(null);
+  const [shieldPanel, setShieldPanel] = useState<{ x: number; y: number } | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const shield = useShield();
 
   const tabs = store.tabs;
   const activeId = store.activeTabId;
   const active = useMemo(() => tabs.find((tab) => tab.id === activeId) ?? null, [tabs, activeId]);
+
+  /* Shield counts per tab, so the badge describes the page in front of the
+     person rather than the window's total. */
+  const shieldOn = shield.settings.enabled || shield.settings.lowData;
+  const blockedCount = shield.blocked[active?.id ?? ""] ?? 0;
 
   /* A window with no tabs should still be usable, and one whose active tab was
      closed should fall back to the last remaining tab.
@@ -241,6 +250,18 @@ export function Browser({ args }: AppProps) {
       run: () => active && store.toggleBookmark(active.url, prettyTitle(active.url)),
     },
     {
+      id: "shield",
+      label: shieldOn ? "Shield — blocking on this page" : "Shield is off",
+      icon: "filter",
+      hint:
+        blockedCount > 0
+          ? `${blockedCount} blocked`
+          : shield.settings.lowData
+            ? "data saver on"
+            : undefined,
+      run: () => setShieldPanel(menu ?? { x: 24, y: 80 }),
+    },
+    {
       id: "copy-url",
       label: "Copy address",
       icon: "link",
@@ -320,7 +341,15 @@ export function Browser({ args }: AppProps) {
                 className="cr-browser__tab-button"
                 onClick={() => store.setActiveTab(tab.id)}
               >
-                <Icon name={tab.loading ? "refresh" : "globe"} size={13} />
+                <span className="cr-browser__tab-favicon" aria-hidden="true">
+                  {tab.loading ? (
+                    <Icon name="refresh" size={11} />
+                  ) : tab.url.startsWith("about:") ? (
+                    <Icon name="browser" size={11} />
+                  ) : (
+                    <SiteIcon host={hostOf(tab.url)} label={tab.title} size={13} />
+                  )}
+                </span>
                 <span className="cr-browser__tab-title">{tab.title}</span>
               </button>
               <button
@@ -355,6 +384,7 @@ export function Browser({ args }: AppProps) {
           }}
         >
           <Icon name="search" size={14} className="cr-browser__omnibox-icon" />
+          <span className="cr-browser__omnibox-brand" aria-hidden="true">Crystal</span>
           <input
             value={address}
             aria-label="Address and search"
@@ -433,6 +463,38 @@ export function Browser({ args }: AppProps) {
           <Icon name="shield" size={14} />
         </button>
 
+        {/* Shield: what was blocked on this page, and the way to set it aside.
+            It sits beside the proxy button because it only ever answers for
+            requests the proxy is carrying. */}
+        <button
+          type="button"
+          className="cr-browser__shield"
+          data-on={shieldOn}
+          data-active={blockedCount > 0}
+          aria-pressed={shieldOn}
+          aria-label={
+            shieldOn
+              ? `Shield: ${blockedCount} blocked on this page`
+              : "Shield is off — ads, trackers and popups are not being blocked"
+          }
+          title={
+            shieldOn
+              ? `CrystalOS Shield — ${blockedCount} request${blockedCount === 1 ? "" : "s"} blocked on this page. Click for the controls.`
+              : "Shield is off. Click to see the controls and turn blocking back on."
+          }
+          onClick={(event) => {
+            const rect = event.currentTarget.getBoundingClientRect();
+            setShieldPanel((current) =>
+              current ? null : { x: rect.right - 330, y: rect.bottom + 6 },
+            );
+          }}
+        >
+          <Icon name="filter" size={14} />
+          {blockedCount > 0 && (
+            <span className="cr-browser__shield-badge">{blockedCount > 99 ? "99+" : blockedCount}</span>
+          )}
+        </button>
+
         {tabIdentity && (
           <span
             className="cr-browser__cloak"
@@ -479,6 +541,23 @@ export function Browser({ args }: AppProps) {
       </div>
 
       {menu && <Menu x={menu.x} y={menu.y} items={menuItems} onClose={() => setMenu(null)} />}
+
+      {shieldPanel && (
+        <ShieldPanel
+          anchor={shieldPanel}
+          owner={active?.id ?? null}
+          currentUrl={active?.url ?? ""}
+          onOpen={(url) => {
+            store.newTab(url, true);
+            setShieldPanel(null);
+          }}
+          onClose={() => setShieldPanel(null)}
+          onOpenSettings={() => {
+            setShieldPanel(null);
+            openApp("settings", { args: { section: "proxy" } });
+          }}
+        />
+      )}
 
       {recent && (
         <RecentPages
@@ -544,6 +623,8 @@ function BrowserTabPane({
   const settleTab = useBrowserStore((state) => state.settleTab);
   const proxyEnabled = useSystemStore((state) => state.proxyEnabled);
   const proxyMode = useBrowserStore((state) => state.proxyMode);
+  const vpn = useVpnSnapshot();
+  const vpnBusy = useVpnStore((state) => state.busy);
   // Either the tab or the whole browser can be in direct mode.
   const proxyOn = proxyMode === "inherit" ? proxyEnabled : proxyMode === "on";
   const directMode = tab.direct === true || !proxyOn;
@@ -554,8 +635,37 @@ function BrowserTabPane({
    * never creates a frame, and the pane below loads the page itself.
    */
   const frame = useProxiedFrame(directMode ? "about:blank" : tab.url, {
+    // Shield's counters belong to the tab: the popover reports the page in
+    // front of the person, not everything the window has loaded.
+    owner: tab.id,
     onUrlChange: (url) => settleTab(tab.id, url),
   });
+
+  /*
+   * The way out of a failed page when a VPN is up.
+   *
+   * A public exit is proven against a handshake and one small answer, and it can
+   * still fail a particular site — that is how a "connected" VPN turns into a
+   * page that never arrives. Reconnecting would re-prove the same exit, so this
+   * instead drops the stored endpoint and asks for a fresh scan whose canary is
+   * the very host that just failed: an exit that can carry *this* site.
+   */
+  const findAnotherExit = () => {
+    let host: string | null = null;
+    try {
+      host = new URL(tab.url).hostname || null;
+    } catch {
+      host = null;
+    }
+    const vpnStore = useVpnStore.getState();
+    void vpnStore
+      .clearEndpoint()
+      .then(() => vpnStore.quickConnect({ canary: host ? [host] : [] }))
+      .then((snapshot) => {
+        if (snapshot?.status === "connected") frame.retry();
+      })
+      .catch(() => undefined);
+  };
 
   // Toolbar history buttons drive the active pane's own stack.
   useEffect(() => {
@@ -584,8 +694,18 @@ function BrowserTabPane({
     );
   }
 
-  if (directMode && vpnLocked) {
-    return <VpnBlockedPane tab={tab} active={active} />;
+  /*
+   * The VPN is enforcing and is not connected.
+   *
+   * This used to be checked only for a tab that would load itself, which left the
+   * proxied case to fail on its own — and a refused proxied stream is not an
+   * error the page can show: the frame came up as an empty pane, or as the
+   * transport's own terse one-line error. Either way the person saw a page that
+   * did not load and nothing that said why. So the refusal is rendered here, for
+   * both routes, with the real reason and the ways out.
+   */
+  if (vpnLocked) {
+    return <VpnBlockedPane tab={tab} active={active} proxied={!directMode} />;
   }
 
   if (directMode) {
@@ -612,6 +732,11 @@ function BrowserTabPane({
             <Button variant="primary" icon="refresh" onClick={frame.retry}>
               Try again
             </Button>
+            {vpn?.status === "connected" && (
+              <Button icon="shield" disabled={vpnBusy !== null} onClick={findAnotherExit}>
+                {vpnBusy === "quick" ? "Finding another exit…" : "Try a different VPN exit"}
+              </Button>
+            )}
             <Button icon="globe" onClick={() => useBrowserStore.getState().setDirectMode(tab.id, true)}>
               Load without the proxy
             </Button>
@@ -638,19 +763,37 @@ function BrowserTabPane({
 /* ---- blocked by the VPN -------------------------------------------------
  *
  * What "fail closed" looks like to a person. With the VPN wanted and
- * enforcement on, a tab that would load its page directly — because the user
- * switched the proxy off, or this tab was put in direct mode before the VPN
- * came on — is refused instead of being quietly served unprotected.
+ * enforcement on, nothing CrystalOS carries is allowed to leave unprotected, so
+ * a request is refused instead of being quietly served without the tunnel.
  *
- * The way out is stated rather than hidden: turn the proxy back on, reconnect,
- * or explicitly give up on protection. Nothing here silently leaks.
+ * There are two ways to arrive here, and the copy says which one happened:
+ *
+ *   • a tab that would load itself — the proxy is off, or this tab was put in
+ *     direct mode before the VPN came on — because a page cannot set a proxy for
+ *     itself, so it could not be tunnelled at all;
+ *   • a proxied tab, whose streams the controller is refusing, which without
+ *     this pane renders as a page that simply did not load.
+ *
+ * The way out is stated rather than hidden: connect, or explicitly give up on
+ * protection. Nothing here silently leaks. The controller's own error message is
+ * shown when it has one, so "no free server answered" is legible here instead of
+ * only in the VPN window.
  */
 
-function VpnBlockedPane({ tab, active }: { tab: BrowserTab; active: boolean }) {
+function VpnBlockedPane({
+  tab,
+  active,
+  proxied,
+}: {
+  tab: BrowserTab;
+  active: boolean;
+  proxied: boolean;
+}) {
   const vpn = useVpnSnapshot();
   const proxyEnabled = useSystemStore((state) => state.proxyEnabled);
   const setProxyMode = useBrowserStore((state) => state.setProxyMode);
   const status = vpn?.status ?? "unknown";
+  const reason = vpn?.error?.message ?? null;
 
   return (
     <div className="cr-browser__page" data-active={active}>
@@ -658,14 +801,28 @@ function VpnBlockedPane({ tab, active }: { tab: BrowserTab; active: boolean }) {
         <Icon name="shield" size={26} />
         <h3>Blocked by the VPN</h3>
         <p>
-          {prettyTitle(tab.url)} would be loaded by this window itself, outside {providerName(vpn)}'s tunnel, and the VPN
-          is set to block unprotected traffic. The connection is currently <strong>{status}</strong>.
+          {proxied ? (
+            <>
+              {prettyTitle(tab.url)} is loaded through CrystalOS's proxy, and every request it makes is
+              being refused rather than sent without the tunnel. {providerName(vpn)} is currently{" "}
+              <strong>{status}</strong>.
+            </>
+          ) : (
+            <>
+              {prettyTitle(tab.url)} would be loaded by this window itself, outside {providerName(vpn)}'s
+              tunnel, and the VPN is set to block unprotected traffic. The connection is currently{" "}
+              <strong>{status}</strong>.
+            </>
+          )}
         </p>
+        {reason && <p className="cr-browser__vpn-block-reason">{reason}</p>}
         <p className="cr-row__desc">
-          Turn Scramjet back on and connect, or turn the VPN off if you would rather browse without it.
+          {proxied
+            ? `Connect ${providerName(vpn)} and this page loads again on its own. Turn the VPN off instead if you would rather browse without it.`
+            : "Turn Scramjet back on and connect, or turn the VPN off if you would rather browse without it."}
         </p>
         <div className="cr-browser__vpn-block-actions">
-          {!proxyEnabled && (
+          {!proxied && !proxyEnabled && (
             <Button variant="primary" icon="globe" onClick={() => setProxyMode("on")}>
               Use Scramjet
             </Button>
@@ -872,14 +1029,70 @@ function SiteIcon({ host, label, size = 16 }: { host: string; label: string; siz
   );
 }
 
-/* ---- start page ---------------------------------------------------------
- * The shortcut labels are meant to be short, so a long name is ellipsised and
- * carried in full by a tooltip instead of being allowed to stretch the tile.
+/* ---- new tab page -------------------------------------------------------
+ * Modelled on the CrystalOS shell: a quiet starfield behind the gem, one
+ * greeting line, a search field, the shortcut tiles, and a row of cards built
+ * from the browser's own history — the pages this user actually visited.
  */
+
+function CrystalGem() {
+  const gradientId = useId();
+  const id1 = `gem-a-${gradientId}`;
+  const id2 = `gem-b-${gradientId}`;
+  return (
+    <svg className="cr-ntp__gem" viewBox="0 0 52 52" fill="none" aria-hidden="true">
+      <defs>
+        <linearGradient id={id1} x1="0" y1="0" x2="52" y2="52" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#7eb8ff" />
+          <stop offset="100%" stopColor="#4060f0" />
+        </linearGradient>
+        <linearGradient id={id2} x1="52" y1="0" x2="0" y2="52" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#a0d0ff" />
+          <stop offset="100%" stopColor="#2040c0" />
+        </linearGradient>
+      </defs>
+      <polygon points="26,4 42,16 36,44 16,44 10,16" fill={`url(#${id1})`} opacity="0.9" />
+      <polygon points="26,4 42,16 26,22" fill={`url(#${id2})`} opacity="0.85" />
+      <polygon points="26,4 10,16 26,22" fill="#90c0ff" opacity="0.7" />
+      <polygon points="42,16 36,44 26,22" fill="#4070e0" opacity="0.8" />
+      <polygon points="10,16 16,44 26,22" fill="#80b0ff" opacity="0.75" />
+      <polygon points="26,22 36,44 16,44" fill="#5080f0" opacity="0.85" />
+      <polygon points="26,4 34,13 26,15 18,13" fill="rgba(255,255,255,0.35)" />
+    </svg>
+  );
+}
+
+function startGreeting(): { part: string; sub: string } {
+  const h = new Date().getHours();
+  return {
+    part: h < 12 ? "morning" : h < 17 ? "afternoon" : "evening",
+    sub: h < 12 ? "ready to explore" : h < 17 ? "where to next?" : "winding down?",
+  };
+}
+
+/** Stable colour seed for a card's backdrop, so a host always looks the same. */
+function hueOf(host: string): number {
+  let value = 0;
+  for (let i = 0; i < host.length; i += 1) value = (value * 31 + host.charCodeAt(i)) % 360;
+  return value;
+}
+
+function pathLabel(url: string): string {
+  try {
+    const parsed = new URL(url);
+    const path = (parsed.pathname === "/" ? "" : parsed.pathname) + parsed.search;
+    return path.replace(/^\//, "").slice(0, 42) || "Home";
+  } catch {
+    return "";
+  }
+}
 
 function StartPage({ tabId }: { tabId: string }) {
   const store = useBrowserStore();
   const engine = store.searchEngine;
+  const { part, sub } = startGreeting();
+  /* The row reflects real visits: the newest entries of this browser's history. */
+  const recents = store.history.slice(0, 3);
 
   /*
    * The search box belongs to one tab, so it navigates that tab — and makes it
@@ -892,15 +1105,22 @@ function StartPage({ tabId }: { tabId: string }) {
   };
 
   return (
-    <div className="cr-browser__start">
-      <div className="cr-browser__start-inner">
-        <header className="cr-browser__start-head">
-          <Icon name="browser" size={18} />
-          <h2>CrystalOS Browser</h2>
+    <div className="cr-ntp">
+      <div className="cr-ntp__wallpaper" aria-hidden="true" />
+
+      <div className="cr-ntp__content">
+        <header className="cr-ntp__brand">
+          <CrystalGem />
+          <h1 className="cr-ntp__brand-name">Crystal<span>OS</span></h1>
+          <p className="cr-ntp__brand-sub">Browser · v2.4</p>
         </header>
 
+        <p className="cr-ntp__greeting">
+          Good {part} — <strong>{sub}</strong>
+        </p>
+
         <form
-          className="cr-browser__start-form"
+          className="cr-ntp__search"
           onSubmit={(event) => {
             event.preventDefault();
             const input = new FormData(event.currentTarget).get("query");
@@ -908,7 +1128,7 @@ function StartPage({ tabId }: { tabId: string }) {
             open(input);
           }}
         >
-          <Icon name="search" size={15} className="cr-browser__start-form-icon" />
+          <Icon name="search" size={18} className="cr-ntp__search-icon" />
           <input
             name="query"
             placeholder={`Search ${engine} or enter an address`}
@@ -916,20 +1136,59 @@ function StartPage({ tabId }: { tabId: string }) {
             autoComplete="off"
             spellCheck={false}
           />
+          <button type="submit" className="cr-ntp__search-submit" aria-label="Search">
+            <Icon name="chevron-right" size={14} />
+          </button>
         </form>
 
-        <div className="cr-browser__shortcuts">
+        <div className="cr-ntp__section">Shortcuts</div>
+        <div className="cr-ntp__shortcuts">
           {browserShortcuts.map((site) => (
             <Tooltip key={site.url} label={`${site.name} — ${site.url.replace(/^https?:\/\//, "")}`}>
-              <button type="button" className="cr-browser__shortcut" onClick={() => open(site.url)}>
-                <span className="cr-browser__shortcut-icon">
-                  <SiteIcon host={site.host} label={site.name} size={18} />
+              <button type="button" className="cr-ntp__shortcut" onClick={() => open(site.url)}>
+                <span className="cr-ntp__shortcut-icon">
+                  <SiteIcon host={site.host} label={site.name} size={28} />
                 </span>
-                <span className="cr-browser__shortcut-name">{site.name}</span>
+                <span className="cr-ntp__shortcut-name">{site.name}</span>
               </button>
             </Tooltip>
           ))}
         </div>
+
+        <div className="cr-ntp__section">Recently visited</div>
+        {recents.length === 0 ? (
+          <p className="cr-ntp__empty">Pages you visit in this browser show up here.</p>
+        ) : (
+          <div className="cr-ntp__cards">
+            {recents.map((entry) => {
+              const host = hostOf(entry.url);
+              const hue = hueOf(host);
+              return (
+                <button
+                  key={entry.id}
+                  type="button"
+                  className="cr-ntp__card"
+                  title={entry.url}
+                  onClick={() => open(entry.url)}
+                >
+                  <span
+                    className="cr-ntp__card-thumb"
+                    style={{
+                      background: `linear-gradient(135deg, hsl(${hue} 45% 14%) 0%, hsl(${hue} 50% 26%) 100%)`,
+                    }}
+                  >
+                    <SiteIcon host={host} label={entry.title} size={44} />
+                  </span>
+                  <span className="cr-ntp__card-meta">
+                    <SiteIcon host={host} label={entry.title} size={14} />
+                    <span className="cr-ntp__card-name">{entry.title}</span>
+                    <span className="cr-ntp__card-path">{pathLabel(entry.url)}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

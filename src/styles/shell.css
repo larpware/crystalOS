@@ -50,9 +50,9 @@
   align-items: center;
   /* A hairline of breathing room between the zones; the outer tracks stay
      equal, so the clock is still centred. */
-  column-gap: 6px;
+  column-gap: var(--space-2);
   height: var(--panel-height);
-  padding: 0 8px;
+  padding: 0 var(--space-3);
   /* A soft edge rather than a hard rule: on a translucent bar a solid hairline
      reads as a seam where the material is meant to fade out. The floating
      layout draws it all the way round, because all four edges are visible. */
@@ -78,7 +78,7 @@
 /* Frosting, guarded exactly like the taskbar strip: performance mode and
    reduced motion fall back to the plain material. */
 @media not (prefers-reduced-motion: reduce) {
-  :root:not([data-motion="reduced"]) .cr-panel {
+  :root:not([data-motion="reduced"]):not([data-perf="on"]) .cr-panel {
     backdrop-filter: blur(30px) saturate(1.35);
     -webkit-backdrop-filter: blur(30px) saturate(1.35);
   }
@@ -134,7 +134,7 @@
 .cr-panel__clock {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
   height: calc(var(--panel-height) - 10px);
   padding: 0 9px;
   border: 1px solid transparent;
@@ -189,13 +189,13 @@
 .cr-panel__app {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
   /* Without this the flex item cannot shrink below the title's min-content
      width â€” a nowrap string â€” so a long window title ran across the clock
      instead of ellipsizing. */
   min-width: 0;
   max-width: 32vw;
-  padding-left: 6px;
+  padding-left: var(--space-2);
   color: var(--text-tertiary);
 }
 
@@ -213,7 +213,7 @@
 .cr-panel__clock-text {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-3);
 }
 
 .cr-panel__date {
@@ -240,7 +240,7 @@
   align-items: center;
   gap: 0;
   height: calc(var(--panel-height) - 10px);
-  padding: 0 4px;
+  padding: 0 var(--space-1);
   border: 1px solid var(--border-subtle);
   border-radius: calc(var(--panel-height) * 0.28);
   /* Light enough to read as glass on top of the translucent bar instead of a
@@ -292,7 +292,7 @@
   position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
   height: calc(var(--panel-height) - 10px);
   padding: 0 9px;
   border: 1px solid transparent;
@@ -366,7 +366,7 @@
 .cr-hz {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
   height: calc(var(--panel-height) - 6px);
   padding: 0 7px;
   border-radius: var(--radius-small);
@@ -413,13 +413,13 @@
   }
 
   .cr-panel__clock-text {
-    gap: 6px;
+    gap: var(--space-2);
   }
 }
 
 @media (max-width: 560px) {
   .cr-panel {
-    padding: 0 6px;
+    padding: 0 var(--space-2);
   }
 
   .cr-panel__activities {
@@ -452,7 +452,7 @@
   z-index: var(--z-dock);
   display: flex;
   justify-content: var(--tb-align, center);
-  padding: 0 var(--tb-edge, 12px) 10px;
+  padding: 0 var(--tb-edge, var(--space-4)) 10px;
 }
 
 .cr-taskbar[data-mode="taskbar"] {
@@ -466,11 +466,11 @@
 
   display: flex;
   align-items: center;
-  gap: calc(var(--tb-gap, 6px) * var(--tb-scale, 1));
+  gap: calc(var(--tb-gap, var(--space-2)) * var(--tb-scale, 1));
   height: calc(var(--tb-icon) + var(--tb-room) + var(--tb-extra, 0px));
-  padding: 0 calc(var(--tb-pad, 12px) * var(--tb-scale, 1));
+  padding: 0 calc(var(--tb-pad, var(--space-4)) * var(--tb-scale, 1));
   border: 1px solid var(--border-subtle);
-  border-radius: var(--tb-radius, 16px);
+  border-radius: var(--tb-radius, var(--radius-window));
   background-color: color-mix(in srgb, var(--dock-bg) var(--tb-surface-opacity, 74%), transparent);
   background-image: var(--surface-sheen);
   box-shadow: var(--inset-highlight),
@@ -499,7 +499,7 @@
   height: auto;
   min-height: calc(var(--tb-icon) + var(--tb-room) + var(--tb-extra, 0px));
   justify-content: flex-start;
-  border-radius: var(--tb-radius, 16px) var(--tb-radius, 16px) 0 0;
+  border-radius: var(--tb-radius, var(--radius-window)) var(--tb-radius, var(--radius-window)) 0 0;
   border-bottom: 0;
   box-shadow: var(--inset-highlight),
     0 -8px 22px -12px color-mix(in srgb, var(--shadow-tint) 78%, transparent);
@@ -639,7 +639,7 @@
   flex-direction: row;
   align-items: center;
   gap: 7px;
-  padding: 3px 8px;
+  padding: 3px var(--space-3);
   border-radius: 10px;
   transition: background var(--dur-fast) var(--ease-standard);
 }
@@ -710,7 +710,9 @@
 /* ---- hover card --------------------------------------------------------
    The reference tooltip: a compact dark-glass card with a small arrow, sitting
    just above the hovered tile. It grows into the window list when the
-   application already has windows open. */
+   application already has windows open — up to a point: the list scrolls once
+   it would run off the top of the screen, so the earliest windows stay
+   reachable instead of the card leaving the viewport. */
 .cr-taskbar__hover {
   position: fixed;
   z-index: calc(var(--z-dock) + 1);
@@ -718,7 +720,7 @@
   top: calc(var(--hover-y) - 12px);
   transform: translate(-50%, -100%);
   display: flex;
-  padding: 4px;
+  padding: var(--space-1);
   border: 1px solid color-mix(in srgb, var(--text-primary) 16%, transparent);
   border-radius: 9px;
   background: color-mix(in srgb, var(--modal-bg) 94%, transparent);
@@ -767,12 +769,20 @@
   gap: 2px;
   min-width: 180px;
   max-width: 260px;
+  /* An application can hold many windows. The card is anchored above the tile,
+     so an uncapped list grows upward past the top of the screen and the older
+     windows become unreachable; cap it to the space above the strip and scroll
+     inside it instead. `overscroll-behavior` keeps a flick at the end of the
+     list from scrolling the desk behind it. */
+  max-height: min(320px, max(120px, calc(100vh - 160px)));
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .cr-taskbar__preview {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-3);
   width: 100%;
   padding: 5px 7px;
   border-radius: 6px;
@@ -904,22 +914,22 @@
 }
 
 .cr-launcher__kbd {
-  padding: 3px 6px;
+  padding: 3px var(--space-2);
   border-radius: var(--radius-xs);
   border: 1px solid var(--border-default);
   background: var(--surface-2);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--fs-xxs);
   color: var(--text-tertiary);
 }
 
 .cr-launcher__categories {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
   flex-wrap: wrap;
   flex: none;
-  padding: 12px 0 10px;
+  padding: var(--space-4) 0 10px;
 }
 
 .cr-launcher__tab {
@@ -957,7 +967,7 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 2px 2px 12px;
+  padding: 2px 2px var(--space-4);
 }
 
 .cr-launcher__grid {
@@ -973,7 +983,7 @@
   flex-direction: column;
   align-items: center;
   gap: 7px;
-  padding: 12px 6px 10px;
+  padding: var(--space-4) var(--space-2) 10px;
   border-radius: var(--radius-medium);
   border: 1px solid transparent;
   color: var(--text-secondary);
@@ -1058,7 +1068,7 @@
   gap: 9px;
   flex: none;
   margin: 0 -14px;
-  padding: 10px 14px 12px;
+  padding: 10px 14px var(--space-4);
   border-top: 1px solid var(--border-subtle);
   background: color-mix(in srgb, var(--surface-1) 60%, transparent);
 }
@@ -1080,7 +1090,7 @@
 .cr-launcher__recent-icons {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .cr-launcher__recent {
@@ -1104,13 +1114,13 @@
 .cr-launcher__status-group {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .cr-launcher__status-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
   height: 28px;
   padding: 0 10px;
   border-radius: var(--radius-pill);
@@ -1134,7 +1144,7 @@
 .cr-launcher__hints {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-4);
   font-size: var(--fs-xs);
   color: var(--text-muted);
 }
@@ -1169,12 +1179,12 @@
 
 .cr-launcher__sys-btn--power:hover {
   background: color-mix(in srgb, #f87171 22%, transparent);
-  color: #f87171;
+  color: var(--accent-danger);
 }
 
 .cr-launcher__reset {
   height: 28px;
-  padding: 0 12px;
+  padding: 0 var(--space-4);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-pill);
   background: var(--surface-2);
@@ -1206,7 +1216,7 @@
   top: calc(var(--panel-bottom, var(--panel-height)) + 6px);
   z-index: var(--z-overlay);
   width: 336px;
-  padding: 12px;
+  padding: var(--space-4);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-large);
   background-color: var(--surface-1);
@@ -1251,7 +1261,7 @@
   padding: 10px 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-3);
   border-bottom: 1px solid var(--border-subtle);
 }
 
@@ -1271,7 +1281,7 @@
 .cr-quick__toggles {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 6px;
+  gap: var(--space-2);
   padding: 10px 0;
   border-bottom: 1px solid var(--border-subtle);
 }
@@ -1280,7 +1290,7 @@
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-3);
   padding: 9px 10px;
   border-radius: var(--radius-medium);
   border: 1px solid var(--border-subtle);
@@ -1378,7 +1388,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-3);
   padding-top: 10px;
 }
 
@@ -1395,9 +1405,9 @@
 .cr-quick__meta {
   display: flex;
   justify-content: space-between;
-  gap: 8px;
-  margin-top: 8px;
-  padding-top: 8px;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
   border-top: 1px solid var(--border-subtle);
   font-size: var(--fs-xxs);
   color: var(--text-disabled);
@@ -1411,7 +1421,7 @@
   z-index: var(--z-notifications);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-3);
   width: 320px;
   pointer-events: none;
 }
@@ -1468,6 +1478,11 @@
   }
 }
 
+:root[data-motion="reduced"] .cr-toast,
+:root[data-perf="on"] .cr-toast {
+  animation: none;
+}
+
 .cr-toast__icon {
   display: flex;
   align-items: center;
@@ -1501,7 +1516,7 @@
 .cr-toast__actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-3);
   margin-top: 5px;
 }
 
@@ -1564,7 +1579,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 11px 12px;
+  padding: 11px var(--space-4);
   border-bottom: 1px solid var(--border-subtle);
 }
 
@@ -1583,8 +1598,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 9px 12px;
+  gap: var(--space-4);
+  padding: 9px var(--space-4);
   border-bottom: 1px solid var(--border-subtle);
 }
 
@@ -1603,7 +1618,7 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 6px;
+  padding: var(--space-2);
 }
 
 .cr-center__item {
@@ -1632,8 +1647,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 8px 12px;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
   border-top: 1px solid var(--border-subtle);
   background: var(--surface-0);
   font-size: var(--fs-xs);
@@ -1742,7 +1757,7 @@
   top: 4px;
   right: 4px;
   min-width: 16px;
-  padding: 2px 4px;
+  padding: 2px var(--space-1);
   border-radius: var(--radius-xs);
   font-size: 7px;
   font-weight: 600;
@@ -1848,11 +1863,15 @@
   animation: cr-fade-in 420ms var(--ease-standard);
 }
 
+:root[data-perf="on"] .cr-sleep {
+  animation: none;
+}
+
 .cr-sleep__wake {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-3);
   padding: 28px 36px;
   border-radius: var(--radius-large);
   color: var(--text-tertiary);
@@ -1886,7 +1905,7 @@
   align-items: center;
   gap: 10px;
   max-width: 420px;
-  padding: 32px;
+  padding: var(--space-8);
   text-align: center;
   color: var(--text-tertiary);
 }
@@ -1920,8 +1939,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 14px 20px;
+  gap: var(--space-2);
+  padding: 14px var(--space-6);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-large);
   background: var(--modal-bg);
@@ -1945,7 +1964,7 @@
 .cr-scale-hint__body kbd {
   display: inline-block;
   min-width: 20px;
-  padding: 1px 6px;
+  padding: 1px var(--space-2);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-small);
   background: var(--surface-2);
@@ -1961,7 +1980,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-4);
   width: 100%;
 }
 
@@ -1991,7 +2010,7 @@
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding: clamp(44px, 12vh, 140px) 16px 24px;
+  padding: clamp(44px, 12vh, 140px) var(--space-5) var(--space-7);
   background: var(--launcher-scrim);
   animation: cr-palette-in var(--dur-fast) var(--ease-standard);
 }
@@ -2025,7 +2044,7 @@
   display: flex;
   align-items: center;
   gap: 9px;
-  padding: 12px 13px;
+  padding: var(--space-4) 13px;
   border-bottom: 1px solid var(--border-subtle);
   color: var(--text-tertiary);
 }
@@ -2048,7 +2067,7 @@
 .cr-palette__kbd,
 .cr-palette__hint {
   flex: none;
-  padding: 2px 6px;
+  padding: 2px var(--space-2);
   border: 1px solid var(--border-subtle);
   border-bottom-width: 2px;
   border-radius: var(--radius-xs);
@@ -2063,7 +2082,7 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 6px;
+  padding: var(--space-2);
 }
 
 .cr-palette__group + .cr-palette__group {
@@ -2071,7 +2090,7 @@
 }
 
 .cr-palette__group-label {
-  padding: 8px 9px 4px;
+  padding: var(--space-3) 9px var(--space-1);
   font-size: 10.5px;
   font-weight: 600;
   letter-spacing: .07em;
@@ -2153,14 +2172,14 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 40px 20px 46px;
+  gap: var(--space-2);
+  padding: 40px var(--space-6) 46px;
   text-align: center;
   color: var(--text-tertiary);
 }
 
 .cr-palette__empty p {
-  margin: 4px 0 0;
+  margin: var(--space-1) 0 0;
   font-size: var(--fs-sm);
   color: var(--text-primary);
 }
@@ -2193,7 +2212,7 @@
 
 .cr-palette__confirm-btn {
   flex: none;
-  padding: 4px 10px;
+  padding: var(--space-1) 10px;
   border: 1px solid var(--border-default);
   border-radius: var(--radius-small);
   background: var(--surface-2);
@@ -2212,7 +2231,7 @@
 .cr-palette__error {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-3);
   padding: 9px 13px;
   border-top: 1px solid var(--border-subtle);
   background: color-mix(in srgb, var(--accent-danger) 14%, transparent);
@@ -2228,8 +2247,8 @@
 .cr-palette__footer {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 8px 13px;
+  gap: var(--space-4);
+  padding: var(--space-3) 13px;
   border-top: 1px solid var(--border-subtle);
   background: var(--surface-1);
   font-size: var(--fs-xs);
@@ -2239,7 +2258,7 @@
 .cr-palette__hints {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-4);
 }
 
 .cr-palette__hints kbd {
@@ -2251,7 +2270,7 @@
   border-radius: var(--radius-xs);
   background: var(--surface-2);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--fs-xxs);
   color: var(--text-secondary);
   text-align: center;
 }
@@ -2272,7 +2291,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 32px 20px;
+  padding: var(--space-8) var(--space-6);
   background: var(--launcher-scrim);
   animation: cr-palette-in var(--dur-fast) var(--ease-standard);
 }
@@ -2316,7 +2335,7 @@
 .cr-overview__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 12px;
+  gap: var(--space-4);
   padding: 15px;
   overflow-y: auto;
 }
@@ -2344,10 +2363,10 @@
 .cr-overview__preview {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-3);
   flex: 1;
   width: 100%;
-  padding: 11px 12px;
+  padding: 11px var(--space-4);
   border: 0;
   background: transparent;
   color: inherit;
@@ -2373,7 +2392,7 @@
 .cr-overview__rename {
   flex: 1;
   min-width: 0;
-  padding: 2px 6px;
+  padding: 2px var(--space-2);
   border: 1px solid var(--accent-primary);
   border-radius: var(--radius-xs);
   background: var(--surface-0);
@@ -2392,7 +2411,7 @@
 
 .cr-overview__window {
   display: block;
-  padding: 3px 6px;
+  padding: 3px var(--space-2);
   border-radius: var(--radius-xs);
   background: var(--surface-3);
   color: var(--text-secondary);
@@ -2418,7 +2437,7 @@
 .cr-overview__actions {
   display: flex;
   gap: 2px;
-  padding: 0 8px 8px;
+  padding: 0 var(--space-3) var(--space-3);
 }
 
 .cr-overview__action {
@@ -2488,7 +2507,7 @@
   border-radius: var(--radius-xs);
   background: var(--surface-2);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--fs-xxs);
   color: var(--text-secondary);
   text-align: center;
 }
@@ -2508,10 +2527,224 @@
 
 :root[data-motion="reduced"] .cr-palette-scrim,
 :root[data-motion="reduced"] .cr-overview-scrim,
-:root[data-motion="reduced"] .cr-palette {
+:root[data-motion="reduced"] .cr-palette,
+:root[data-perf="on"] .cr-palette-scrim,
+:root[data-perf="on"] .cr-overview-scrim,
+:root[data-perf="on"] .cr-palette {
   animation: none;
 }
 
-:root[data-motion="reduced"] .cr-palette {
+:root[data-motion="reduced"] .cr-palette,
+:root[data-perf="on"] .cr-palette {
   transform: none;
+}
+
+/* ==========================================================================
+   Standby (always-on display)
+   ========================================================================== */
+
+.cr-standby {
+  position: fixed;
+  inset: 0;
+  z-index: 9600;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 90% at 50% 8%, color-mix(in srgb, var(--accent-primary) 9%, transparent), transparent 62%),
+    linear-gradient(180deg, var(--bg-desktop), var(--bg-root));
+  color: var(--text-primary);
+  cursor: none;
+  animation: cr-standby-in 1100ms ease both;
+}
+
+.cr-standby__wash {
+  position: absolute;
+  inset: -25%;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--accent-primary) 20%, transparent),
+    transparent
+  );
+  filter: blur(70px);
+  opacity: 0.32;
+  animation: cr-standby-drift 36s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+.cr-standby__content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  text-align: center;
+  transition: opacity 1400ms ease;
+}
+
+.cr-standby__mark {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
+  font-weight: 550;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.cr-standby__time {
+  font-family: var(--font-display);
+  font-size: clamp(84px, 17vw, 208px);
+  font-weight: 400;
+  line-height: 0.88;
+  letter-spacing: -0.045em;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 18px 70px color-mix(in srgb, var(--shadow-tint, #000) 45%, transparent);
+}
+
+.cr-standby__date {
+  font-size: var(--fs-lg);
+  color: var(--text-secondary);
+  letter-spacing: 0.01em;
+}
+
+.cr-standby__hint {
+  position: absolute;
+  bottom: 7vh;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.cr-standby[data-stage="sleep"] {
+  background: #000;
+  animation: cr-standby-sleep 2200ms ease both;
+}
+
+.cr-standby[data-stage="sleep"] .cr-standby__wash {
+  opacity: 0;
+  animation: none;
+}
+
+.cr-standby[data-stage="sleep"] .cr-standby__content {
+  opacity: 0.06;
+}
+
+.cr-standby[data-stage="sleep"] .cr-standby__hint {
+  display: none;
+}
+
+@keyframes cr-standby-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes cr-standby-sleep {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    background: #000;
+  }
+}
+
+@keyframes cr-standby-drift {
+  from {
+    transform: translate3d(-4%, -2%, 0) scale(1);
+  }
+  to {
+    transform: translate3d(5%, 3%, 0) scale(1.08);
+  }
+}
+
+:root[data-motion="reduced"] .cr-standby,
+:root[data-motion="reduced"] .cr-standby__wash,
+:root[data-perf="on"] .cr-standby,
+:root[data-perf="on"] .cr-standby__wash {
+  animation: none;
+}
+
+/* ---- full screen: the chrome stands aside ------------------------------
+   A window in full screen owns the viewport, so the top bar, the strip under
+   it and the dock leave the screen instead of sitting on top of the
+   application. They are not excluded from the mode: they are one gesture away.
+   The pointer touching the edge they live on slides them back in, and they
+   stay open while the pointer is over them — the reveal is held until the
+   pointer has travelled past the bar it opened, so it cannot flicker as the bar
+   comes out from under the cursor.
+
+   The dataset is written by useFullScreenChrome (hooks/useUi). It reads "off"
+   on an ordinary desk, where none of this applies, and the reveal values are
+   "top", "bottom" or "both" — "both" is what a shell surface opened from the
+   keyboard asks for, since the panel and the dock are what those surfaces hang
+   off. The transition sits behind the same motion guards as the rest of the
+   shell, so reduced motion and performance mode swap the bars instantly. */
+@media not (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="reduced"]):not([data-perf="on"])[data-fullscreen] .cr-panel,
+  :root:not([data-motion="reduced"]):not([data-perf="on"])[data-fullscreen] .cr-taskbar,
+  :root:not([data-motion="reduced"]):not([data-perf="on"])[data-fullscreen] .cr-offline {
+    transition: transform var(--dur-normal) var(--ease-standard),
+      opacity var(--dur-fast) var(--ease-standard);
+  }
+}
+
+:root[data-fullscreen="on"] .cr-panel {
+  /* Up past its own top offset, plus a hair, so no rounded corner or shadow
+     stays caught on the edge of the viewport. */
+  transform: translateY(calc(-100% - var(--panel-top, 0px) - 8px));
+  opacity: 0;
+  pointer-events: none;
+}
+
+:root[data-fullscreen="on"][data-fullscreen-reveal="top"] .cr-panel,
+:root[data-fullscreen="on"][data-fullscreen-reveal="both"] .cr-panel {
+  transform: none;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+:root[data-fullscreen="on"] .cr-taskbar {
+  transform: translateY(calc(100% + 12px));
+  opacity: 0;
+  pointer-events: none;
+}
+
+:root[data-fullscreen="on"][data-fullscreen-reveal="bottom"] .cr-taskbar,
+:root[data-fullscreen="on"][data-fullscreen-reveal="both"] .cr-taskbar {
+  transform: none;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* The dock's hover card is fixed to the viewport rather than living inside the
+   bar, so it has to be taken away with the bar or it floats over the
+   application on its own. */
+:root[data-fullscreen="on"]:not([data-fullscreen-reveal="bottom"]):not(
+    [data-fullscreen-reveal="both"]
+  )
+  .cr-taskbar__hover {
+  display: none;
+}
+
+/* The offline strip is part of the top chrome: it comes and goes with the bar
+   it hangs under, with no slide of its own. */
+:root[data-fullscreen="on"]:not([data-fullscreen-reveal="top"]):not(
+    [data-fullscreen-reveal="both"]
+  )
+  .cr-offline {
+  opacity: 0;
+  pointer-events: none;
 }

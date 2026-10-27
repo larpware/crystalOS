@@ -34,19 +34,27 @@ import {
   SESSION_COOKIE,
   validateAvatar,
   validateBio,
+  validateCommentBody,
   validateDisplayName,
   validateMessageBody,
   validateMessageId,
   validatePassword,
+  validatePostBody,
+  validatePostImage,
+  validateReportReason,
+  validateReview,
+  validateSubmission,
   validateUsername,
   verifyPassword,
 } from "./security.mjs";
+import { PERM, ServerError } from "./servers.mjs";
 import {
   formatFriendCode,
   isWellFormedFriendCode,
   normalizeFriendCode,
 } from "./codes.mjs";
 import { conversationIdFor, openAccountsStore, publicUser } from "./db.mjs";
+import { tagsOf, validateTags } from "./tags.mjs";
 import { createId } from "./ids.mjs";
 import { rarityGuide } from "./rarity.mjs";
 
@@ -60,7 +68,24 @@ const DEFAULT_LIMITS = {
   login: { windowMs: 5 * 60_000, max: 20 },
   friendRequest: { windowMs: 5 * 60_000, max: 30 },
   message: { windowMs: 60_000, max: 120 },
+  socialPost: { windowMs: 60_000, max: 20 },
+  socialComment: { windowMs: 60_000, max: 40 },
+  socialAction: { windowMs: 60_000, max: 90 },
 };
+
+/**
+ * Usernames named by the environment, in addition to the first account.
+ * Read per API instance (not at module load) so tests and reconfiguration
+ * behave the same way.
+ */
+function envAdmins() {
+  return new Set(
+    String(process.env.CRESCENT_ADMINS ?? "")
+      .split(",")
+      .map((name) => name.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
 
 function send(res, status, payload, headers = {}) {
   const body = JSON.stringify(payload ?? {});
@@ -147,7 +172,17 @@ export function createAccountsApi(options = {}) {
     login: createRateLimiter(options.limits?.login ?? DEFAULT_LIMITS.login),
     friendRequest: createRateLimiter(options.limits?.friendRequest ?? DEFAULT_LIMITS.friendRequest),
     message: createRateLimiter(options.limits?.message ?? DEFAULT_LIMITS.message),
+    socialPost: createRateLimiter(options.limits?.socialPost ?? DEFAULT_LIMITS.socialPost),
+    socialComment: createRateLimiter(options.limits?.socialComment ?? DEFAULT_LIMITS.socialComment),
+    socialAction: createRateLimiter(options.limits?.socialAction ?? DEFAULT_LIMITS.socialAction),
   };
+
+  const ADMIN_USERNAMES = envAdmins();
+
+  /** Moderation authority: the role column, or the environment's list. */
+  function isAdmin(user) {
+    return user?.role === "admin" || ADMIN_USERNAMES.has(String(user?.username ?? "").toLowerCase());
+  }
 
   let sweeps = 0;
 
@@ -238,6 +273,7 @@ export function createAccountsApi(options = {}) {
       friendCode: formatFriendCode(row.friend_code),
       avatar: row.avatar ?? undefined,
       rarity: row.rarity ?? undefined,
+      tags: tagsOf(row),
       online: row.last_seen_at > now - 60_000,
       lastSeenAt: row.last_seen_at,
     };
@@ -281,6 +317,14 @@ export function createAccountsApi(options = {}) {
           passwordHash: hash,
           createdAt: Date.now(),
         });
+        // The first account on a fresh database is the project owner and gets
+        // moderation authority. CRESCENT_ADMINS can name more, by username.
+        const isFirst =
+          Number(store.db.prepare("SELECT COUNT(*) AS n FROM users").get().n) === 1;
+        if (isFirst || ADMIN_USERNAMES.has(username.value.toLowerCase())) {
+          store.db.prepare("UPDATE users SET role = 'admin' WHERE id = ?").run(created.id);
+          created.role = "admin";
+        }
         startSession(req, res, created);
         return created;
       });
@@ -348,6 +392,12 @@ export function createAccountsApi(options = {}) {
       const avatar = validateAvatar(body.avatar);
       if (avatar.error) return fail(res, 400, "INVALID_AVATAR", avatar.error);
       patch.avatar = avatar.value;
+    }
+    if (body.privateAccount !== undefined) {
+      if (typeof body.privateAccount !== "boolean") {
+        return fail(res, 400, "INVALID_PRIVACY", "Private account must be true or false.");
+      }
+      patch.privateAccount = body.privateAccount;
     }
     if (Object.keys(patch).length === 0) {
       return fail(res, 400, "NOTHING_TO_UPDATE", "Nothing to update.");
@@ -641,6 +691,49 @@ export function createAccountsApi(options = {}) {
     });
   }
 
+  /* ---- Crystal Social --------------------------------------------------- */
+
+  function handleCreatePost(req, res, { body, user }) {
+    if (limitOr429(limits.socialPost, `post:${user.id}`, res)) return;
+    const postBody = validatePostBody(body.body);
+    if (postBody.error) return fail(res, 400, "INVALID_POST", postBody.error);
+    const image = validatePostImage(body.image);
+    if (image.error) return fail(res, 400, "INVALID_IMAGE", image.error);
+    const post = store.transaction(() =>
+      store.social.createPost(user.id, { body: postBody.value, image: image.value }),
+    );
+    send(res, 201, { post });
+  }
+
+  /** Loads a post for an action, or answers the standard errors. */
+  function withPost(res, user, postId) {
+    const post = store.social.postById(postId);
+    if (!post || post.deleted_at) {
+      fail(res, 404, "POST_NOT_FOUND", "That post is gone.");
+      return null;
+    }
+    if (!store.social.canViewPosts(user.id, post.author_id)) {
+      fail(res, 403, "NOT_VISIBLE", "That post is not visible to you.");
+      return null;
+    }
+    return post;
+  }
+
+  function handleNotifications(req, res, url, user) {
+    const sinceRaw = Number(url.searchParams.get("since") ?? 0);
+    const since = Number.isFinite(sinceRaw) ? Math.max(0, Math.floor(sinceRaw)) : 0;
+    send(res, 200, { notifications: store.social.notifications(user.id, since) });
+  }
+
+  function handleProfileFetch(res, url, user, username) {
+    const profile = store.social.profile(user.id, username);
+    if (!profile) return fail(res, 404, "ACCOUNT_NOT_FOUND", "That account no longer exists.");
+    if (profile.blocked) {
+      return fail(res, 403, "BLOCKED", "You cannot view that account.");
+    }
+    send(res, 200, { profile });
+  }
+
   /* ---- router ---------------------------------------------------------- */
 
   const API_PREFIX = "/api/accounts";
@@ -779,6 +872,617 @@ export function createAccountsApi(options = {}) {
         return true;
       }
 
+      /* ---- Crystal Social ---- */
+
+      // GET /api/accounts/feed?before=&limit=
+      if (method === "GET" && segments.length === 1 && segments[0] === "feed") {
+        const user = requireUser(req, res, limits.login);
+        if (!user) return true;
+        const beforeRaw = Number(url.searchParams.get("before") ?? 0);
+        const limitRaw = Number(url.searchParams.get("limit") ?? 20);
+        send(res, 200, {
+          feed: store.social.feedPage(user.id, {
+            before: Number.isFinite(beforeRaw) && beforeRaw > 0 ? beforeRaw : null,
+            limit: Number.isFinite(limitRaw) ? limitRaw : 20,
+          }),
+        });
+        return true;
+      }
+
+      // GET /api/accounts/bookmarks
+      if (method === "GET" && segments.length === 1 && segments[0] === "bookmarks") {
+        const user = requireUser(req, res, limits.login);
+        if (!user) return true;
+        send(res, 200, store.social.bookmarksFor(user.id));
+        return true;
+      }
+
+      // GET /api/accounts/notifications · POST marks everything read
+      if (segments.length === 1 && segments[0] === "notifications") {
+        const user = requireUser(req, res, limits.login);
+        if (!user) return true;
+        if (method === "GET") {
+          handleNotifications(req, res, url, user);
+          return true;
+        }
+        if (method === "POST") {
+          store.transaction(() => store.social.markNotificationsRead(user.id));
+          send(res, 200, { ok: true });
+          return true;
+        }
+      }
+
+      // GET /api/accounts/follow-requests — pending follows on private accounts
+      if (method === "GET" && segments.length === 1 && segments[0] === "follow-requests") {
+        const user = requireUser(req, res, limits.login);
+        if (!user) return true;
+        send(res, 200, { requests: store.social.pendingFollowers(user.id) });
+        return true;
+      }
+
+      // POST /api/accounts/follow-requests/:followerId/accept|decline
+      if (
+        method === "POST" &&
+        segments.length === 3 &&
+        segments[0] === "follow-requests" &&
+        (segments[2] === "accept" || segments[2] === "decline")
+      ) {
+        const user = requireUser(req, res, limits.socialAction);
+        if (!user) return true;
+        const followerId = decodeURIComponent(segments[1]);
+        const handled = store.transaction(() =>
+          store.social.respondFollow(followerId, user.id, segments[2] === "accept"),
+        );
+        if (!handled) {
+          return fail(res, 404, "REQUEST_NOT_FOUND", "That follow request is gone.") || true;
+        }
+        send(res, 200, { ok: true });
+        return true;
+      }
+
+      // POST /api/accounts/posts
+      if (method === "POST" && segments.length === 1 && segments[0] === "posts") {
+        const user = requireUser(req, res, limits.login);
+        if (!user) return true;
+        handleCreatePost(req, res, { body, user });
+        return true;
+      }
+
+      // /api/accounts/posts/:id[/like|bookmark|report|comments]
+      if (segments[0] === "posts" && segments.length >= 2) {
+        const postId = decodeURIComponent(segments[1]);
+
+        // GET/PATCH/DELETE /api/accounts/posts/:id
+        if (segments.length === 2) {
+          if (method === "GET") {
+            const user = requireUser(req, res, limits.login);
+            if (!user) return true;
+            const post = withPost(res, user, postId);
+            if (!post) return true;
+            send(res, 200, { post: store.social.shapedPost(post, user.id) });
+            return true;
+          }
+          if (method === "PATCH") {
+            const user = requireUser(req, res, limits.socialPost);
+            if (!user) return true;
+            const post = store.social.postById(postId);
+            if (!post || post.deleted_at) {
+              return fail(res, 404, "POST_NOT_FOUND", "That post is gone.") || true;
+            }
+            if (post.author_id !== user.id) {
+              return fail(res, 403, "NOT_AUTHOR", "Only the author can edit a post.") || true;
+            }
+            const postBody = validatePostBody(body.body);
+            if (postBody.error) return fail(res, 400, "INVALID_POST", postBody.error) || true;
+            const updated = store.transaction(() => store.social.editPost(postId, postBody.value));
+            send(res, 200, { post: store.social.shapedPost(store.social.postById(postId), user.id), editedAt: updated.edited_at });
+            return true;
+          }
+          if (method === "DELETE") {
+            const user = requireUser(req, res, limits.socialPost);
+            if (!user) return true;
+            const post = store.social.postById(postId);
+            if (!post || post.deleted_at) {
+              return fail(res, 404, "POST_NOT_FOUND", "That post is gone.") || true;
+            }
+            if (post.author_id !== user.id && !isAdmin(user)) {
+              return fail(res, 403, "NOT_AUTHOR", "Only the author (or an administrator) can delete a post.") || true;
+            }
+            store.transaction(() => store.social.deletePost(postId));
+            send(res, 200, { ok: true });
+            return true;
+          }
+        }
+
+        // POST/DELETE /api/accounts/posts/:id/like
+        if (segments.length === 3 && segments[2] === "like" && (method === "POST" || method === "DELETE")) {
+          const user = requireUser(req, res, limits.socialAction);
+          if (!user) return true;
+          const post = withPost(res, user, postId);
+          if (!post) return true;
+          if (method === "DELETE") {
+            store.transaction(() => {
+              if (store.social.isPostLikedBy(postId, user.id)) store.social.toggleLike(postId, user.id);
+            });
+            send(res, 200, { liked: false });
+            return true;
+          }
+          const liked = store.transaction(() => {
+            if (store.social.isPostLikedBy(postId, user.id)) return false;
+            store.social.toggleLike(postId, user.id);
+            return true;
+          });
+          send(res, 200, { liked });
+          return true;
+        }
+
+        // POST/DELETE /api/accounts/posts/:id/bookmark
+        if (segments.length === 3 && segments[2] === "bookmark" && (method === "POST" || method === "DELETE")) {
+          const user = requireUser(req, res, limits.socialAction);
+          if (!user) return true;
+          const post = withPost(res, user, postId);
+          if (!post) return true;
+          const bookmarked = store.transaction(() => {
+            const isBookmarked = store.social.isBookmarkedBy(postId, user.id);
+            if (method === "DELETE") {
+              if (isBookmarked) store.social.toggleBookmark(postId, user.id);
+              return false;
+            }
+            if (!isBookmarked) store.social.toggleBookmark(postId, user.id);
+            return true;
+          });
+          send(res, 200, { bookmarked });
+          return true;
+        }
+
+        // POST /api/accounts/posts/:id/report
+        if (segments.length === 3 && segments[2] === "report" && method === "POST") {
+          const user = requireUser(req, res, limits.socialPost);
+          if (!user) return true;
+          const post = store.social.postById(postId);
+          if (!post || post.deleted_at) {
+            return fail(res, 404, "POST_NOT_FOUND", "That post is gone.") || true;
+          }
+          const reason = validateReportReason(body.reason);
+          if (reason.error) return fail(res, 400, "INVALID_REASON", reason.error) || true;
+          store.transaction(() => store.social.reportPost(user.id, postId, reason.value));
+          send(res, 201, { ok: true });
+          return true;
+        }
+
+        // GET/POST /api/accounts/posts/:id/comments
+        if (segments.length === 3 && segments[2] === "comments") {
+          if (method === "GET") {
+            const user = requireUser(req, res, limits.login);
+            if (!user) return true;
+            const post = withPost(res, user, postId);
+            if (!post) return true;
+            send(res, 200, { comments: store.social.commentsFor(postId, user.id) });
+            return true;
+          }
+          if (method === "POST") {
+            const user = requireUser(req, res, limits.socialComment);
+            if (!user) return true;
+            const post = withPost(res, user, postId);
+            if (!post) return true;
+            const comment = validateCommentBody(body.body);
+            if (comment.error) return fail(res, 400, "INVALID_COMMENT", comment.error) || true;
+            if (limitOr429(limits.socialComment, `comment:${user.id}`, res)) return true;
+            const created = store.transaction(() => store.social.addComment(postId, user.id, comment.value));
+            send(res, 201, { comment: created });
+            return true;
+          }
+        }
+      }
+
+      // POST/DELETE /api/accounts/comments/:id/like · DELETE removes own comment
+      if (segments[0] === "comments" && segments.length >= 2) {
+        const commentId = decodeURIComponent(segments[1]);
+        if (segments.length === 2 && method === "DELETE") {
+          const user = requireUser(req, res, limits.socialAction);
+          if (!user) return true;
+          const verdict = store.transaction(() =>
+            store.social.deleteComment(commentId, user.id, isAdmin(user)),
+          );
+          if (!verdict.found) return fail(res, 404, "COMMENT_NOT_FOUND", "That comment is gone.") || true;
+          if (!verdict.allowed) return fail(res, 403, "NOT_AUTHOR", "Only the author (or an administrator) can delete a comment.") || true;
+          send(res, 200, { ok: true });
+          return true;
+        }
+        if (segments.length === 3 && segments[2] === "like" && (method === "POST" || method === "DELETE")) {
+          const user = requireUser(req, res, limits.socialAction);
+          if (!user) return true;
+          const liked = store.transaction(() => {
+            const isLiked = store.social.isCommentLikedBy(commentId, user.id);
+            if (method === "DELETE") {
+              if (isLiked) store.social.toggleCommentLike(commentId, user.id);
+              return false;
+            }
+            if (!isLiked) store.social.toggleCommentLike(commentId, user.id);
+            return true;
+          });
+          send(res, 200, { liked });
+          return true;
+        }
+      }
+
+      // /api/accounts/users/:username[/posts|follow|block]
+      if (segments[0] === "users" && segments.length >= 2) {
+        const username = segments[1];
+
+        if (segments.length === 2 && method === "GET") {
+          const user = requireUser(req, res, limits.login);
+          if (!user) return true;
+          handleProfileFetch(res, url, user, username);
+          return true;
+        }
+
+        if (segments.length === 3 && segments[2] === "posts" && method === "GET") {
+          const user = requireUser(req, res, limits.login);
+          if (!user) return true;
+          const target = store.social.userByUsername(decodeURIComponent(username));
+          if (!target) return fail(res, 404, "ACCOUNT_NOT_FOUND", "That account no longer exists.") || true;
+          if (store.social.isBlockedEither(user.id, target.id)) {
+            return fail(res, 403, "BLOCKED", "You cannot view that account.") || true;
+          }
+          const beforeRaw = Number(url.searchParams.get("before") ?? 0);
+          const limitRaw = Number(url.searchParams.get("limit") ?? 20);
+          const page = store.social.postsByAuthor(user.id, target.id, {
+            before: Number.isFinite(beforeRaw) && beforeRaw > 0 ? beforeRaw : null,
+            limit: Number.isFinite(limitRaw) ? limitRaw : 20,
+          });
+          send(res, 200, page);
+          return true;
+        }
+
+        if (segments.length === 3 && segments[2] === "follow" && (method === "POST" || method === "DELETE")) {
+          const user = requireUser(req, res, limits.socialAction);
+          if (!user) return true;
+          const target = store.social.userByUsername(decodeURIComponent(username));
+          if (!target) return fail(res, 404, "ACCOUNT_NOT_FOUND", "That account no longer exists.") || true;
+          if (target.id === user.id) {
+            return fail(res, 400, "SELF_FOLLOW", "You cannot follow yourself.") || true;
+          }
+          if (store.social.isBlockedEither(user.id, target.id)) {
+            return fail(res, 403, "BLOCKED", "You cannot interact with that account.") || true;
+          }
+          if (method === "DELETE") {
+            store.transaction(() => store.social.unfollow(user.id, target.id));
+            send(res, 200, { following: false });
+            return true;
+          }
+          const status = store.transaction(() => store.social.requestFollow(user.id, target.id));
+          send(res, 200, { following: status === "accepted", pending: status === "pending" });
+          return true;
+        }
+
+        if (segments.length === 3 && segments[2] === "block" && (method === "POST" || method === "DELETE")) {
+          const user = requireUser(req, res, limits.socialAction);
+          if (!user) return true;
+          const target = store.social.userByUsername(decodeURIComponent(username));
+          if (!target) return fail(res, 404, "ACCOUNT_NOT_FOUND", "That account no longer exists.") || true;
+          if (target.id === user.id) {
+            return fail(res, 400, "SELF_BLOCK", "You cannot block yourself.") || true;
+          }
+          store.transaction(() => store.social.setBlocked(user.id, target.id, method === "POST"));
+          send(res, 200, { blocked: method === "POST" });
+          return true;
+        }
+      }
+
+      // GET /api/accounts/reports · POST /api/accounts/reports/:id/resolve (admin)
+      if (segments[0] === "reports") {
+        const user = requireUser(req, res, limits.login);
+        if (!user) return true;
+        if (!isAdmin(user)) {
+          return fail(res, 403, "NOT_ADMIN", "Moderator tools are for administrators.") || true;
+        }
+        if (segments.length === 1 && method === "GET") {
+          send(res, 200, { reports: store.social.openReports() });
+          return true;
+        }
+        if (segments.length === 3 && segments[2] === "resolve" && method === "POST") {
+          const reportId = decodeURIComponent(segments[1]);
+          const resolution = cleanText(String(body.resolution ?? "resolved")).slice(0, 200);
+          const removePost = body.removePost === true;
+          store.transaction(() => store.social.resolveReport(reportId, resolution, body.postId, removePost));
+          send(res, 200, { ok: true });
+          return true;
+        }
+      }
+
+      // POST /api/accounts/admin/users/:username/tags { tags: [...] } (admin)
+      //
+      // Tags are labels worn beside a name everywhere the account appears.
+      // Only administrators set them, and they grant nothing: authority lives
+      // in users.role, never in a label.
+      if (
+        segments[0] === "admin" &&
+        segments[1] === "users" &&
+        segments.length === 4 &&
+        segments[3] === "tags" &&
+        method === "POST"
+      ) {
+        const user = requireUser(req, res, limits.socialAction);
+        if (!user) return true;
+        if (!isAdmin(user)) {
+          return fail(res, 403, "NOT_ADMIN", "Tags are set by administrators.");
+        }
+        const checked = validateTags(body.tags ?? []);
+        if (checked.error) return fail(res, 400, "INVALID_TAGS", checked.error);
+        const username = decodeURIComponent(segments[2]).toLowerCase();
+        const target = store.db.prepare("SELECT id FROM users WHERE username_lower = ?").get(username);
+        if (!target) return fail(res, 404, "USER_NOT_FOUND", "No account with that username.");
+        store.db.prepare("UPDATE users SET tags = ? WHERE id = ?").run(JSON.stringify(checked.value), target.id);
+        send(res, 200, { user: publicUser(store.db.prepare("SELECT * FROM users WHERE id = ?").get(target.id)) });
+        return true;
+      }
+
+      /* ---- Crystal Chat servers ---- */
+
+      // GET /api/accounts/servers · POST creates one
+      if (segments.length === 1 && segments[0] === "servers") {
+        const user = requireUser(req, res, limits.login);
+        if (!user) return true;
+        if (method === "GET") {
+          send(res, 200, { servers: store.servers.myServers(user.id) });
+          return true;
+        }
+        if (method === "POST") {
+          if (limitOr429(limits.socialPost, `server-create:${user.id}`, res)) return true;
+          const name = cleanText(String(body.name ?? "")).trim().slice(0, 60);
+          if (!name) return fail(res, 400, "INVALID_NAME", "A server needs a name.") || true;
+          const description = cleanText(String(body.description ?? "")).trim().slice(0, 400) || null;
+          const icon = typeof body.icon === "string" && body.icon.length <= 512 * 1024 ? body.icon : null;
+          const server = store.servers.createServer(user.id, { name, description, icon });
+          send(res, 201, { server });
+          return true;
+        }
+      }
+
+      // /api/accounts/invites/:code[/join] — preview, join, revoke
+      if (
+        (segments.length === 3 || segments.length === 2) &&
+        segments[0] === "invites"
+      ) {
+        const code = decodeURIComponent(segments[1]);
+        const user = requireUser(req, res, limits.socialAction);
+        if (!user) return true;
+        if (method === "GET") {
+          const invite = store.db
+            .prepare("SELECT server_id FROM invites WHERE code = ? AND revoked_at IS NULL")
+            .get(String(code).toUpperCase());
+          if (!invite) return fail(res, 404, "INVITE_INVALID", "That invite no longer works.") || true;
+          send(res, 200, { serverId: invite.server_id });
+          return true;
+        }
+        if (method === "POST" && segments[2] === "join") {
+          const result = store.servers.joinByInvite(code, user.id);
+          send(res, result.alreadyMember ? 200 : 201, result);
+          return true;
+        }
+        if (method === "DELETE") {
+          store.servers.revokeInvite(code, user.id);
+          send(res, 200, { ok: true });
+          return true;
+        }
+      }
+
+      // /api/accounts/servers/:id/...
+      if (segments[0] === "servers" && segments.length >= 2) {
+        const serverId = decodeURIComponent(segments[1]);
+
+        if (segments.length === 2) {
+          if (method === "GET") {
+            const user = requireUser(req, res, limits.login);
+            if (!user) return true;
+            send(res, 200, store.servers.serverDetail(serverId, user.id));
+            return true;
+          }
+          if (method === "PATCH") {
+            const user = requireUser(req, res, limits.socialAction);
+            if (!user) return true;
+            const patch = {};
+            if (body.name !== undefined) patch.name = String(body.name).slice(0, 60);
+            if (body.description !== undefined) patch.description = String(body.description).slice(0, 400);
+            if (body.icon !== undefined) patch.icon = String(body.icon).slice(0, 512 * 1024);
+            send(res, 200, { server: store.servers.updateServer(serverId, user.id, patch) });
+            return true;
+          }
+          if (method === "DELETE") {
+            const user = requireUser(req, res, limits.socialAction);
+            if (!user) return true;
+            store.servers.deleteServer(serverId, user.id);
+            send(res, 200, { ok: true });
+            return true;
+          }
+        }
+
+        // POST /api/accounts/servers/:id/transfer { username }
+        if (segments.length === 3 && segments[2] === "transfer" && method === "POST") {
+          const user = requireUser(req, res, limits.socialAction);
+          if (!user) return true;
+          const target = store.social.userByUsername(String(body.username ?? ""));
+          if (!target) return fail(res, 404, "ACCOUNT_NOT_FOUND", "That account no longer exists.") || true;
+          store.servers.transferOwnership(serverId, user.id, target.id);
+          send(res, 200, { ok: true });
+          return true;
+        }
+
+        // POST /api/accounts/servers/:id/channels
+        if (segments.length === 3 && segments[2] === "channels" && method === "POST") {
+          const user = requireUser(req, res, limits.socialAction);
+          if (!user) return true;
+          const channel = store.servers.addChannel(serverId, user.id, {
+            name: String(body.name ?? ""),
+            category: body.category,
+            description: body.description,
+            requiresPermission: body.requiresPermission ?? null,
+          });
+          send(res, 201, { channel });
+          return true;
+        }
+
+        // GET /api/accounts/servers/:id/roles · POST creates one
+        if (segments.length === 3 && segments[2] === "roles") {
+          const user = requireUser(req, res, limits.socialAction);
+          if (!user) return true;
+          if (method === "GET") {
+            const detail = store.servers.serverDetail(serverId, user.id);
+            send(res, 200, { roles: detail.roles });
+            return true;
+          }
+          if (method === "POST") {
+            const role = store.servers.createRole(serverId, user.id, {
+              name: body.name,
+              color: body.color,
+              permissions: body.permissions,
+            });
+            send(res, 201, { role });
+            return true;
+          }
+        }
+
+        // GET /api/accounts/servers/:id/members
+        if (segments.length === 3 && segments[2] === "members" && method === "GET") {
+          const user = requireUser(req, res, limits.login);
+          if (!user) return true;
+          send(res, 200, { members: store.servers.membersFor(serverId) });
+          return true;
+        }
+
+        // PUT /api/accounts/servers/:id/members/:userId/role
+        if (
+          segments.length === 5 &&
+          segments[2] === "members" &&
+          segments[4] === "role" &&
+          method === "PUT"
+        ) {
+          const user = requireUser(req, res, limits.socialAction);
+          if (!user) return true;
+          store.servers.assignRole(serverId, user.id, decodeURIComponent(segments[3]), body.roleId ?? null);
+          send(res, 200, { ok: true });
+          return true;
+        }
+
+        // DELETE /api/accounts/servers/:id/members/:userId (kick)
+        if (segments.length === 4 && segments[2] === "members" && method === "DELETE") {
+          const user = requireUser(req, res, limits.socialAction);
+          if (!user) return true;
+          store.servers.kickMember(serverId, user.id, decodeURIComponent(segments[3]));
+          send(res, 200, { ok: true });
+          return true;
+        }
+
+        // POST /api/accounts/servers/:id/invites · GET lists them
+        if (segments.length === 3 && segments[2] === "invites") {
+          const user = requireUser(req, res, limits.socialAction);
+          if (!user) return true;
+          if (method === "GET") {
+            send(res, 200, { invites: store.servers.listInvites(serverId, user.id) });
+            return true;
+          }
+          if (method === "POST") {
+            const invite = store.servers.createInvite(serverId, user.id, {
+              expiresInMs: body.expiresInMs,
+              maxUses: body.maxUses,
+            });
+            send(res, 201, { invite });
+            return true;
+          }
+        }
+
+        // GET /api/accounts/servers/:id/audit
+        if (segments.length === 3 && segments[2] === "audit" && method === "GET") {
+          const user = requireUser(req, res, limits.login);
+          if (!user) return true;
+          send(res, 200, { audit: store.servers.auditFor(serverId, user.id) });
+          return true;
+        }
+      }
+
+      // /api/accounts/channels/:id[/messages] and role/message mutations
+      if (segments[0] === "channels" && segments.length >= 2) {
+        const channelId = decodeURIComponent(segments[1]);
+
+        // GET/POST /api/accounts/channels/:id/messages
+        if (segments.length === 3 && segments[2] === "messages") {
+          if (method === "GET") {
+            const user = requireUser(req, res, limits.login);
+            if (!user) return true;
+            const beforeRaw = Number(url.searchParams.get("before") ?? 0);
+            const limitRaw = Number(url.searchParams.get("limit") ?? 50);
+            send(
+              res,
+              200,
+              store.servers.messagesFor(channelId, user.id, {
+                before: Number.isFinite(beforeRaw) && beforeRaw > 0 ? beforeRaw : null,
+                limit: Number.isFinite(limitRaw) ? limitRaw : 50,
+              }),
+            );
+            return true;
+          }
+          if (method === "POST") {
+            const user = requireUser(req, res, limits.message);
+            if (!user) return true;
+            const clientId =
+              typeof body.clientId === "string" && /^[A-Za-z0-9_-]{6,64}$/.test(body.clientId)
+                ? body.clientId
+                : undefined;
+            const message = store.servers.postMessage(channelId, user.id, body.body, clientId);
+            send(res, 201, { message });
+            return true;
+          }
+        }
+
+        // PATCH /api/accounts/channels/:id — channel settings
+        if (segments.length === 2 && method === "PATCH") {
+          const user = requireUser(req, res, limits.socialAction);
+          if (!user) return true;
+          send(res, 200, { channel: store.servers.updateChannel(channelId, user.id, body) });
+          return true;
+        }
+        if (segments.length === 2 && method === "DELETE") {
+          const user = requireUser(req, res, limits.socialAction);
+          if (!user) return true;
+          store.servers.deleteChannel(channelId, user.id);
+          send(res, 200, { ok: true });
+          return true;
+        }
+      }
+
+      // /api/accounts/roles/:id — edit/delete; /server-messages/:id — edit/delete
+      if (segments[0] === "roles" && segments.length === 2) {
+        const roleId = decodeURIComponent(segments[1]);
+        const user = requireUser(req, res, limits.socialAction);
+        if (!user) return true;
+        if (method === "PATCH") {
+          send(res, 200, { role: store.servers.updateRole(roleId, user.id, body) });
+          return true;
+        }
+        if (method === "DELETE") {
+          store.servers.deleteRole(roleId, user.id);
+          send(res, 200, { ok: true });
+          return true;
+        }
+      }
+
+      if (segments[0] === "server-messages" && segments.length === 2) {
+        const messageId = decodeURIComponent(segments[1]);
+        const user = requireUser(req, res, limits.message);
+        if (!user) return true;
+        if (method === "PATCH") {
+          store.servers.editMessage(messageId, user.id, body.body);
+          send(res, 200, { ok: true });
+          return true;
+        }
+        if (method === "DELETE") {
+          store.servers.deleteMessage(messageId, user.id, isAdmin(user));
+          send(res, 200, { ok: true });
+          return true;
+        }
+      }
+
       // /api/accounts/conversations/:peerId/messages
       if (segments[0] === "conversations" && segments.length === 3 && segments[2] === "messages") {
         const user = requireUser(req, res);
@@ -793,7 +1497,81 @@ export function createAccountsApi(options = {}) {
           return true;
         }
       }
+
+      /* ---- Store submissions ------------------------------------------- */
+
+      if (segments[0] === "store") {
+        // GET /api/accounts/store/approved — public catalogue of approved apps
+        if (segments.length === 2 && segments[1] === "approved" && method === "GET") {
+          send(res, 200, { submissions: store.appStore.approved() });
+          return true;
+        }
+
+        // GET /api/accounts/store/mine — your own submissions and their state
+        if (segments.length === 2 && segments[1] === "mine" && method === "GET") {
+          const user = requireUser(req, res, limits.login);
+          if (!user) return true;
+          send(res, 200, { submissions: store.appStore.mine(user.id) });
+          return true;
+        }
+
+        // POST /api/accounts/store/submit — propose a web application
+        if (segments.length === 2 && segments[1] === "submit" && method === "POST") {
+          const user = requireUser(req, res, limits.socialPost);
+          if (!user) return true;
+          const checked = validateSubmission(body);
+          if (checked.error) return fail(res, 400, "INVALID_SUBMISSION", checked.error);
+          send(res, 201, { submission: store.appStore.submit(user.id, checked.value) });
+          return true;
+        }
+
+        // GET /api/accounts/store/admin?status=pending — the moderation queue
+        if (segments.length === 2 && segments[1] === "admin" && method === "GET") {
+          const user = requireUser(req, res, limits.login);
+          if (!user) return true;
+          if (!isAdmin(user)) {
+            return fail(res, 403, "NOT_AUTHORIZED", "Only store moderators can read the queue.");
+          }
+          const status = url.searchParams.get("status") ?? "pending";
+          send(res, 200, {
+            submissions: store.appStore.listByStatus(status),
+            pendingCount: store.appStore.pendingCount(),
+          });
+          return true;
+        }
+
+        // POST /api/accounts/store/admin/:id/review { action, note }
+        if (
+          segments.length === 4 &&
+          segments[1] === "admin" &&
+          segments[3] === "review" &&
+          method === "POST"
+        ) {
+          const user = requireUser(req, res, limits.socialAction);
+          if (!user) return true;
+          if (!isAdmin(user)) {
+            return fail(res, 403, "NOT_AUTHORIZED", "Only store moderators can review submissions.");
+          }
+          const checked = validateReview(body);
+          if (checked.error) return fail(res, 400, "INVALID_REVIEW", checked.error);
+          const result = store.appStore.review(
+            decodeURIComponent(segments[2]),
+            user.id,
+            checked.value.action,
+            checked.value.note,
+          );
+          if (result.error) return fail(res, 404, "SUBMISSION_NOT_FOUND", result.error);
+          send(res, 200, { submission: result.value });
+          return true;
+        }
+      }
     } catch (error) {
+      // A refusal with a name and a sentence (permission, rank, missing
+      // channel) is answered as itself; everything else is a plain 500.
+      if (error instanceof ServerError) {
+        fail(res, error.status, error.code, error.message);
+        return true;
+      }
       // Never leak a stack trace or a SQL statement to the client.
       process.stderr.write(`[accounts] ${method} ${path} failed: ${error?.message ?? error}\n`);
       if (!res.headersSent) {

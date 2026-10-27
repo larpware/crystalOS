@@ -111,6 +111,14 @@ export interface WindowInstance {
   snapBox?: FractionalRect;
   minimized: boolean;
   focused: boolean;
+  /**
+   * Full screen: the window owns the entire viewport instead of the work area.
+   * Unlike maximize it reserves nothing for the panel or the dock — the shell's
+   * bars are not excluded, they keep their stacking order and stay painted above
+   * the window. Geometry is deliberately untouched: `rect` still describes where
+   * the window goes back to, so leaving full screen restores it exactly.
+   */
+  full?: boolean;
   args?: Record<string, unknown>;
   /** Blocking the rest of the desktop with a scrim. */
   modal?: boolean;
@@ -203,6 +211,19 @@ export interface ThemePreset {
   appearance: "dark" | "light";
   description: string;
   tokens: ThemeTokens;
+  /**
+   * Font persona some themes ship with (the Solarized pair swaps the whole
+   * type system). Honoured while the user's font picks are the interface
+   * defaults; any explicit font choice in Settings wins.
+   */
+  defaultFonts?: { ui: string; mono: string; display: string };
+  /** Curated flag: these carry the unified design system at its best. */
+  recommended?: boolean;
+  /**
+   * Kept so existing profiles and custom themes built from it still work, but
+   * no longer promoted: badged as deprecated and listed last in every picker.
+   */
+  deprecated?: boolean;
 }
 
 export interface CustomTheme extends ThemePreset {
@@ -394,9 +415,19 @@ export interface AccountProfile {
    * Also immutable: no route accepts a rarity, so it can never be re-rolled.
    */
   rarity?: RarityId;
+  /**
+   * Labels worn beside the name (owner, staff, …). Set by administrators on
+   * the account server; presentation only — they grant nothing.
+   */
+  tags?: string[];
   /** Data URL of the avatar image. */
   avatar?: string;
   bio?: string;
+  /**
+   * Moderation authority as the account server records it: the first
+   * registered account, anyone named in CRESCENT_ADMINS, or nobody.
+   */
+  role?: "admin" | "user";
   createdAt: number;
   guest?: boolean;
 }
@@ -416,6 +447,8 @@ export interface FriendSummary {
   avatar?: string;
   /** The friend's friend-code rarity, as drawn by the server. */
   rarity?: RarityId;
+  /** Labels worn beside the friend's name (owner, staff, …). */
+  tags?: string[];
   /** True when the account was seen within the last minute. */
   online: boolean;
   lastSeenAt: number;

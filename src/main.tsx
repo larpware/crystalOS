@@ -8,6 +8,7 @@ import { startPluginCommands } from "./services/plugins/registry";
 /* Stylesheets are imported in cascade order: tokens first, then base, shared
    primitives, shell chrome, then per-application styles. */
 import "./styles/tokens.css";
+import "./styles/fonts.css";
 import "./styles/base.css";
 import "./styles/components.css";
 import "./styles/glass.css";
@@ -28,7 +29,10 @@ import "./styles/apps/games.css";
 import "./styles/apps/media.css";
 import "./styles/apps/store.css";
 import "./styles/apps/messages.css";
+import "./styles/apps/communities.css";
 import "./styles/apps/vpn.css";
+import "./styles/apps/ai.css";
+import "./styles/apps/social.css";
 // Last: the small per-application pieces that had markup but no rule. Loaded
 // after every app stylesheet so it can complete them without competing.
 import "./styles/apps/details.css";

@@ -410,7 +410,75 @@ function readConnectResponse(socket, timeoutMs) {
 }
 
 /**
- * Proves a proxy can carry a *real, verified* TLS session to `target`.
+ * The path the proof asks for once it has a verified session.
+ *
+ * `/` on any host is the cheapest thing that a *web* target will answer, and the
+ * answer is what the check below is for.
+ */
+const PROOF_REQUEST_PATH = "/";
+
+/** How much of the answer the proof will read before giving up on it. */
+const PROOF_MAX_BYTES = 16 * 1024;
+
+/**
+ * Reads one HTTP response head off a proven session.
+ *
+ * Resolves with the status code of a complete, well-formed status line, and
+ * rejects if nothing arrives, if what arrives is not an HTTP response, or if the
+ * session dies while it is being read — the TLS layer raises its own error for
+ * that last case, which is the interesting one: a stream that is mangled in
+ * transit fails its integrity check exactly here.
+ */
+function readProofAnswer(secure, hostname, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    let buffer = Buffer.alloc(0);
+    const finish = (fn, value) => {
+      clearTimeout(timer);
+      secure.off("data", onData);
+      secure.off("error", onError);
+      fn(value);
+    };
+    const timer = setTimeout(
+      () => finish(reject, new Error("The proxy carried a secure session but no answer to a request over it.")),
+      timeoutMs,
+    );
+    const onError = (error) => finish(reject, error);
+    const onData = (chunk) => {
+      buffer = Buffer.concat([buffer, chunk]);
+      const end = buffer.indexOf("\r\n\r\n");
+      if (end === -1) {
+        if (buffer.length > PROOF_MAX_BYTES) {
+          finish(reject, new Error("The proxy carried no HTTP response to a request over the session."));
+        }
+        return;
+      }
+      const head = buffer.subarray(0, end).toString("latin1");
+      const status = Number(/^HTTP\/1\.[01] (\d{3})/.exec(head)?.[1]);
+      if (!Number.isInteger(status)) {
+        finish(reject, new Error("The proxy carried something other than an HTTP response."));
+        return;
+      }
+      finish(resolve, status);
+    };
+    secure.on("data", onData);
+    secure.on("error", onError);
+    secure.write(
+      [
+        `GET ${PROOF_REQUEST_PATH} HTTP/1.1`,
+        `Host: ${hostname}`,
+        "Accept: */*",
+        "User-Agent: CrystalOS-VPN-proof",
+        "Connection: close",
+        "",
+        "",
+      ].join("\r\n"),
+    );
+  });
+}
+
+/**
+ * Proves a proxy can carry a *real, verified* TLS session to `target`, and that
+ * the session itself carries a real answer.
  *
  * A CONNECT that returns 200 is only a promise. It cannot tell a working exit
  * from one that black-holes the target, and it cannot tell either from a proxy
@@ -422,18 +490,35 @@ function readConnectResponse(socket, timeoutMs) {
  * So this dials the tunnel and then completes an ordinary TLS handshake with
  * `rejectUnauthorized` left at its default of `true`, checking the target's
  * certificate against the target's own name. A rogue proxy cannot pass, because
- * passing would require a certificate it cannot forge. The session is destroyed
- * the moment it is proven; nothing is ever requested over it.
+ * passing would require a certificate it cannot forge.
  *
- * On success resolves `{ subject }` (the certificate's CN, for the log). On any
- * failure it throws — the caller treats every throw as "this proxy is no good".
+ * A handshake is still only half of it, and the half that public exits fail:
+ * a proxy that completes the handshake and then mangles, stalls or truncates the
+ * bytes passes the certificate check and fails every page that goes through it.
+ * That is a "connected" VPN whose sites come up blank, which is precisely the
+ * failure this check exists to prevent. So the proof goes one step further and
+ * asks for one small document over the session it just built, and requires a
+ * complete HTTP status line back. Nothing is authenticated, nothing is kept: the
+ * answer is read as bytes and the session is destroyed immediately after.
+ *
+ * On success resolves `{ subject, status }` (the certificate's CN and the status
+ * of the proof request, for the log). On any failure it throws — the caller
+ * treats every throw as "this proxy is no good".
+ *
+ * `connectImpl` replaces both dials so the tests can trust a throwaway CA; the
+ * code under test keeps `rejectUnauthorized: true` either way.
  */
-export async function verifyTlsThroughProxy({ proxy, target, timeoutMs = PROXY_HANDSHAKE_TIMEOUT_MS }) {
+export async function verifyTlsThroughProxy({
+  proxy,
+  target,
+  timeoutMs = PROXY_HANDSHAKE_TIMEOUT_MS,
+  connectImpl = null,
+}) {
   const scheme = proxy.scheme === "http" ? "http" : "https";
   const socket =
-    scheme === "http"
+    scheme === "http" && !connectImpl
       ? netConnect({ host: proxy.host, port: proxy.port })
-      : tlsConnect({
+      : (connectImpl ?? tlsConnect)({
           host: proxy.host,
           port: proxy.port,
           servername: proxy.host,
@@ -474,7 +559,7 @@ export async function verifyTlsThroughProxy({ proxy, target, timeoutMs = PROXY_H
     // stream, so they are handed back to the socket before TLS wraps it.
     if (rest.length > 0) socket.unshift(rest);
 
-    const secure = tlsConnect({ socket, servername: target.host, rejectUnauthorized: true });
+    const secure = (connectImpl ?? tlsConnect)({ socket, servername: target.host, rejectUnauthorized: true });
     await new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         secure.destroy();
@@ -491,9 +576,16 @@ export async function verifyTlsThroughProxy({ proxy, target, timeoutMs = PROXY_H
     });
 
     const subject = secure.getPeerCertificate()?.subject?.CN ?? null;
+    // The certificate is checked; now the bytes are. See the doc comment above:
+    // an exit that completes handshakes and then corrupts the stream is exactly
+    // the exit that turns into a blank page.
+    const proofStatus = await readProofAnswer(secure, target.host, timeoutMs).catch((error) => {
+      secure.destroy();
+      throw error;
+    });
     secure.destroy();
     socket.destroy();
-    return { subject };
+    return { subject, status: proofStatus };
   } catch (error) {
     socket.destroy();
     throw error;
@@ -537,6 +629,21 @@ function openDirectSocket(hostname, port, timeoutMs = PROXY_HANDSHAKE_TIMEOUT_MS
 /* ----------------------------------------------------------------- socket */
 
 /**
+ * How long one stream waits for an exit to prove a TLS session to its target.
+ *
+ * Deliberately shorter than `PROXY_HANDSHAKE_TIMEOUT_MS`: this happens in front
+ * of a page load, and an exit that cannot answer within this long is one the
+ * user would rather pass over than wait out.
+ */
+export const STREAM_PROOF_TIMEOUT_MS = 8_000;
+
+/** How long a proven (exit, host) pair is trusted before it is proven again. */
+export const STREAM_PROOF_TTL_MS = 120_000;
+
+/** How long an exit that failed a host is passed over for that host. */
+export const STREAM_REJECT_TTL_MS = 60_000;
+
+/**
  * Builds the socket class wisp dials through.
  *
  * `decide(hostname, port)` runs once per stream, at connect time, and is the
@@ -544,12 +651,71 @@ function openDirectSocket(hostname, port, timeoutMs = PROXY_HANDSHAKE_TIMEOUT_MS
  * process is what makes a settings change apply to the next request instead of
  * to the process's whole lifetime, and what lets an in-flight request keep the
  * route it started on.
+ *
+ * ## Why one stream can be dialled more than once
+ *
+ * An automatic connection is not one server: it is the ranked set of exits a
+ * scan proved, with a preferred one in front. Public exits fail per host all the
+ * time — refusing a CONNECT to a site they cannot reach, dying between the scan
+ * and the request, or accepting a CONNECT and then carrying nothing at all. Any
+ * of those used to end as a page that simply did not render. So a stream walks
+ * its candidates in order, and the first one that gets all the way through
+ * carries it:
+ *
+ *   1. an exit that already failed *this* host is passed over while the memory
+ *      below holds that failure;
+ *   2. a TLS target gets a real, certificate-verified handshake to that host
+ *      through the exit, *before* the stream is handed to wisp — the same proof
+ *      the scan uses, applied per host, because that is the check that separates
+ *      a working exit from one that black-holes this particular site;
+ *   3. the CONNECT tunnel is opened.
+ *
+ * The proof is remembered per host, so a page that fetches twenty things from
+ * one origin proves that origin once. It is opt-in: only a decision that sets
+ * `prove` gets it, so a caller that knows its transport works is not slowed
+ * down, and the test doubles are unaffected.
  */
 export function createRoutedTCPSocket({
   decide,
   openTunnel = openConnectTunnel,
   openDirect = openDirectSocket,
-}) {
+  /** The per-host proof of step 2. `null` disables it entirely. */
+  proveTls = verifyTlsThroughProxy,
+  proofTimeoutMs = STREAM_PROOF_TIMEOUT_MS,
+  proofTtlMs = STREAM_PROOF_TTL_MS,
+  rejectTtlMs = STREAM_REJECT_TTL_MS,
+  now = () => Date.now(),
+  log = () => undefined,
+} = {}) {
+  /**
+   * Per-host memory of which exits carried a verified TLS session to it.
+   *
+   * One socket class serves every stream in the process, so this is shared: the
+   * point is that a page's many requests to one origin pay for the proof once.
+   * Both maps are bounded — a long session can visit thousands of hosts, and
+   * this is a hint, not a cache worth growing without limit.
+   */
+  const proven = new Map();
+  const refused = new Map();
+
+  const exitKey = (proxy) => `${proxy.scheme === "https" ? "https" : "http"}://${proxy.host}:${proxy.port}`;
+
+  function remember(store, host, key, ttl) {
+    let byHost = store.get(host);
+    if (!byHost) store.set(host, (byHost = new Map()));
+    byHost.set(key, now() + ttl);
+    if (store.size > 512) store.delete(store.keys().next().value);
+  }
+
+  function held(store, host, key) {
+    const byHost = store.get(host);
+    const until = byHost?.get(key);
+    if (until === undefined) return false;
+    if (until > now()) return true;
+    byHost.delete(key);
+    return false;
+  }
+
   return class RoutedTCPSocket {
     constructor(hostname, port) {
       this.hostname = hostname;
@@ -560,7 +726,56 @@ export function createRoutedTCPSocket({
       this.paused = false;
       this.connected = false;
       this.mode = null;
+      /** The exit this stream actually ended up on, for logging. */
+      this.exit = null;
       this.queue = new BoundedQueue(this.recv_buffer_size);
+    }
+
+    get targetKey() {
+      return `${this.hostname}:${this.port}`;
+    }
+
+    /**
+     * Whether the proof can say anything about this target.
+     *
+     * Only a TLS port has a certificate to check, and a certificate is issued to
+     * a name — an IP literal has none, so proving one would reject exits that
+     * carry it perfectly well.
+     */
+    get canProve() {
+      return typeof proveTls === "function" && this.port === 443 && !isIP(this.hostname);
+    }
+
+    /**
+     * Proves this exit carries a verified TLS session to this stream's target.
+     *
+     * A hit in either memory answers without touching the network; otherwise the
+     * real handshake runs and its outcome is remembered.
+     */
+    async prove(proxy) {
+      const key = exitKey(proxy);
+      if (held(proven, this.targetKey, key)) return;
+      if (held(refused, this.targetKey, key)) {
+        throw new Error(`${proxy.host}:${proxy.port} could not carry ${this.hostname} a moment ago.`);
+      }
+      try {
+        await proveTls({
+          proxy,
+          target: { host: this.hostname, port: this.port },
+          timeoutMs: proofTimeoutMs,
+        });
+      } catch (error) {
+        remember(refused, this.targetKey, key, rejectTtlMs);
+        throw error;
+      }
+      remember(proven, this.targetKey, key, proofTtlMs);
+    }
+
+    /** `end`, `close` and `error` all mean the same thing to a reader. */
+    watch() {
+      this.socket.on("end", () => this.queue.close());
+      this.socket.on("close", () => this.queue.close());
+      this.socket.on("error", () => this.queue.close());
     }
 
     async connect() {
@@ -577,23 +792,57 @@ export function createRoutedTCPSocket({
         this.socket = await openDirect(this.hostname, this.port);
         // No handshake reader here, so this is the only data path.
         this.socket.on("data", (chunk) => void this.queue.put(chunk));
-      } else {
-        const { socket, reader } = await openTunnel({
-          proxy: decision.proxy,
-          target: { host: this.hostname, port: this.port },
-        });
-        this.socket = socket;
-        // From here the socket is a byte stream. `takeRest` replays anything
-        // that arrived with the handshake and owns every later chunk, so no
-        // second `data` listener is attached in this branch.
-        reader.takeRest((chunk) => void this.queue.put(chunk));
+        this.watch();
+        this.connected = true;
+        return;
       }
 
-      this.socket.on("end", () => this.queue.close());
-      this.socket.on("close", () => this.queue.close());
-      this.socket.on("error", () => this.queue.close());
+      // The preferred exit first, then every other exit the last scan proved,
+      // de-duplicated on the exit itself rather than on anything it claims.
+      const candidates = [decision.proxy, ...(decision.alternatives ?? [])]
+        .filter(Boolean)
+        .filter(
+          (proxy, index, list) => list.findIndex((other) => exitKey(other) === exitKey(proxy)) === index,
+        );
+      const prove = Boolean(decision.prove) && this.canProve;
 
-      this.connected = true;
+      let lastError = null;
+      for (let index = 0; index < candidates.length; index += 1) {
+        const proxy = candidates[index];
+        if (held(refused, this.targetKey, exitKey(proxy))) continue;
+        try {
+          if (prove) await this.prove(proxy);
+          const { socket, reader } = await openTunnel({
+            proxy,
+            target: { host: this.hostname, port: this.port },
+          });
+          this.socket = socket;
+          this.exit = proxy;
+          // From here the socket is a byte stream. `takeRest` replays anything
+          // that arrived with the handshake and owns every later chunk, so no
+          // second `data` listener is attached in this branch.
+          reader.takeRest((chunk) => void this.queue.put(chunk));
+          this.watch();
+          this.connected = true;
+          if (index > 0) {
+            log(
+              `vpn: ${this.hostname}:${this.port} was carried by ${proxy.host}:${proxy.port} after ` +
+                `${candidates.length - 1} other exit${candidates.length === 2 ? "" : "s"} could not take it`,
+            );
+          }
+          return;
+        } catch (error) {
+          lastError = error;
+          const why = error instanceof Error ? error.message : String(error);
+          if (index + 1 < candidates.length) {
+            log(`vpn: ${proxy.host}:${proxy.port} could not carry ${this.hostname}:${this.port} (${why}); trying the next exit`);
+          } else {
+            log(`vpn: no exit could carry ${this.hostname}:${this.port} (last: ${why})`);
+          }
+        }
+      }
+
+      throw lastError ?? new Error(`No exit could carry ${this.hostname}:${this.port}.`);
     }
 
     async recv() {

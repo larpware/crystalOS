@@ -19,6 +19,20 @@ export interface FontOption {
 
 export const uiFontOptions: FontOption[] = [
   {
+    id: "dm",
+    name: "DM Sans",
+    stack:
+      '"DM Sans", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Inter, system-ui, Roboto, sans-serif',
+    description: "Knockout's bundled interface face — warm, even letterforms, all weights.",
+  },
+  {
+    id: "plex",
+    name: "IBM Plex Sans",
+    stack:
+      '"IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, Roboto, sans-serif',
+    description: "Engineered grotesque with a technical, printed-readout character.",
+  },
+  {
     id: "system",
     name: "System",
     stack:
@@ -99,6 +113,24 @@ export const monoFontOptions: FontOption[] = [
 
 /** The display role drives the lock-screen clock; it can borrow any family. */
 export const displayFontOptions: FontOption[] = [
+  {
+    id: "display",
+    name: "Follow theme",
+    stack: "var(--font-display)",
+    description: "Whatever display face the active theme carries — serif for Cinema, grotesk for Solarized.",
+  },
+  {
+    id: "instrument",
+    name: "Instrument Serif",
+    stack: '"Instrument Serif", Georgia, "Times New Roman", ui-serif, serif',
+    description: "The bundled editorial face — tall, quiet strokes for large type.",
+  },
+  {
+    id: "space-grotesk",
+    name: "Space Grotesk",
+    stack: '"Space Grotesk", "IBM Plex Sans", Inter, system-ui, sans-serif',
+    description: "Engineered grotesque with ink traps — the Solarized readout face.",
+  },
   ...uiFontOptions,
   {
     id: "digital",

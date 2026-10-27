@@ -16,3 +16,4 @@ coverage/
 
 # Agent scratch: analysis logs, capture scripts and undo snapshots. Never committed.
 .tmp-*
+tmp-review/

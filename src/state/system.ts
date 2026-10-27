@@ -72,6 +72,14 @@ export interface SystemState {
   proxyModes: Record<string, ProxyMode>;
   /** Epoch ms of the current session start, used by the uptime readout. */
   sessionStartedAt: number;
+  /**
+   * Always-on display. The desk dims to a large clock after `standbyIdleMinutes`
+   * without input, and the screen goes to sleep after `standbySleepMinutes`
+   * more. Any key, pointer or wheel event wakes it; 0 disables either stage.
+   */
+  standbyEnabled: boolean;
+  standbyIdleMinutes: number;
+  standbySleepMinutes: number;
 
   completeSetup: (input: {
     deviceType: "desktop" | "laptop";
@@ -91,6 +99,9 @@ export interface SystemState {
   setHzDisplay: (display: HzDisplay) => void;
   setReduceTransparency: (enabled: boolean) => void;
   setGlassSurfaces: (enabled: boolean) => void;
+  setStandbyEnabled: (enabled: boolean) => void;
+  setStandbyIdleMinutes: (minutes: number) => void;
+  setStandbySleepMinutes: (minutes: number) => void;
   /** Returns the OS to the first-run wizard without deleting user data. */
   rerunSetup: () => void;
   markSessionStart: () => void;
@@ -113,6 +124,9 @@ export const useSystemStore = create<SystemState>()(
       offlineMode: "auto",
       proxyModes: {},
       sessionStartedAt: Date.now(),
+      standbyEnabled: true,
+      standbyIdleMinutes: 5,
+      standbySleepMinutes: 10,
 
       completeSetup: ({ deviceType, performanceMode, motionOverride }) =>
         set({ setupComplete: true, deviceType, performanceMode, motionOverride }),
@@ -130,6 +144,9 @@ export const useSystemStore = create<SystemState>()(
       setHzDisplay: (hzDisplay) => set({ hzDisplay }),
       setReduceTransparency: (reduceTransparency) => set({ reduceTransparency }),
       setGlassSurfaces: (glassSurfaces) => set({ glassSurfaces }),
+      setStandbyEnabled: (standbyEnabled) => set({ standbyEnabled }),
+      setStandbyIdleMinutes: (standbyIdleMinutes) => set({ standbyIdleMinutes }),
+      setStandbySleepMinutes: (standbySleepMinutes) => set({ standbySleepMinutes }),
       rerunSetup: () => set({ setupComplete: false }),
       markSessionStart: () => set({ sessionStartedAt: Date.now() }),
     }),
@@ -151,6 +168,9 @@ export const useSystemStore = create<SystemState>()(
         proxyEnabled: state.proxyEnabled,
         offlineMode: state.offlineMode,
         proxyModes: state.proxyModes,
+        standbyEnabled: state.standbyEnabled,
+        standbyIdleMinutes: state.standbyIdleMinutes,
+        standbySleepMinutes: state.standbySleepMinutes,
       }) as SystemState,
     },
   ),

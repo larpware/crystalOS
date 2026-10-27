@@ -8,6 +8,7 @@ import { usePlaybackStore } from "@/state/playback";
 import { useShellStore } from "@/state/shell";
 import { useSystemStore } from "@/state/system";
 import { useNetworkStatus } from "@/hooks/useNetwork";
+import { useElementTheme } from "@/themes/scope";
 import { isEnforcing, providerAppId, providerName } from "@/services/vpn/coverage";
 import { useVpnStore } from "@/state/vpn";
 import { lockSession, notify, openApp, powerOff, sleepSession } from "@/services/os";
@@ -29,6 +30,7 @@ export function QuickSettings() {
   const open = useShellStore((state) => state.quickSettingsOpen);
   const setOpen = useShellStore((state) => state.setQuickSettingsOpen);
   const panelRef = useRef<HTMLDivElement>(null);
+  const overlayTheme = useElementTheme("overlays");
 
   const network = useNetworkStatus();
   const prefs = useNotificationStore((state) => state.prefs);
@@ -79,7 +81,14 @@ export function QuickSettings() {
   if (!open) return null;
 
   return (
-    <div className="cr-quick" ref={panelRef} role="dialog" aria-label="Quick settings">
+    <div
+      className="cr-quick"
+      ref={panelRef}
+      role="dialog"
+      aria-label="Quick settings"
+      data-element-theme={overlayTheme.themeId ?? undefined}
+      style={overlayTheme.style}
+    >
       <div className="cr-quick__status">
         <div className="cr-quick__status-main">
           <Icon name={network.online ? "wifi" : "wifi-off"} size={16} />

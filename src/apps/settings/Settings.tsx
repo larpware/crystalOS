@@ -30,6 +30,7 @@ import { AccountsPage, MessagingPage, PrivacyPage } from "./pages/account";
 import { CreditsPage } from "./pages/credits";
 import { PluginsPage } from "./pages/plugins";
 import { VpnPage } from "./pages/vpn";
+import { ProxyPage } from "./pages/proxy";
 
 /* ==========================================================================
    Settings
@@ -154,6 +155,28 @@ const pages: SettingsPage[] = [
     group: "System",
     keywords: ["browser", "proxy", "scramjet", "transport", "search engine", "home", "wisp"],
     Component: BrowserPage,
+  },
+  {
+    id: "proxy",
+    label: "Proxy",
+    icon: "filter",
+    group: "System",
+    keywords: [
+      "proxy",
+      "shield",
+      "adblock",
+      "ad blocker",
+      "ads",
+      "trackers",
+      "popups",
+      "data saver",
+      "low data",
+      "slow",
+      "bandwidth",
+      "scramjet",
+      "privacy",
+    ],
+    Component: ProxyPage,
   },
   {
     id: "tabIdentity",

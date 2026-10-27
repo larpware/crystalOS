@@ -47,6 +47,22 @@ const tokenToVariable: Record<Exclude<keyof ThemeTokens, "wallpaperDefault">, st
   accentOnMuted: "--accent-on-muted",
 };
 
+/** Token → custom property, for trees that render a theme inside the root theme. */
+export const themeVariableMap = tokenToVariable;
+
+/** True when a theme's root background is light. Shared with scoped themes. */
+export function themeIsLight(theme: ThemePreset): boolean {
+  return isLightRoot(theme.tokens.bgRoot);
+}
+
+/** The font stack a theme would publish, honouring explicit user picks. */
+export function themeFontsFor(
+  theme: ThemePreset,
+  fonts?: ApplyThemeOptions["fonts"],
+): ApplyThemeOptions["fonts"] | undefined {
+  return fontsMatchStock(fonts) && theme.defaultFonts ? theme.defaultFonts : fonts;
+}
+
 export interface ApplyThemeOptions {
   accent?: AccentOption | null;
   /** Overall UI scale multiplier. */
@@ -78,6 +94,12 @@ export interface ApplyThemeOptions {
   fonts?: { ui: string; mono: string; display: string };
   /** Dock corner radius in pixels. */
   dockBorderRadius?: number;
+}
+
+/** True when the user's font picks are the interface defaults (or unset) —
+ *  the condition a theme must meet to impose its own type persona. */
+function fontsMatchStock(fonts?: { ui: string; mono: string; display: string }): boolean {
+  return !fonts || (fonts.ui === "dm" && fonts.mono === "mono" && fonts.display === "instrument");
 }
 
 export function applyTheme(theme: ThemePreset, options: ApplyThemeOptions): void {
@@ -150,10 +172,16 @@ export function applyTheme(theme: ThemePreset, options: ApplyThemeOptions): void
 
   // Fonts are thin stacks resolved from ids; writing them here keeps every
   // surface that reads `--font-ui` / `--font-mono` in step with the choice.
-  if (options.fonts) {
-    root.setProperty("--font-ui", fontStack(options.fonts.ui));
-    root.setProperty("--font-mono", fontStack(options.fonts.mono));
-    root.setProperty("--font-display", fontStack(options.fonts.display));
+  // The user's picks win — but while they ride the interface defaults, a theme
+  // with its own type persona (the Solarized pair) swaps the whole type system,
+  // exactly the way the palette swaps: theme as product, not theme as tint.
+  const fonts = fontsMatchStock(options.fonts) && theme.defaultFonts
+    ? theme.defaultFonts
+    : options.fonts;
+  if (fonts) {
+    root.setProperty("--font-ui", fontStack(fonts.ui));
+    root.setProperty("--font-mono", fontStack(fonts.mono));
+    root.setProperty("--font-display", fontStack(fonts.display));
   }
 
   document.documentElement.dataset.appearance = theme.appearance;

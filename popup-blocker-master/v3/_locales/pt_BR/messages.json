@@ -1,0 +1,296 @@
+{
+  "app_description": {
+    "message": "Bloqueia rigorosamente todas as solicitações pop-up de qualquer site"
+  },
+  "context_item2": {
+    "message": "Permitir a última solicitação pop-up"
+  },
+  "context_item3": {
+    "message": "Negar a última solicitação pop-up"
+  },
+  "context_item4": {
+    "message": "Abrir último pedido de pop-up em uma aba em segundo plano"
+  },
+  "context_item5": {
+    "message": "Redirecionar aba atual ao último pedido de pop-up"
+  },
+  "context_item6": {
+    "message": "Mover foco da página para a última solicitação de pop-up"
+  },
+  "options_item1": {
+    "message": "Número máximo de solicitações de pop-up para uma única página"
+  },
+  "options_item2": {
+    "message": "Tempo limite para exibição de cada pop-up (em segundos)"
+  },
+  "options_item3": {
+    "message": "Não bloquear solicitações pop-up da mesma origem"
+  },
+  "options_item5": {
+    "message": "Exibir o número total de solicitações bloqueadas no ícone da barra de ferramentas"
+  },
+  "options_item6": {
+    "message": "Não bloquear pop-ups destas origens:"
+  },
+  "options_item7": {
+    "message": "Não bloquear pop-ups destas páginas:"
+  },
+  "options_item8": {
+    "message": "Pra essa mudança fazer efeito, atualize a aba."
+  },
+  "options_item9": {
+    "message": "Contagem regressiva para executar a última ação (em segundos)"
+  },
+  "options_item10": {
+    "message": "Use o número zero para desativar a contagem regressiva para executar a ação anterior."
+  },
+  "options_item13": {
+    "message": "Fontes da lista negra (modo de operação reversa):"
+  },
+  "options_item15": {
+    "message": "Previne o redirecionamento de página por 2 segundos após a solicitação de um pop-up"
+  },
+  "options_item17": {
+    "message": "Ação padrão quando um pop-up é solicitado"
+  },
+  "options_item18": {
+    "message": "Não fazer nada"
+  },
+  "options_item19": {
+    "message": "Negar solicitação"
+  },
+  "options_item20": {
+    "message": "Abrir em segundo plano"
+  },
+  "options_item21": {
+    "message": "Página de redirecionamento"
+  },
+  "options_item22": {
+    "message": "Cor do emblema de contagem"
+  },
+  "options_item23": {
+    "message": "Ignorar notificação pop-up quando possível (não recomendado)"
+  },
+  "options_item25": {
+    "message": "Descrições"
+  },
+  "options_item26": {
+    "message": "Exibir página de FAQs nas atualizações"
+  },
+  "options_item27": {
+    "message": "Não bloquear estes protocolos:"
+  },
+  "options_item28": {
+    "message": "Permitir redirecionamento de página para as seguintes origens:"
+  },
+  "options_item29": {
+    "message": "Permitir redirecionamento de página para a mesma origem"
+  },
+  "options_item30": {
+    "message": "Simular o botão 'Permitir' para prevenir que o bloqueador interno de pop-up do seu navegador bloqueie esses pedidos"
+  },
+  "options_item31": {
+    "message": "Quando o botão \"confiar\" é pressionado:"
+  },
+  "options_item32": {
+    "message": "Não bloquear mais a origem do pop-up"
+  },
+  "options_item33": {
+    "message": "Permitir que a página principal mostre qualquer pop-up"
+  },
+  "options_item34": {
+    "message": "Silenciar notificações nestes sites:"
+  },
+  "options_item35": {
+    "message": "Aplicar as seguintes regras CSS personalizadas à interface do popup:"
+  },
+  "options_item40": {
+    "message": "Foca a interface pop-up recém-gerada. Você pode então usar atalhos ou a tecla ESC para ocultar"
+  },
+  "options_item36": {
+    "message": "Habilitar detecção agressiva de IFrame estático"
+  },
+  "options_item37": {
+    "message": "Quando este modo está ativado, a extensão instala um observador de mutação para monitorar IFrames estáticos com atributos 'JavaScript:' src. Isso aumenta o poder de bloqueio, mas tem desvantagens de desempenho."
+  },
+  "options_item38": {
+    "message": "Redirecionamento de página"
+  },
+  "options_item39": {
+    "message": "Diversos"
+  },
+  "options_item41": {
+    "message": "Ação em uma nova solicitação pop-up"
+  },
+  "options_item42": {
+    "message": "Posição do pop-up na página"
+  },
+  "options_item43": {
+    "message": "Superior esquerdo"
+  },
+  "options_item44": {
+    "message": "Superior direito"
+  },
+  "options_item45": {
+    "message": "Inferior esquerdo"
+  },
+  "options_item46": {
+    "message": "Inferior direito"
+  },
+  "options_item47": {
+    "message": "Escopo de proteção"
+  },
+  "options_item48": {
+    "message": "Leia a documentação sobre como configurar o escopo da extensão."
+  },
+  "options_item49": {
+    "message": "Largura do pop-up (em pixels)"
+  },
+  "options_item50": {
+    "message": "Bloquear redirecionamentos de página automáticos sem interação do usuário"
+  },
+  "options_sync": {
+    "message": "Sincronizar esta preferência"
+  },
+  "options_support": {
+    "message": "Apoie o desenvolvimento"
+  },
+  "options_import": {
+    "message": "Importar preferências"
+  },
+  "options_export": {
+    "message": "Exportar preferências"
+  },
+  "options_reset": {
+    "message": "Redefinir padrão"
+  },
+  "options_save": {
+    "message": "Salvar opções"
+  },
+  "options_msg": {
+    "message": "As opções foram salvas"
+  },
+  "options_review": {
+    "message": "Avaliação no YouTube"
+  },
+  "options_page": {
+    "message": "Página de Perguntas Frequentes"
+  },
+  "options_t_1": {
+    "message": "Lista de nomes de servidores separados por vírgulas (ex.: www.google.com, www.yahoo.com)"
+  },
+  "options_t_2": {
+    "message": "Lista de nomes de domínios separados por vírgulas (ex.: www.google.com, www.yahoo.com)"
+  },
+  "options_t_3": {
+    "message": "Um objeto JSON que orienta a extensão na execução de uma ação específica em resposta a uma solicitação pop-up, determinada por sua URL. Leia a página de perguntas frequentes para obter exemplos."
+  },
+  "options_t_4": {
+    "message": "Insira uma lista de padrões separados por vírgulas para definir o escopo global. Altere isso somente se souber o que está fazendo, pois valores incorretos podem danificar a extensão. Leia a página de perguntas frequentes para mais informações."
+  },
+  "ui_msg": {
+    "message": "O pop-up foi solicitado por"
+  },
+  "ui_button_allow": {
+    "message": "Permitir este popup (Alt + Shift + A ou Control + Option + A)"
+  },
+  "ui_button_allow_value": {
+    "message": "Permitir"
+  },
+  "ui_button_redirect": {
+    "message": "Redirecione a página atual para o novo destino em vez de abri-la em uma nova aba ou popup (Alt + Shift + R ou Control + Option + R)"
+  },
+  "ui_button_redirect_value": {
+    "message": "Redirecionar"
+  },
+  "ui_button_background": {
+    "message": "Abra o link em uma aba em segundo plano (Alt + Shift + B ou Control + Option + B)"
+  },
+  "ui_button_background_value": {
+    "message": "Segundo plano"
+  },
+  "ui_button_deny": {
+    "message": "Recusar a abertura do popup ou abertura de aba (Alt + Shift + D ou Control + Option + D)"
+  },
+  "ui_button_deny_value": {
+    "message": "Negar"
+  },
+  "ui_button_trust": {
+    "message": "Coloque este domínio na lista de permissões para abrir popups (Alt + Shift + T ou Control + Option + T)"
+  },
+  "ui_button_trust_value": {
+    "message": "Confiar"
+  },
+  "ui_button_trust_confirm": {
+    "message": "Clique para confirmar"
+  },
+  "bg_msg_state_0": {
+    "message": "O Popup Blocker está habilitado globalmente, mas não está ativo nesta aba, provavelmente porque é uma página interna, fora do escopo ou ainda está carregando."
+  },
+  "bg_msg_state_1": {
+    "message": "O Popup Blocker está habilitado globalmente e protege esta aba"
+  },
+  "bg_msg_state_2": {
+    "message": "O Popup Blocker está ativado globalmente, mas não protege esta aba"
+  },
+  "bg_msg_state_3": {
+    "message": "O Popup Blocker está desativado globalmente e não protege esta aba"
+  },
+  "bg_msg_state_4": {
+    "message": "O Popup Blocker está desabilitado globalmente, mas protege esta aba"
+  },
+  "bg_msg_reg": {
+    "message": "O registro do filtro de bloqueio falhou devido a uma regra formatada incorretamente. Use a página de opções para corrigi-lo."
+  },
+  "pp_enabled_g": {
+    "message": "Habilitado (Global)"
+  },
+  "pp_enabled_c": {
+    "message": "Ativado (Este domínio)"
+  },
+  "pp_enabled_cf": {
+    "message": "Incluir/excluir sub-frames"
+  },
+  "pp_silent": {
+    "message": "Mostrar notificações"
+  },
+  "pp_ignore": {
+    "message": "Executar Ação se possível"
+  },
+  "pp_redirect": {
+    "message": "Bloquear redirecionamento de página."
+  },
+  "pp_last_request": {
+    "message": "Última solicitação"
+  },
+  "pp_test": {
+    "message": "Testar boqueador"
+  },
+  "pp_homepage": {
+    "message": "Página inicial"
+  },
+  "pp_options": {
+    "message": "Opções"
+  },
+  "pp_shadow": {
+    "message": "Usar sombra"
+  },
+  "pp_allow": {
+    "message": "Permitir"
+  },
+  "pp_block": {
+    "message": "Bloquear"
+  },
+  "pp_health": {
+    "message": "O script em segundo plano parece não responder. Deseja tentar reiniciar a extensão?"
+  },
+  "pp_block_redirect": {
+    "message": "Leve"
+  },
+  "pp_block_automated": {
+    "message": "Rigoroso"
+  },
+  "pp_redirect_info": {
+    "message": "O modo Leve impede redirecionamentos por 2 segundos após a interação do usuário. O modo Rigoroso também bloqueia redirecionamentos de página não interativos."
+  }
+}

@@ -149,6 +149,15 @@ export interface VpnSnapshot {
   preference: VpnPreference | null;
   /** The configured endpoint, described without secrets. */
   endpoint: VpnEndpointSummary | null;
+  /**
+   * How many proved exits this connection holds, including the preferred one.
+   *
+   * `1` is a single endpoint — typed by hand, or a scan that found exactly one —
+   * and anything above that is what an automatic connection actually is: a ranked
+   * set whose streams move to the next exit when the preferred one cannot carry a
+   * host. Nothing on screen should describe such a connection as "the exit".
+   */
+  poolSize: number;
   server: VpnServerSummary | null;
   verified: {
     tunnel: VpnTunnelVerification | null;

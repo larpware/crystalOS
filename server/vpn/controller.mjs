@@ -140,6 +140,27 @@ export const MANUAL_PROBE_TARGET = { host: "example.com", port: 443 };
  */
 const QUICK_CONNECT_ATTEMPTS = 5;
 
+/**
+ * How many exits one stream may be offered.
+ *
+ * A stream walks them in order until one carries it, so this trades the cost of
+ * a failed attempt against the chance of finding one that works. Four keeps a
+ * hopeless stream bounded at four quick failures rather than a scan's worth, and
+ * the transport remembers per host which exits already failed, so the walk is
+ * short the second time.
+ */
+const MAX_STREAM_EXITS = 4;
+
+/**
+ * How many times one Quick connect may scan before reporting no free server.
+ *
+ * The public lists are live and turn over constantly — a scan that finds nothing
+ * says "nothing in this list right now", not "nothing exists". Fetching them
+ * again is a few seconds and routinely lists a different set of proxies, so one
+ * retry turns a transient empty result into a connection instead of an error.
+ */
+const QUICK_CONNECT_SCAN_ROUNDS = 2;
+
 function classifyFailure(error) {
   if (error instanceof NoEndpointError) return errorOf(ERROR.NO_ENDPOINT, error.message);
   if (error instanceof NoProxyError) return errorOf(ERROR.NO_PROXY_FOUND, error.message);
@@ -204,6 +225,20 @@ export function createVpnController({
    * of every page load. The store is the durable copy; this is the live one.
    */
   let manual = null;
+  /**
+   * The other exits the last automatic scan proved, best first.
+   *
+   * Not a second source of truth: it never decides whether the VPN is connected,
+   * and nothing in the snapshot claims it is in use. It exists so that a single
+   * public exit refusing one host does not end as a page that does not render —
+   * `decideRoute` hands the ranked list to the stream, which walks it in order.
+   *
+   * Memory only, on purpose. The endpoint file holds the one exit the UI reports,
+   * and a restart rediscovers the rest through the next Quick connect; persisting
+   * a set of public proxies that will be dead by morning would be a lie with a
+   * longer shelf life.
+   */
+  let pool = [];
   /** Server catalogue from the last successful fetch, for the UI list. */
   let catalogue = null;
 
@@ -239,6 +274,12 @@ export function createVpnController({
        * endpoint with nothing connected must not read as a live server.
        */
       endpoint: describeEndpoint(manual),
+      /**
+       * How many proven exits the automatic pool is holding, including the one
+       * above. `1` means "this connection is a single endpoint" — a typed one, or
+       * a scan that found exactly one — and `0` means nothing is stored.
+       */
+      poolSize: pool.length + (manual ? 1 : 0),
       /** What the user asked for: `{id|country|city}`, or null. */
       preference: state.preference ? { ...state.preference } : null,
       verified: {
@@ -327,6 +368,57 @@ export function createVpnController({
   }
 
   /**
+   * The exits one stream may be dialled through: the reported one first, then the
+   * rest of the proved pool.
+   *
+   * The snapshot names the preferred exit, and it is what normally carries
+   * traffic — but a public exit that refuses one host while carrying everything
+   * else is ordinary, and failing the whole stream over it is exactly how a page
+   * ends up blank. Handing the ranked list to the transport makes that a second
+   * dial instead of a dead request.
+   */
+  function exitCandidates() {
+    if (!manual) return { primary: null, alternatives: [] };
+    const primary = manualProxy(manual);
+    const seen = new Set([`${primary.host}:${primary.port}`]);
+    const alternatives = [];
+    for (const candidate of pool) {
+      const key = `${candidate.host}:${candidate.port}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      alternatives.push(manualProxy(candidate));
+      if (alternatives.length >= MAX_STREAM_EXITS - 1) break;
+    }
+    return { primary, alternatives };
+  }
+
+  /**
+   * Turns one scan result into the canonical endpoints the rest of the layer uses.
+   *
+   * `normaliseEndpoint` is the same validation a typed endpoint goes through, so
+   * a list entry that could not have survived being typed is dropped rather than
+   * dialled. The scan's own facts (`ms`, `canary`) ride along for logging and for
+   * the choice between survivors; they are never written to the endpoint file,
+   * which `normaliseEndpoint` also sees to.
+   */
+  function rankEndpoints(found, country) {
+    const rows = found?.endpoints ?? (found?.endpoint ? [found.endpoint] : []);
+    const ranked = [];
+    for (const row of rows) {
+      try {
+        ranked.push({
+          ...normaliseEndpoint({ ...row, country: row.country || country || "" }),
+          ms: Number.isFinite(row.ms) ? row.ms : null,
+          canary: row.canary ?? null,
+        });
+      } catch {
+        // An unusable entry is skipped, never repaired into something dialled.
+      }
+    }
+    return ranked;
+  }
+
+  /**
    * The proxy every routed stream is dialled through, for whichever provider is
    * active. Proton credentials are re-minted here because they expire; a custom
    * endpoint has none to mint, and needs no account to use.
@@ -379,6 +471,19 @@ export function createVpnController({
 
     if (state.status === STATUS.connected) {
       try {
+        if (state.provider === PROVIDER.manual) {
+          const { primary, alternatives } = exitCandidates();
+          if (!primary) throw new NoEndpointError();
+          /*
+           * `prove` is set here and nowhere else. Under the account-free
+           * provider the exit is a public proxy, so every TLS stream is proved
+           * against its *own* target before the browser is allowed to use it —
+           * the check that turns "the CONNECT was answered" into "this exit can
+           * actually carry this site". Proton is a real VPN exit that does not
+           * need that second opinion, so its streams are not slowed by it.
+           */
+          return { mode: "proxy", proxy: primary, alternatives, prove: true };
+        }
         return { mode: "proxy", proxy: await currentProxy() };
       } catch (error) {
         // Credentials that cannot be re-minted mean the tunnel is no longer
@@ -787,7 +892,9 @@ export function createVpnController({
             ok: true,
             checkedAt: now(),
             detail: `The proxy at ${manual.host}:${manual.port} ${
-              usedTlsProof ? "carried a verified TLS session" : "accepted a CONNECT"
+              usedTlsProof
+                ? "carried a verified TLS session and answered a request over it"
+                : "accepted a CONNECT"
             }.`,
           },
           egress: null,
@@ -971,23 +1078,47 @@ export function createVpnController({
           verified: { tunnel: null, egress: null },
         });
 
-        let found;
-        try {
-          found = await proxyPool.findBest({
-            count: QUICK_CONNECT_ATTEMPTS,
-            country: wantedCountry,
-            canary,
-          });
-        } catch (error) {
-          return failAttempt(
-            new NoProxyError(error instanceof Error ? error.message : String(error)),
-            ++generation,
-          );
+        /*
+         * Scan, and scan again if the first round found nothing.
+         *
+         * `findBest` fetches the public lists on every call, and those lists are
+         * live: a round that returns nothing is a statement about the list at that
+         * moment, not about public proxies in general. One retry turns a
+         * transiently empty list into a connection instead of an error, and the
+         * cost is bounded because the second round is the last one either way.
+         */
+        let found = null;
+        let ranked = [];
+        for (let round = 1; round <= QUICK_CONNECT_SCAN_ROUNDS; round += 1) {
+          try {
+            found = await proxyPool.findBest({
+              count: QUICK_CONNECT_ATTEMPTS,
+              country: wantedCountry,
+              canary,
+            });
+          } catch (error) {
+            return failAttempt(
+              new NoProxyError(error instanceof Error ? error.message : String(error)),
+              ++generation,
+            );
+          }
+          ranked = rankEndpoints(found, wantedCountry);
+          if (ranked.length > 0) break;
+          log(`vpn: scan round ${round} found nothing (${found?.reason ?? "no reason given"})`);
         }
 
-        const candidates = found?.endpoints ?? (found?.endpoint ? [found.endpoint] : []);
-        if (candidates.length === 0) {
-          return failAttempt(new NoProxyError(found?.reason), ++generation);
+        if (ranked.length === 0) {
+          // The scan's own reason, plus what the person can do about it. Both
+          // halves matter: the count is why they are reading an error at all, and
+          // the suggestion is the difference between "retry" and "give up".
+          return failAttempt(
+            new NoProxyError(
+              `${found?.reason ?? "No public proxy answered."} ${
+                wantedCountry ? "Try again in a moment, or pick Fastest anywhere." : "Try again in a moment."
+              }`,
+            ),
+            ++generation,
+          );
         }
         log(
           `vpn: ${found.working} working ${wantedCountry ? `in ${wantedCountry}` : "worldwide"}, ` +
@@ -995,15 +1126,15 @@ export function createVpnController({
         );
 
         let last = snapshot();
-        for (const candidate of candidates) {
-          try {
-            manual = normaliseEndpoint({
-              ...candidate,
-              country: candidate.country || wantedCountry || "",
-            });
-          } catch {
-            continue;
-          }
+        for (let index = 0; index < ranked.length; index += 1) {
+          const candidate = ranked[index];
+          /*
+           * The best survivor becomes the reported exit; every survivor behind it
+           * stays in the pool for the stream-level failover. That is what makes
+           * one exit refusing one host a second dial rather than a blank page.
+           */
+          pool = ranked.slice(index + 1);
+          manual = candidate;
           if (endpointStore) await endpointStore.save({ provider: PROVIDER.manual, endpoint: manual });
           publish({ provider: PROVIDER.manual, error: null });
 
@@ -1012,7 +1143,8 @@ export function createVpnController({
             log(
               `vpn: auto-selected ${manual.host}:${manual.port}` +
                 (manual.country ? ` in ${countryName(manual.country)}` : "") +
-                (candidate.canary === false ? " (could not reach the canary)" : ""),
+                (candidate.canary === false ? " (could not reach the canary)" : "") +
+                (pool.length > 0 ? ` with ${pool.length} more exit${pool.length === 1 ? "" : "s"} behind it` : ""),
             );
             return attempt;
           }
@@ -1030,8 +1162,9 @@ export function createVpnController({
           });
         }
 
+        pool = [];
         return failAttempt(
-          new NoProxyError(`${candidates.length} working proxies stopped responding before connecting.`),
+          new NoProxyError(`${ranked.length} working proxies stopped responding before connecting.`),
           ++generation,
         );
       });
@@ -1052,6 +1185,10 @@ export function createVpnController({
         generation += 1;
         credentials = null;
         catalogue = null;
+        // The pool belongs to the connection: a stored endpoint on its own is not
+        // a set of proved exits, and keeping one across a disconnect would let a
+        // later stream be routed through an exit nothing has measured recently.
+        pool = [];
         publish({
           status: STATUS.disconnected,
           enabled: false,
@@ -1100,6 +1237,7 @@ export function createVpnController({
       if (next !== state.provider) {
         generation += 1;
         credentials = null;
+        pool = [];
         publish({
           provider: next,
           status: STATUS.disconnected,
@@ -1126,6 +1264,9 @@ export function createVpnController({
     async saveEndpoint(input) {
       const next = normaliseEndpoint(input);
       manual = next;
+      // A typed endpoint is one named exit, not a pool: the survivors from an
+      // earlier automatic scan have nothing to do with it.
+      pool = [];
       const wasLive = state.status === STATUS.connected || state.status === STATUS.reconnecting;
       if (wasLive) generation += 1;
       publish(
@@ -1148,6 +1289,7 @@ export function createVpnController({
     /** Removes the custom endpoint and returns the VPN to the legacy provider. */
     async clearEndpoint() {
       manual = null;
+      pool = [];
       generation += 1;
       credentials = null;
       publish({

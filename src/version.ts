@@ -8,13 +8,59 @@ import type { ReleaseNote, SystemVersion } from "@/types";
    ========================================================================== */
 
 export const SYSTEM_VERSION: SystemVersion = {
-  version: "1.4.0",
-  build: "2026.10.18-crystal.1",
-  releaseDate: "2026-10-18",
+  version: "1.6.0",
+  build: "2026.10.26-crystal.1",
+  releaseDate: "2026-10-26",
   codename: "CrystalOS",
 };
 
 export const releaseNotes: ReleaseNote[] = [
+  {
+    version: "1.6.0",
+    date: "2026-10-26",
+    added: [
+      "Games open in windows of their own. By default the Game Library stays where it was and every Play opens a player window, filled to the work area so the panel and the dock stay reachable and a game is never squeezed into a short frame. The behaviour is a switch in the Game Library's own rail and in Settings → Applications, and the player's new desk button toggles the same fill at any time beside the existing native fullscreen.",
+      "Territorial.io as a second Editor's Choice pick in the Games library — the live multiplayer site, front of the IO collection, with its own bundled cover art.",
+      "Standby, an always-on display in the spirit of a phone left on its side: after five minutes without input the desk fades to a large themed clock, and after ten more the screen goes dark. Any pointer movement, wheel tick or key wakes it with every window exactly where it was. Timings and the feature itself are in Settings → Lock Screen.",
+      "Per-element themes under Settings → Appearance → Advanced: windows, the dock, the top panel, the launcher and menus, the lock screen and standby can each ride a different theme while everything else keeps the active one. Scoped themes carry the picked theme's full token set — surfaces, text, borders, materials, elevation and type — not just an accent.",
+      "An optional blended titlebar (Settings → Appearance → Window chrome): the bar's own material thins out to nothing as it meets the application, and the tail under it is a live blur of what the application is drawing — so the gradient below the controls is made of the site's own colours rather than a painted band, and the frame has no seam where the app begins. Geometry is untouched: the application keeps its space and the frosted tail passes pointer events through. Off by default, and reduced transparency or high contrast both put the crisp bar back.",
+      "A full-screen control in the window bar, beside the three dots. Where maximize reserves the strips the panel and the dock occupy, this one takes the whole viewport, and the shell's chrome stands aside for it: the top bar and the dock slide off the screen rather than sitting over the application, and slide back the moment the pointer touches the edge they live on, staying open while the pointer is over them. They are never more than one gesture away — the top panel still carries the application's name and the control that leaves full screen, Escape does the same thing, and a shell surface opened from the keyboard brings both bars back on its own. The maximize control is untouched for anyone who wants the reserved-strip version.",
+      "A way out of full screen that does not depend on any bar. Shift + Z toggles the focused window between full screen and its normal size — rebindable like every other binding, in Settings → Keyboard — and right-clicking a window now opens its menu with Full screen (or Exit full screen) above Minimize and Close window, so the controls the titlebar carries stay reachable exactly where the titlebar has unmounted. The menu is the window's own, so an embedded site still keeps its right-click menu inside itself; Escape, the top panel's exit control and the shortcut all work there regardless.",
+    ],
+    changed: [
+      "A game launched from the library no longer takes over the library's own window unless that behaviour is chosen. Existing play sessions, favourites and profiles are untouched.",
+      "Player windows open maximized. The work area already excludes the panel and the dock, so a game gets the desk while the shell stays one gesture away.",
+    ],
+    fixed: [
+      "Games no longer load into a short, cramped frame on a laptop-height screen: player windows fill the available desk and the frame is sized from it, which is the difference between a map that renders at its intended scale and one that appears cropped.",
+      "Everything that still addressed the retired games app id now addresses the surviving entry: the dock shortcut, the desktop-shortcuts widget, the palette's Play commands, the terminal's \"games\" alias and the icon-pack preview all answered with \"Application unavailable\" (or an empty tile) after the two games libraries became one. The palette's Play also passes the game the way the library does, honouring a profile that opens in a browser tab, and the merged application keeps the CrystalOS Games tile.",
+      "Label text on an accent fill chose its ink from a fixed luminance cut-off, so every accent just beneath it shipped white text that failed at 2.5:1 — ochre among them, and any theme accent in the same band. The ink is now picked by the contrast it actually achieves: white keeps the fill while it still reads at 3:1 on it, and the dark ink takes over the moment it does not.",
+    ],
+  },
+  {
+    version: "1.5.0",
+    date: "2026-10-24",
+    added: [
+      "A unified design system across the shell: one token vocabulary for colour, type, spacing, radius and elevation that every theme and application shares — the whole surface of the OS switches coherently when a theme changes.",
+      "The Cinema theme family — a warm charcoal editorial dark with cream text and forest-green/moss and ochre accents, and its daylight counterpart Cinema Light on warm paper. Both ship a film-grain surface texture.",
+      "The Solarized family, dark and light: Solarized Dark is the base03 board, deep-teal surfaces with glassy bright text and the cyan accent; Solarized Light is the base3 paper counterpart; Dim is the scheme's black variant, near-black surfaces with canonical base0/base1 text and all eight accent hues in their assigned roles (blue primary). All three use hard corners, hairline blueprint grid, and the IBM Plex Sans / Space Grotesk / Plex Mono type persona.",
+      "Bundled web fonts in public/fonts (DM Sans, Instrument Serif, JetBrains Mono, IBM Plex Sans, IBM Plex Mono, Space Grotesk, latin subsets) with a font catalog that carries them; the interface default is DM Sans and the display role drives the lock-screen clock.",
+      "Theme font personas: a theme that ships a type system (the Solarized pair) swaps the whole set of faces while the user rides the interface defaults; any explicit font choice in Settings wins.",
+      "Wallpapers follow the theme: switching themes moves the desktop and lock backdrop to the theme's own wallpaper until the user picks one of their own.",
+      "Recommended flags in Settings and the first-run setup: Cinema, Cinema Light, Solarized Dark, Dim and Solarized Light carry a curated badge.",
+      "Moss (#43915c) and Ochre (#d29a3f) join the built-in accent picker.",
+    ],
+    changed: [
+      "Per-theme elevation: the derived shadow ladder (window, popover and lift shadows) picks up each theme's own lighting family, so cool themes no longer cast warm shadows.",
+      "A value-preserving tokenisation sweep across every stylesheet except the Browser: all padding, margin and gap values on the shared scale read --space-1…8, border radii read the radius ladder, and stray px font sizes map to the type scale — no layout moved.",
+      "The static fallback palette applied before the theme engine runs matches Cinema, and appearance state migrates automatically (persist version 3): existing profiles ride to the new look; any genuine non-default pick is preserved.",
+      "Cinema Cream is renamed Cinema Light (theme id \"cinema-light\") — the picker, exports and custom themes built from it keep working through the rename.",
+    ],
+    fixed: [
+      "The lock-screen clock was silently stuck on the system font stack: its follow-the-theme id fell through the catalog's fallback. There is now a Follow theme entry in the picker and the clock takes the active theme's display face.",
+      "A font-id collision in the catalog map (an older \"grotesk\" stack shadowing \"Space Grotesk\") that made theme personas resolve Helvetica; ids are now unique.",
+    ],
+  },
   {
     version: "1.4.0",
     date: "2026-10-18",

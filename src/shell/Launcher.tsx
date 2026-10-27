@@ -19,6 +19,7 @@ import { useWindowStore } from "@/state/windows";
 import { APP_DRAG_TYPE, lockSession, openApp, powerOff, sleepSession } from "@/services/os";
 import { APP_CATEGORY_LABEL, type AppCategory } from "@/types";
 import { useSystemStore } from "@/state/system";
+import { useElementTheme } from "@/themes/scope";
 
 /* ==========================================================================
    Launcher — "All Apps"
@@ -52,6 +53,7 @@ export function Launcher() {
   const closeContextMenu = useShellStore((state) => state.closeContextMenu);
   const config = useShellStore((state) => state.launcher);
   const setConfig = useShellStore((state) => state.setLauncher);
+  const overlayTheme = useElementTheme("overlays");
 
   const recents = useAppsStore((state) => state.recents);
   const launchCounts = useAppsStore((state) => state.launchCounts);
@@ -187,7 +189,13 @@ export function Launcher() {
   const recentIconSize = Math.max(16, Math.round(iconSize * 0.52));
 
   return (
-    <div className="cr-launcher" data-side="bottom" onKeyDown={onKeyDown}>
+    <div
+      className="cr-launcher"
+      data-side="bottom"
+      data-element-theme={overlayTheme.themeId ?? undefined}
+      style={overlayTheme.style}
+      onKeyDown={onKeyDown}
+    >
       <div className="cr-launcher__scrim" onClick={() => setOpen(false)} aria-hidden="true" />
       <div
         className="cr-launcher__panel"

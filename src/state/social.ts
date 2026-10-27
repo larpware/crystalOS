@@ -58,6 +58,7 @@ function toPeerRef(friend: FriendSummary) {
     displayName: friend.displayName,
     friendCode: friend.friendCode,
     avatar: friend.avatar,
+    tags: friend.tags,
   };
 }
 

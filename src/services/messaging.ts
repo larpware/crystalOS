@@ -21,6 +21,8 @@ export interface PeerRef {
   displayName: string;
   friendCode: string;
   avatar?: string;
+  /** Account tags (owner, staff, …) for the name chip; presentation only. */
+  tags?: string[];
 }
 
 export type EnvelopeKind =
@@ -217,5 +219,6 @@ export function peerRefFromProfile(profile: AccountProfile): PeerRef {
     // empty one rather than inventing a code the server would never accept.
     friendCode: profile.friendCode ?? "",
     avatar: profile.avatar,
+    tags: profile.tags,
   };
 }

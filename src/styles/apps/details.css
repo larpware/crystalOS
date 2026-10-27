@@ -15,7 +15,7 @@
 .cr-quick__status-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-3);
   flex: none;
 }
 
@@ -24,7 +24,7 @@
 .cr-setup__footer-left {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-3);
 }
 
 /* ---- Settings → Accounts ----------------------------------------------- */
@@ -40,7 +40,7 @@
 .cr-cloak-row {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-3);
   min-width: 0;
 }
 
@@ -55,9 +55,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: var(--space-3);
   flex-wrap: wrap;
-  margin-top: 6px;
+  margin-top: var(--space-2);
 }
 
 /* ---- Messages ---------------------------------------------------------- */
@@ -65,13 +65,13 @@
 .cr-messages__identity-code {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
   min-width: 0;
 }
 
 .cr-messages__identity-hint {
   margin: 0;
-  padding: 8px 12px;
+  padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--border-subtle);
   font-size: var(--fs-xxs);
   line-height: 1.5;
@@ -85,9 +85,9 @@
 .cr-music__errors {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-1);
   margin: 10px 14px 0;
-  padding: 10px 12px;
+  padding: 10px var(--space-4);
   border-radius: var(--radius-medium);
   border: 1px solid var(--border-subtle);
   border-left: 3px solid var(--accent-warning);
@@ -111,9 +111,9 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  margin: 12px 14px 0;
-  padding: 10px 12px;
+  gap: var(--space-3);
+  margin: var(--space-4) 14px 0;
+  padding: 10px var(--space-4);
   border-radius: var(--radius-medium);
   border: 1px solid var(--border-subtle);
   background-color: var(--surface-1);

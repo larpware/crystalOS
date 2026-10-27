@@ -1,5 +1,6 @@
-import { launchUrl } from "@/services/os";
+import { launchUrl, openApp } from "@/services/os";
 import { useGamesStore } from "@/state/games";
+import { useWindowStore } from "@/state/windows";
 import type { CrystalOSGame } from "./catalogue";
 
 /* ==========================================================================
@@ -36,8 +37,29 @@ export function launchGame(game: CrystalOSGame): LaunchOutcome {
   return "embedded";
 }
 
+/**
+ * Opens a game in a player window of its own.
+ *
+ * The window carries the game id as a launch argument, so the player can start
+ * straight on that game without the library around it. Player windows open
+ * maximized: a game deserves the desk, and the work area already accounts for
+ * the panel and the dock, so "full" here still leaves the shell reachable. The
+ * target is the surviving games catalogue entry — the old duplicate app id no
+ * longer resolves to anything, and opening it would answer with "Application
+ * unavailable".
+ */
+export function launchGameInWindow(game: CrystalOSGame): string | null {
+  const windowId = openApp("library", {
+    newInstance: true,
+    args: { playGameId: game.id },
+  });
+  if (windowId) useWindowStore.getState().toggleMaximize(windowId);
+  return windowId;
+}
+
 /** The name to show for a game: the profile's override, else the catalogue's. */
 export function gameDisplayTitle(game: CrystalOSGame, override: string): string {
   const trimmed = override.trim();
   return trimmed || game.title;
 }
+

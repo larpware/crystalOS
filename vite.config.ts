@@ -55,8 +55,34 @@ function backendWatch(): Plugin {
   };
 }
 
+/**
+ * Refuses the Scramjet scope prefix in dev.
+ *
+ * Proxied pages live under /~/… and are answered by the service worker. When
+ * a frame's first navigation outruns the worker's activation, the request
+ * reaches this server instead — and the SPA fallback would serve index.html,
+ * booting a whole nested CrystalOS inside the frame. Nothing legitimate asks
+ * the dev server for these paths, so they are refused outright.
+ */
+function scramjetScopeGuard(): Plugin {
+  return {
+    name: "crescent:scramjet-scope-guard",
+    apply: "serve",
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (!req.url?.startsWith("/~")) return next();
+        res.statusCode = 404;
+        res.setHeader("content-type", "text/plain; charset=utf-8");
+        res.end(
+          "The Scramjet proxy prefix is answered by the service worker, not the dev server.\n",
+        );
+      });
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react(), backendWatch()],
+  plugins: [react(), backendWatch(), scramjetScopeGuard()],
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),

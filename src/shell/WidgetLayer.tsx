@@ -311,9 +311,13 @@ function WidgetBody({ instance }: { instance: WidgetInstance }) {
 function ClockWidget() {
   const panel = useShellStore((state) => state.panel);
   const backgroundUpdates = useSystemStore((state) => state.backgroundWidgetUpdates);
+  const performanceMode = useSystemStore((state) => state.performanceMode);
   // With background updates off the widget still shows the right time, it just
-  // refreshes once a minute instead of every second.
-  const interval = backgroundUpdates ? (panel.clockSeconds ? 1000 : 15_000) : 60_000;
+  // refreshes once a minute instead of every second. Performance mode pauses
+  // the background work outright, so it lands on the same slow clock whether or
+  // not the standalone switch is on.
+  const interval =
+    backgroundUpdates && !performanceMode ? (panel.clockSeconds ? 1000 : 15_000) : 60_000;
   const now = useClock(interval);
   const date = new Date(now);
   return (
@@ -556,7 +560,7 @@ function SystemWidget() {
   const sessionStartedAt = useSystemStore((state) => state.sessionStartedAt);
   const performanceMode = useSystemStore((state) => state.performanceMode);
   const backgroundUpdates = useSystemStore((state) => state.backgroundWidgetUpdates);
-  const now = useClock(backgroundUpdates ? 15_000 : 60_000);
+  const now = useClock(backgroundUpdates && !performanceMode ? 15_000 : 60_000);
 
   const rows: [string, string][] = [
     // The desktop is measured in OS pixels (viewport ÷ UI scale), so the scale
@@ -636,7 +640,7 @@ function ShortcutsWidget() {
     { appId: "drive", label: "Drive", icon: "drive" },
     { appId: "terminal", label: "Terminal", icon: "terminal" },
     { appId: "browser", label: "Browser", icon: "browser" },
-    { appId: "games", label: "Games", icon: "games" },
+    { appId: "library", label: "Games", icon: "games" },
     { appId: "music", label: "Music", icon: "music" },
     { appId: "wallpaper", label: "Wallpapers", icon: "wallpaper" },
   ];

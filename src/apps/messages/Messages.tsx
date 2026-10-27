@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Badge, Button, EmptyState, IconButton, Modal, TextInput, Tooltip } from "@/components/ui";
+import { Badge, Button, EmptyState, IconButton, Modal, TextInput, Tooltip, UserTag } from "@/components/ui";
 import { Icon } from "@/icons/Icon";
 import { notify } from "@/services/os";
 import { useAuthStore } from "@/state/auth";
@@ -7,6 +7,7 @@ import { channelsFromServer, useChatStore } from "@/state/chat";
 import { useSocialStore } from "@/state/social";
 import type { Channel, ChatMessage } from "@/types";
 import { CallOverlay } from "./CallOverlay";
+import { Communities } from "./Communities";
 import { FriendsPanel } from "./FriendsPanel";
 
 /* ==========================================================================
@@ -52,6 +53,7 @@ export function Messages() {
   const [groupName, setGroupName] = useState("");
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   const [showMembers, setShowMembers] = useState(true);
+  const [mode, setMode] = useState<"direct" | "communities">("direct");
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const typingRef = useRef(0);
@@ -126,7 +128,23 @@ export function Messages() {
   const callPeerId = activeChannel?.kind === "direct" ? activeChannel.peerId : null;
 
   return (
-    <div className="cr-messages">
+    <div className="cr-messages-host">
+      <nav className="cr-messages-switch" aria-label="Chat mode">
+        <button type="button" data-active={mode === "direct"} onClick={() => setMode("direct")}>
+          Direct
+        </button>
+        <button
+          type="button"
+          data-active={mode === "communities"}
+          onClick={() => setMode("communities")}
+        >
+          Communities
+        </button>
+      </nav>
+      {mode === "communities" ? (
+        <Communities />
+      ) : (
+        <div className="cr-messages">
       <aside className="cr-messages__rail">
         <div className="cr-messages__identity">
           <div className="cr-messages__avatar">
@@ -137,7 +155,10 @@ export function Messages() {
             )}
           </div>
           <div className="cr-messages__identity-text">
-            <span>{account?.displayName ?? "Not signed in"}</span>
+            <span>
+              {account?.displayName ?? "Not signed in"}
+              <UserTag tags={account?.tags} />
+            </span>
             <span className="cr-messages__identity-code">
               <span className="cr-code cr-code--sm">{account?.friendCode ?? "—"}</span>
               <IconButton
@@ -259,7 +280,12 @@ export function Messages() {
             <header className="cr-messages__head">
               <Icon name={channelIcon(activeChannel)} size={16} />
               <div className="cr-messages__head-text">
-                <span>{channelName(activeChannel, chat.friends)}</span>
+                <span>
+                  {channelName(activeChannel, chat.friends)}
+                  {activeChannel.kind === "direct" && (
+                    <UserTag tags={chat.friends.find((friend) => friend.id === activeChannel.peerId)?.tags} />
+                  )}
+                </span>
                 <span className="cr-row__desc">
                   {activeChannel.kind === "direct"
                     ? chat.peers.some((state) => state.peer.id === activeChannel.peerId)
@@ -393,7 +419,10 @@ export function Messages() {
             return (
               <div key={id} className="cr-messages__member">
                 <span className="cr-messages__presence" data-online={online} />
-                <span>{friend?.displayName ?? (id === chat.selfId ? "You" : id.slice(0, 8))}</span>
+                <span>
+                  {friend?.displayName ?? (id === chat.selfId ? "You" : id.slice(0, 8))}
+                  <UserTag tags={friend?.tags} />
+                </span>
               </div>
             );
           })}
@@ -562,6 +591,8 @@ export function Messages() {
           ))}
         </div>
       </Modal>
+        </div>
+      )}
     </div>
   );
 }
@@ -573,7 +604,7 @@ function MessageList({
 }: {
   messages: ChatMessage[];
   selfId: string | null;
-  friends: { id: string; displayName: string }[];
+  friends: { id: string; displayName: string; tags?: string[] }[];
 }) {
   let lastDay = "";
   return (
@@ -583,9 +614,10 @@ function MessageList({
         const showDay = day !== lastDay;
         lastDay = day;
         const own = message.authorId === selfId;
+        const authorFriend = friends.find((friend) => friend.id === message.authorId);
         const author = own
           ? "You"
-          : message.authorName || friends.find((friend) => friend.id === message.authorId)?.displayName || "Unknown";
+          : message.authorName || authorFriend?.displayName || "Unknown";
         return (
           <div key={message.id}>
             {showDay && (
@@ -595,7 +627,10 @@ function MessageList({
             )}
             <div className="cr-messages__message" data-own={own}>
               <div className="cr-messages__message-head">
-                <span className="cr-messages__author">{author}</span>
+                <span className="cr-messages__author">
+                  {author}
+                  {!own && <UserTag tags={authorFriend?.tags} />}
+                </span>
                 <span className="cr-messages__time cr-num">
                   {new Date(message.sentAt).toLocaleTimeString([], {
                     hour: "2-digit",

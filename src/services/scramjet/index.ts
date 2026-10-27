@@ -1,5 +1,8 @@
 import type { ScramjetController, ScramjetFrame, ScramjetPlugin } from "./types";
 import { currentOffline, offlineExplanation, offlineHeadline } from "@/services/offline";
+import { createShieldPlugin } from "@/services/shield/plugin";
+import { resetBlocked } from "@/services/shield/state";
+import { createFailureReporterPlugin, type FrameFailure } from "./frameFailure";
 
 /* ==========================================================================
    Shared Scramjet service
@@ -174,6 +177,7 @@ async function createController(): Promise<ScramjetController> {
   try {
     const created = await window.initBootstrap();
     await created.wait();
+    await waitForScopeServiceWorker();
     controller = created;
     publish({
       status: "ready",
@@ -188,6 +192,42 @@ async function createController(): Promise<ScramjetController> {
     }`;
     publish({ status: "error", error: message, backendReachable: true });
     throw new Error(message);
+  }
+}
+
+/**
+ * Waits (briefly) for a service worker to reach `active` for this scope.
+ *
+ * The controller being ready is not the same as the worker being able to
+ * intercept: a frame whose first navigation outruns activation has its request
+ * fall through to the server, whose SPA fallback answers with the shell — a
+ * second CrystalOS boots inside the frame. Waiting here closes that race at
+ * the source; the bounded wait means a worker that never activates still
+ * proceeds to an honest failure further down rather than hanging.
+ */
+async function waitForScopeServiceWorker(timeoutMs = 2_500): Promise<void> {
+  if (!navigator.serviceWorker) return;
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const registration = await navigator.serviceWorker.getRegistration();
+      if (registration?.active) return;
+      const worker = registration?.installing ?? registration?.waiting ?? null;
+      if (!worker) {
+        // Registration itself may still be in flight; poll until the deadline.
+        await new Promise((resolve) => window.setTimeout(resolve, 100));
+        continue;
+      }
+      await new Promise((resolve) => {
+        const done = () => {
+          worker.removeEventListener("statechange", done);
+          resolve(undefined);
+        };
+        worker.addEventListener("statechange", done);
+      });
+    } catch {
+      return;
+    }
   }
 }
 
@@ -219,7 +259,25 @@ export interface CreateFrameOptions {
   onUrl?: (url: string) => void;
   /** Links that try to escape the frame (target=_blank, window.open). */
   onEscapedLink?: (url: URL) => void;
+  /**
+   * A request for the frame's own document that the transport could not
+   * complete. Reported as it happens, before anything is rendered, so the
+   * caller can fail with the reason instead of leaving a pane empty.
+   */
+  onFailure?: (failure: FrameFailure) => void;
   plugins?: ScramjetPlugin[];
+  /**
+   * What Shield's counters belong to — a browser tab id, a window, an app.
+   * Without one the blocked count is shared, which is still honest but less
+   * useful.
+   */
+  owner?: string | null;
+}
+
+/** Compares two URLs ignoring the fragment, so a hash change is not a new page. */
+function withoutHash(url: string): string {
+  const hash = url.indexOf("#");
+  return hash < 0 ? url : url.slice(0, hash);
 }
 
 /**
@@ -236,7 +294,34 @@ export async function createProxiedFrame(
 
   if (utils) {
     plugins.push(new utils.HttpCachePlugin());
-    if (options.onUrl) plugins.push(new utils.UrlWatcherPlugin(options.onUrl));
+
+    // Shield is installed before the URL watcher so it is in place for the
+    // frame's very first request, and so its counters can be reset here when
+    // the frame really moves to a different page.
+    const owner = options.owner ?? null;
+    const shield = createShieldPlugin({ owner });
+    if (shield) plugins.push(shield);
+
+    if (options.onUrl) {
+      let lastUrl: string | null = null;
+      plugins.push(
+        new utils.UrlWatcherPlugin((url) => {
+          if (owner && (lastUrl === null || withoutHash(lastUrl) !== withoutHash(url))) {
+            resetBlocked(owner);
+          }
+          lastUrl = url;
+          options.onUrl?.(url);
+        }),
+      );
+    }
+
+    // A failed document request is reported as it happens, so a frame that will
+    // never render says why instead of showing an empty pane.
+    if (options.onFailure) {
+      const reporter = createFailureReporterPlugin({ onFailure: options.onFailure });
+      if (reporter) plugins.push(reporter);
+    }
+
     if (options.onEscapedLink) {
       plugins.push(new utils.CatchEscapedLinksPlugin(options.onEscapedLink));
     }
@@ -253,81 +338,13 @@ export async function createProxiedFrame(
   };
 }
 
-/**
- * True when the frame's own document is showing a real page.
- *
- * A proxied document is served from this origin, so the shell can read it.
- * Every check is defensive: a frame that has navigated somewhere cross-origin,
- * or that is mid-navigation, throws or is unreadable — which is simply "not
- * loaded yet", never an error here.
- */
-function frameHasDocument(frame: HTMLIFrameElement): boolean {
-  try {
-    const doc = frame.contentDocument;
-    if (!doc || !doc.body) return false;
-    const href = doc.location?.href ?? "";
-    if (!href || href === "about:blank") return false;
-    // A real page sets a title and builds a document. The controller's own
-    // bootstrap page has neither, which is what this pair of checks separates.
-    return doc.title.trim().length > 0 && doc.body.childElementCount > 0;
-  } catch {
-    return false;
-  }
-}
+/* Frame readiness — when a proxied frame counts as "showing a page" — lives in
+   its own module so the rule can be tested on its own. It is re-exported here
+   because every proxied application imports it from the service. */
+export { waitForFrameLoad } from "./frameReady";
 
-/**
- * Resolves once the proxied frame is showing a page, rejects after `timeoutMs`.
- *
- * There are two signals on purpose. The frame's `load` event is the first, but
- * a proxied page can finish loading without raising it on this element: the
- * Scramjet controller navigates the frame itself once its client bootstrap has
- * run, and on heavy sites that navigation happens after the initial load
- * event — so the load listener alone reported "Nothing loaded" for a page the
- * user was already looking at. The second signal polls the document, which
- * works because the proxied document is same-origin with the shell.
- */
-export function waitForFrameLoad(frame: HTMLIFrameElement, timeoutMs: number): Promise<void> {
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    /** Timeout id for the document poll, kept so `done` can stop the chain. */
-    let poll = 0;
-    const done = (error?: Error) => {
-      if (settled) return;
-      settled = true;
-      window.clearTimeout(timer);
-      window.clearTimeout(poll);
-      frame.removeEventListener("load", onLoad);
-      if (error) reject(error);
-      else resolve();
-    };
-    const onLoad = () => done();
-    /* Chained rather than an interval: a tick that lands while the page is busy
-       cannot stack up behind another one, and the chain always ends with the
-       timeout. The read itself is a title and a child count — no layout. */
-    const pollDocument = () => {
-      if (settled) return;
-      if (frameHasDocument(frame)) {
-        done();
-        return;
-      }
-      poll = window.setTimeout(pollDocument, 350);
-    };
-    pollDocument();
-    const timer = window.setTimeout(
-      () =>
-        done(
-          new Error(
-            `Nothing loaded within ${Math.round(timeoutMs / 1000)}s. The transport may be blocked, or the site may be refusing the proxy.`,
-          ),
-        ),
-      timeoutMs,
-    );
-    frame.addEventListener("load", onLoad);
-    // The document may already be in place — the load event fires after this
-    // call on a fresh frame, but a reused frame can arrive ready.
-    if (frameHasDocument(frame)) done();
-  });
-}
+/** The failure a frame reports when its own document could not be fetched. */
+export type { FrameFailure } from "./frameFailure";
 
 /** The URL prefix proxied frames live under, used for routing decisions. */
 export function scramjetPrefix(): string {

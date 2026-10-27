@@ -66,7 +66,7 @@ describe("resolveApp", () => {
     const resolution = installs.resolveApp("  crystalos GAMES ");
     assert.equal(resolution.kind, "app");
     if (resolution.kind !== "app") return;
-    assert.equal(resolution.meta.id, "games");
+    assert.equal(resolution.meta.id, "library");
     assert.equal(resolution.matchedBy, "name");
   });
 
@@ -147,7 +147,7 @@ describe("searchApps", () => {
 
   test("finds an application by name fragment", () => {
     const results = installs.searchApps("game");
-    assert.ok(results.some((meta) => meta.id === "games"), "the games app is found");
+    assert.ok(results.some((meta) => meta.id === "library"), "the games app is found");
   });
 
   test("finds applications by category label", () => {

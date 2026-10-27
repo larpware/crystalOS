@@ -19,6 +19,8 @@ import { Media } from "./media/Media";
 import { Store } from "./store/Store";
 import { UpdateLog } from "./updates/UpdateLog";
 import { Messages } from "./messages/Messages";
+import { CrystalAi } from "./ai/CrystalAi";
+import { Social } from "./social/Social";
 import { Discord } from "./discord/Discord";
 import { QMovies } from "./qmovies/QMovies";
 
@@ -62,12 +64,21 @@ const components: Record<string, ComponentType<AppProps>> = {
   store: Store,
   updates: UpdateLog,
   messages: Messages,
+  ai: CrystalAi,
+  social: Social,
   discord: Discord,
   qmovies: QMovies,
 };
 
 export function getAppComponent(appId: string): ComponentType<AppProps> | null {
   return components[appId] ?? null;
+}
+
+/** Component IDs present in this build but absent from the application catalogue,
+    i.e. not shown on the homepage/launcher or in the Store. */
+export function unlistedComponentIds(): string[] {
+  const catalogIds = new Set(appCatalog.map((meta) => meta.id));
+  return Object.keys(components).filter((id) => !catalogIds.has(id));
 }
 
 /** True when a catalogue entry actually has an implementation in this build. */

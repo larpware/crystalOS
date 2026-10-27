@@ -16,6 +16,7 @@ import { useSystemStore } from "@/state/system";
 import { WallpaperLayer } from "@/wallpapers/Wallpaper";
 import { restartSession, sleepSession, powerOff } from "@/services/os";
 import { fontStack } from "@/themes/fonts";
+import { useElementTheme } from "@/themes/scope";
 import { formatDateLong, formatTime } from "@/utils/format";
 
 /* ==========================================================================
@@ -29,6 +30,7 @@ import { formatDateLong, formatTime } from "@/utils/format";
 export function LockScreen() {
   const config = useShellStore((state) => state.lock);
   const setPowerState = useShellStore((state) => state.setPowerState);
+  const lockTheme = useElementTheme("lock");
 
   const account = useAuthStore((state) => state.account);
   const mode = useAuthStore((state) => state.mode);
@@ -124,7 +126,13 @@ export function LockScreen() {
       className="cr-lock"
       data-blur={blurred}
       data-bg={backgroundStyle}
-      style={{ "--lock-clock-scale": config.clockScale } as CSSProperties}
+      data-element-theme={lockTheme.themeId ?? undefined}
+      style={
+        {
+          "--lock-clock-scale": config.clockScale,
+          ...lockTheme.style,
+        } as CSSProperties
+      }
     >
       <WallpaperLayer target="lock" dimmed={backgroundStyle !== "solid"} />
       {config.dim > 0 && (
@@ -142,7 +150,14 @@ export function LockScreen() {
           className="cr-lock__clock"
           data-style={config.clockStyle}
           data-align={textAlign}
-          style={{ fontFamily: fontStack(config.fontId) }}
+          style={{
+            fontFamily:
+              config.fontId === "display"
+                ? /* "display" is the follow-the-theme meta id: the clock takes
+                     whatever persona the active theme's --font-display carries. */
+                  "var(--font-display)"
+                : fontStack(config.fontId),
+          }}
         >
           {config.showDate && <div className="cr-lock__date">{formatDateLong(date, true)}</div>}
           {config.showTime && (

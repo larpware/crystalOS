@@ -58,7 +58,9 @@ export const APP_ALIASES: Record<string, string> = {
   updates: "updates",
   trash: "trash",
   recycle: "trash",
-  games: "games",
+  // The catalogue's games entry is "library": "games" was the duplicate that
+  // merged into it, and an alias has to name an id that actually resolves.
+  games: "library",
   library: "library",
   discord: "discord",
   spotify: "spotify",

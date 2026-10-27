@@ -22,6 +22,7 @@ export const BOOT_TIPS: readonly string[] = [
   "Alt + Shift + L cycles the snap layouts for this workspace.",
   "Alt + Shift + U returns a snapped window to its own size.",
   "Alt + Tab cycles between open windows.",
+  "Shift + Z toggles full screen for the focused window; right-click it for close and minimize.",
   "Ctrl + Space toggles the application launcher.",
   "Ctrl + Alt + S saves the desktop by hand, before you try something risky.",
   "The whole interface scale is adjustable under Settings → Appearance.",

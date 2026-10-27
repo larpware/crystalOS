@@ -1,0 +1,39 @@
+<html>
+  <head>
+    <base target="_blank"/>
+  </head>
+  <body>
+    <style>
+      body, html {
+        height: 100%;
+      }
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        font-size: 13px;
+        font-family: arial,sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      a {
+        border: none;
+        background-color: #ddd;
+        text-decoration: none;
+        color: #000;
+        display: inline-block;
+        text-align: center;
+        font-size: 90%;
+        cursor: pointer;
+        outline: none;
+        margin-right: 5px;
+        padding: 5px 0;
+      }
+    </style>
+    <a href='https://example.com/test/5' style="color: #f00">
+    <script>
+      document.write(decodeURIComponent(document.location.search.substr(7)));
+    </script></a>
+  </body>
+</html>

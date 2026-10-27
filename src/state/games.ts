@@ -124,7 +124,14 @@ interface GamesState {
   hidden: string[];
   /** Per-game configuration, keyed by catalogue id. Absent means "all default". */
   profiles: Record<string, GameProfile>;
+  /**
+   * Play a game in a window of its own rather than swapping the library's own
+   * view for the player. On, the library stays open while a game fills the
+   * desk; off, a game takes over the library window it was launched from.
+   */
+  windowPerGame: boolean;
 
+  setWindowPerGame: (windowPerGame: boolean) => void;
   toggleFavourite: (gameId: string) => void;
   isFavourite: (gameId: string) => boolean;
   recordSession: (session: PlaySession) => void;
@@ -148,6 +155,9 @@ export const useGamesStore = create<GamesState>()(
       sessions: [],
       hidden: [],
       profiles: {},
+      windowPerGame: true,
+
+      setWindowPerGame: (windowPerGame) => set({ windowPerGame }),
 
       toggleFavourite: (gameId) =>
         set({

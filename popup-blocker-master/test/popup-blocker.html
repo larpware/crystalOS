@@ -1,0 +1,468 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+    <title>Popup blocking test suite :: tools.add0n.com</title>
+    <base target="_self">
+  </head>
+  <body>
+    <h1>Popup Blocker Detection</h1>
+    <p>
+      <ul>
+        <li>Do you have a popup blocker (sync):&nbsp;<b>
+        <script>
+          /* eslint no-trailing-spaces: 0, eol-last: 0 */
+          document.write((/\{\s*\[native code\]\s*\}/).test('' + window.open) === false);
+        </script>
+        </b></li>
+        <li>Do you have a popup blocker (async):&nbsp;<b id="detection">
+        <script type="text/javascript">
+          /* eslint no-trailing-spaces: 0, eol-last: 0 */
+          window.setTimeout(() => {
+            document.getElementById('detection').textContent = /\{\s*\[native code\]\s*\}/.test('' + window.open) === false;
+          }, 0);
+        </script>
+        </b></li>
+        <li>Do you have a popup blocker (iframe sync):&nbsp;<b>
+        <script>
+          /* eslint no-trailing-spaces: 0, eol-last: 0 */
+          var iframe = document.createElement('iframe');
+          document.body.appendChild(iframe);
+          document.write((/\{\s*\[native code\]\s*\}/).test('' + iframe.contentWindow.open) === false);
+          iframe.remove();
+        </script>
+        </b></li>
+      </ul>
+    </p>
+    <style>
+      body {
+        font-family: "Helvetica Neue",Helvetica,sans-serif;
+        font-size: 13px;
+      }
+      h1 {
+        font-weight: 400;
+      }
+      li {
+        margin: 5px 0;
+        display: flex;
+        align-items: center;
+      }
+      iframe,
+      input,
+      a {
+        border: none;
+        background-color: #ddd;
+        text-decoration: none;
+        color: #000;
+        display: inline-block;
+        text-align: center;
+        font-size: 90%;
+        cursor: pointer;
+        outline: none;
+        margin-right: 5px;
+        padding: 5px 0;
+      }
+      input {
+        padding: 5px;
+      }
+      iframe:active,
+      input:active,
+      a:hover {
+        opacity: 0.5;
+      }
+      li a,
+      li input {
+        min-width: 100px;
+      }
+      iframe {
+        border: none;
+        width: 100px;
+        height: 23px;
+        vertical-align: middle;
+        padding: 0;
+      }
+    </style>
+    <script>
+      /* eslint no-trailing-spaces: 0, eol-last: 0 */
+      'use strict';
+      var pointer = window.open;
+
+      var e1 = document.createEvent('CustomEvent');
+      e1.initCustomEvent('ppp-blocker-create', false, false, {
+        cmd: 'open-tab',
+        url: 'about:blank'
+      });
+      new CustomEvent('ppp-blocker-create');
+
+      function method1() {
+        var newwindow = pointer('', 'result', 'status=1,width=700,height=500,menubar=yes');
+        newwindow.document.open('text/html', 'replace');
+        newwindow.document.write('<html><body>test page / 1 ...<body/><html/>');
+        newwindow.document.write('<script> document.onreadystatechange = function(){   if(document.readyState=="loaded" || document.readyState=="complete") window.print(); } <' + '/script>');
+        newwindow.focus();
+        newwindow.location.replace('http://www.example.com/method/1');
+        newwindow.document.close();
+      }
+      function method2() {
+        var newwindow = window.open('javascript:alert("alerting from window.open")');
+      }
+      function method3(url, title, w, h) {
+        var dualScreenLeft = window.screenLeft !== undefined ? window.screenLeft : screen.left;
+        var dualScreenTop = window.screenTop !== undefined ? window.screenTop : screen.top;
+        var width = window.innerWidth ?
+          window.innerWidth :
+          document.documentElement.clientWidth ? document.documentElement.clientWidth : screen.width;
+        var height = window.innerHeight ?
+          window.innerHeight :
+          document.documentElement.clientHeight ? document.documentElement.clientHeight : screen.height;
+
+        var left = ((width / 2) - (w / 2)) + dualScreenLeft;
+        var top = ((height / 2) - (h / 2)) + dualScreenTop;
+        var newWindow = window.open(url, title, 'scrollbars=yes, width=' + w + ', height=' + h + ', top=' + top + ', left=' + left);
+
+        // Puts focus on the newWindow
+        if (window && window.focus) {
+          newWindow.focus();
+        }
+      }
+      function method7() {
+        var c = document.createElement('a');
+        var d = document.createEvent('MouseEvents');
+        c.href = 'https://example.com/test/7', d.initMouseEvent('click', !1, !0, window, 0, 0, 0, 0, 0, !0, !1, !1, !0, 0, null), c.dispatchEvent(d);
+      }
+      function method12_1() {
+        var e = new MouseEvent('click', {
+          button: 0,
+          bubbles: true
+        });
+        const target = document.head.querySelector('base').target;
+        document.head.querySelector('base').target = 'fake_target';
+        document.getElementById('id4').dispatchEvent(e);
+        document.head.querySelector('base').target = target;
+      }
+      function method12_2() {
+        document.getElementById('id4').dispatchEvent(new MouseEvent('click', {
+          button: 1
+        }));
+      }
+      function method12_3() {
+        var evt = document.createEvent('MouseEvents');
+        evt.initEvent('click', true, false);
+        document.getElementById('id4').target = 'fake_target';
+        document.getElementById('id4').dispatchEvent(evt);
+        document.getElementById('id4').removeAttribute('target');
+      }
+      function method12_4() {
+        document.getElementById('id4').click();
+      }
+      function method12_5() {
+        var e = new MouseEvent('click', {
+          button: 0,
+          ctrlKey: true,
+          metaKey: true
+        });
+
+        document.getElementById('id4').dispatchEvent(e);
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      function method10() {
+        var a = document.createElement('a');
+        a.target = '_blank';
+        a.href = 'https://example.com/test/10';
+        document.body.appendChild(a);
+        var b = new MouseEvent('click', {
+          view: window,
+          bubbles: !1,
+          cancelable: !1
+        });
+        a.dispatchEvent(b);
+      }
+      function method13_1() {
+        var f = document.createElement('form');
+        f.setAttribute('action', 'https://example.com/test/13');
+        f.setAttribute('method', 'post');
+        f.setAttribute('target', 'invalid_target_tag');
+        document.body.appendChild(f);
+        f.submit();
+        document.body.removeChild(f);
+        return false;
+      }
+      function method13_2() {
+        var f = document.createElement('form');
+        f.setAttribute('action', 'https://example.com/test/13');
+        f.setAttribute('method', 'post');
+        f.setAttribute('target', '_blank');
+        document.body.appendChild(f);
+        var button = document.createElement('button');
+        button.type = 'submit';
+        f.appendChild(button);
+        f.dispatchEvent(new Event('submit', {
+          bubbles: true
+        }));
+        document.body.removeChild(f);
+        return false;
+      }
+      function method13_3() {
+        var f = document.createElement('form');
+        f.setAttribute('action', 'https://example.com/test/13');
+        f.setAttribute('method', 'post');
+        f.setAttribute('target', '_blank');
+        document.body.appendChild(f);
+        var button = document.createElement('button');
+        button.type = 'submit';
+        f.appendChild(button);
+        button.click();
+        document.body.removeChild(f);
+        return false;
+      }
+      function method13_4() {
+        var div = document.createElement('div');
+        var f = document.createElement('form');
+        f.setAttribute('action', 'https://example.com/test/13');
+        f.setAttribute('method', 'post');
+        f.setAttribute('target', '_blank');
+        div.appendChild(f);
+        document.body.appendChild(div);
+        var button = document.createElement('button');
+        button.type = 'submit';
+        f.appendChild(button);
+        button.dispatchEvent(new Event('click', {
+          bubbles: true
+        }));
+        document.body.removeChild(div);
+        return false;
+      }
+      function method14_1(e) {
+        function isWindow(obj) {
+            if (typeof(window.constructor) === 'undefined') {
+                return obj instanceof window.constructor;
+            }
+            else {
+                return obj.window === obj;
+            }
+        }
+        var win = window.open('https://example.com/test/14');
+        if (!isWindow(win)) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          e.stopPropagation();
+          window.setTimeout(function() {
+            window.location.href = 'https://example.com/test/14';
+          }, 500);
+        }
+      }
+      function method14_2() {
+        function isWindow(obj) {
+            if (typeof(window.constructor) === 'undefined') {
+                return obj instanceof window.constructor;
+            }
+            else {
+              return obj.window === obj;
+            }
+        }
+        var win = window.open('https://example.com/test/14');
+        if (!isWindow(win)) {
+          window.location.href = 'https://example.com/test/14';
+        }
+      }
+
+      function method16() {
+        window.open('popup-blocker.html');
+      }
+      function method17_1() {
+        var f = document.createElement('iframe');
+        f.style = 'display: none;';
+        document.body.appendChild(f);
+        f.contentWindow.open('https://example.com/test/17/1');
+      }
+      function method17_2() {
+        var f = document.createElement('iframe');
+        f.style = 'display: none;';
+        document.body.appendChild(f);
+        window.setTimeout(function() {
+          f.contentWindow.open('https://example.com/test/17/1');
+        }, 2000);
+      }
+      function method17_3() {
+        var f = document.createElement('iframe');
+        f.style = 'display: none;';
+        document.body.appendChild(f);
+
+        var a = f.contentDocument.createElement('a');
+        a.target = '_blank';
+        a.href = 'https://example.com/test/17/2';
+        a.click();
+        document.body.appendChild(a);
+      }
+      function method20() {
+        var a = document.createElement('a');
+        a.href = 'http://example.com/method/20';
+        a.target = 't4kojpe98h';
+        a.click();
+      }
+      function method21() {
+        var a = document.createElement('a');
+        a.href = 'http://example.com/method/20';
+        a.target = 'sub_frame';
+        a.click();
+      }
+      function method22() {
+        const iframe = document.createElement("iframe");
+        iframe.src = "javascript:true";
+        document.body.appendChild(iframe);
+        const iframewin = iframe.contentWindow || iframe;
+        iframewin.open("", "", "top=9999,left=9999,width=100,height=100");
+      }
+      function method23() {
+        const iframe = document.createElement("iframe");
+        iframe.src = 'data:text/html;charset=utf-8,' + encodeURI(`<p></p>`);
+        document.body.appendChild(iframe);
+        const iframewin = iframe.contentWindow || iframe;
+        console.log('fire');
+        iframewin.open("", "", "top=9999,left=9999,width=100,height=100");
+      }
+
+      function overwrite1() {
+        try {
+          Object.defineProperty(window, 'open', {
+            writable: false,
+            value: function() {
+              alert('window.open is bypassed; still your popup-blocker should not allow popups');
+            }
+          });
+        }
+        catch (e) {
+          alert('Error: ' + e.message);
+        }
+      }
+
+      function overwrite2() {
+        try {
+          MouseEvent.prototype.preventDefault = function() {};
+        }
+        catch (e) {
+          alert('Error: ' + e.message);
+        }
+      }
+
+      function overwrite3() {
+        const div = document.createElement('div');
+        div.style = `
+          position: fixed;
+          top: 0;
+          left: 50%;
+          width: 100%;
+          height: 100%;
+          background: rgba(0, 0, 0, 0.1);
+          z-index: 1000000000000000;
+        `;
+        div.addEventListener('click', e => {
+          e.stopPropagation();
+          e.preventDefault();
+        });
+        document.body.appendChild(div);
+      }
+    </script>
+    <h1>Test the effectiveness of your popup blocker add-on</h1>
+    <ul>
+      <li><input type="button" onclick="method1()" value="Method 1/1"> opening a new about:blank popup window and then fill the content using JavaScript engine; part 1</li>
+      <li><input type="button" onclick="method2()" value="Method 1/2"> window.open(javascript:...)</li>
+      <li><input type="button" onclick="window.open('https://example.com/test/2/1');" value="Method 2/1"> opening a new popup tab using window.open method</li>
+      <li><input type="button" onclick="pointer('https://example.com/test/2/2');" value="Method 2/2"> opening a new popup tab using a predefined pointer to window.open method</li>
+      <li><input type="button" onclick="method3('https://example.com/test/3', 'new window', 600, 600)" value="Method 3"> opening a new popup window and passing arguments to it</li>
+      <li><a href='https://example.com/test/4' target="_blank">Method 4</a> opening new popup window using target="_blank" method over links</li>
+      <li><iframe name="sub_frame" src="./popup-blocker-iframe.html?title=Method 5/1"></iframe> redirecting tab using iframe with "base" header set to target="_parent" method</li>
+      <li><iframe sandbox="allow-forms allow-popups allow-scripts allow-same-origin" src="./popup-blocker-iframe.html?title=Method 5/2"></iframe> opening a new popup tab using iframe with "base" header set to target="_parent" method when iframe is sandboxed</li>
+      <li><a href='https://example.com/test/6' id="method_6">Method 6</a> opening a new popup tab using link with "base" header set to target="_blank"</li>
+      <script>
+        var e = document.getElementById('method_6');
+        e.addEventListener('mousedown', () => {
+          const target = document.head.querySelector('base').target;
+          document.head.querySelector('base').target = '_blank';
+          window.setTimeout(() => {
+            document.head.querySelector('base').target = target;
+          }, 1000);
+        })
+      </script>
+      <li><input type="button" onclick="method7()" value="Method 7"> opening a new about:blank popup window using createEvent method</li>
+      <li><a id="id1" href='https://example.com/test/8/1' target="_blank">Method 8/1</a> opening new popup window using target="_blank" method over links powered by stop propagation</li>
+      <script>
+        /* eslint no-trailing-spaces: 0, eol-last: 0 */
+        document.getElementById('id1').addEventListener('click', function(e) {
+          e.stopPropagation();
+        });
+      </script>
+      <li><a id="id2" href='https://example.com/test/8/2' target="_blank">Method 8/2</a> opening new popup window using target="_blank" method over links powered by stop propagation</li>
+      <script>
+        /* eslint no-trailing-spaces: 0, eol-last: 0 */
+        document.getElementById('id2').addEventListener('click', function(e) {
+          e.stopImmediatePropagation();
+        });
+      </script>
+      <li><span id="id3"> click the button to create iframe, then click on the generated link</li>
+      <script>
+        /* eslint no-trailing-spaces: 0, eol-last: 0 */
+        var f = document.createElement('iframe');
+        var elem = document.getElementById('id3');
+        elem.parentNode.insertBefore(f, elem);
+        f.contentDocument.write('<html><head><style>body{display: flex; align-items: center; justify-content: center; margin: 0; overflow: hidden;}</style></head><body><a href="https://example.com/test/9" target="_blank">Method 9</a>');
+        f.contentDocument.write('</body></html>');
+        f.contentDocument.documentElement.appendChild(document.querySelector('style').cloneNode(true));
+        f.contentDocument.close();
+      </script>
+      <li><input type="button" onclick="method10()" value="Method 10"> creating new element and dispatching an uncancellable click event</li>
+      <li>
+        <form action="https://example.com/test/11" target="_blank">
+          <input type=submit value="Method 11">
+        </form> using form element to issue a popup
+      </li>
+      <div style="display: none;" id="id4-div"><a href="https://example.com/test/12" id="id4"></a></div>
+      <li><input onclick="method12_1()" type="button" value="Method 12/1">generating click event (button=0) and dispatching it over a "a" element</li>
+      <li><input onclick="method12_2()" type="button" value="Method 12/2">generating click event (button=1) and dispatching it over a "a" element</li>
+      <li><input onclick="method12_3()" type="button" value="Method 12/3">generating click event (button=0) and dispatching it over a "a" element</li>
+      <li><input onclick="method12_4()" type="button" value="Method 12/4">fire click() over a "a" element</li>
+      <li><input onclick="method12_5()" type="button" value="Method 12/5">generating click event (button=0; ctrlKey = true) and dispatching it over a "a" element</li>
+      <li><input onclick="method13_1(event)" type="button" value="Method 13_1">opening link through form submission</li>
+      <li><input onclick="method13_2(event)" type="button" value="Method 13_2">opening link through form submission; Firefox only</li>
+      <li><input onclick="method13_3(event)" type="button" value="Method 13_3">opening link through form submission</li>
+      <li><input onclick="method13_4(event)" type="button" value="Method 13_4">opening link through form submission; Firefox only</li>
+      <li><input style="color: #f00" onclick="method14_1(event)" type="button" value="Method 14/1">opening a popup and if it was unsuccessful, redirect current page to destination (redirect with delay). To prevent this enable "Prevent page redirection for 5 seconds after a popup is requested" in the options page.</li>
+      <li><input style="color: #f00" onclick="method14_2()" type="button" value="Method 14/2">opening a popup and if it was unsuccessful, redirect current page to destination (instant redirect). To prevent this enable "Prevent page redirection for 5 seconds after a popup is requested" in the options page.</li>
+      <li><a href='javascript:window.open("https://example.com/test/15");' target="_blank">Method 15</a> open a popup through direct JS execution</li>
+      <li><a href='popup-blocker.html");' target="_blank">Method 16/1</a> open a popup using relative link</li>
+      <li><input type="button" onclick="method16()" value="Method 16/2"> open a popup using relative link</li>
+      <li><input type="button" onclick="method17_1()" value="Method 17/1"> open a popup by creating a dynamic iframe (method 1); <b>PB blocks this type even when it is disabled</b></li>
+      <li><input type="button" onclick="method17_2()" value="Method 17/2"> open a popup by creating a dynamic iframe (method 1 with 2 secs delay)</li>
+      <li><input type="button" onclick="method17_3()" value="Method 17/3"> open a popup by creating a dynamic iframe (method 3); <b>PB blocks this type even when it is disabled</b></li>
+      <li><a href="#" target="_blank">Method 18</a>Same origin tag</li>
+      <li><label><a target="_blank" href="http://example.com/method/19">Method 19</a></label></li>
+      <li><input type="button" onclick="method20()" value="Method 20"> invalid target</li>
+      <li><input type="button" onclick="method21()" value="Method 21"> named target (should allow)</li>
+      <li><input type="button" onclick="method22()" value="Method 22"> iframe.src = "javascript:false"</li>
+      <li><input type="button" onclick="method23()" value="Method 23"> iframe.src = "data:text/html;..."</li>
+    </ul>
+    <p>
+      Click <input type="button" onclick="overwrite1();" value="here"> to overwrite "window.open" and try tests one more time.
+    </p>
+    <p>
+      Click <input type="button" onclick="overwrite2();" value="here"> to overwrite "MouseEvent.prototype.preventDefault" and try tests one more time.
+    </p>
+    <p>
+      Click <input type="button" onclick="overwrite3();" value="here"> to add an overlay div to prevent access to the buttons; issue a new popup to have access to the panel
+    </p>
+
+    <p>It is recommended to use <b>Popup Blocker (strict)</b> add-on for the best experience; <a href="https://chrome.google.com/webstore/detail/aefkmifgmaafnojlojpnekbpbmjiiogg">Chrome</a>, <a href="https://addons.mozilla.org/firefox/addon/popup-blocker/">Firefox</a>, and <a href="https://addons.opera.com/en/extensions/details/popup-blocker-ultimate/">Opera</a>.
+    </p>
+
+    <script>
+      (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+      (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+      m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+      })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+      ga('create', 'UA-33732869-1', 'auto');
+      ga('send', 'pageview');
+    </script>
+  </body>
+</html>

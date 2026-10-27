@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { Badge, Button, IconButton, TextInput } from "@/components/ui";
+import { Badge, Button, IconButton, TextInput, UserTag } from "@/components/ui";
 import { RarityBadge } from "@/components/rarity";
 import { Icon } from "@/icons/Icon";
 import { openApp } from "@/services/os";
@@ -117,7 +117,10 @@ export function FriendsPanel() {
               {social.incoming.map((request) => (
                 <div key={request.id} className="cr-messages__request">
                   <div className="cr-messages__request-head">
-                    <span className="cr-truncate">{request.from.displayName}</span>
+                    <span className="cr-truncate">
+                      {request.from.displayName}
+                      <UserTag tags={request.from.tags} />
+                    </span>
                     <RarityBadge rarity={request.from.rarity} showLabel={false} />
                     <span className="cr-code cr-code--sm">{request.from.friendCode}</span>
                   </div>
@@ -153,7 +156,10 @@ export function FriendsPanel() {
                     name={entry.status === "pending" ? "clock" : entry.status === "declined" ? "close" : "check"}
                     size={12}
                   />
-                  <span className="cr-truncate">{entry.to.displayName}</span>
+                  <span className="cr-truncate">
+                    {entry.to.displayName}
+                    <UserTag tags={entry.to.tags} />
+                  </span>
                   <span className="cr-row__desc">
                     {entry.status === "pending" ? "waiting" : entry.status}
                   </span>
@@ -185,7 +191,10 @@ export function FriendsPanel() {
                 >
                   <span className="cr-messages__presence" data-online={friend.online} />
                   <RarityBadge rarity={friend.rarity} showLabel={false} />
-                  <span>{friend.displayName}</span>
+                  <span>
+                    {friend.displayName}
+                    <UserTag tags={friend.tags} />
+                  </span>
                   <span className="cr-code cr-code--sm">{friend.friendCode}</span>
                 </button>
                 <IconButton

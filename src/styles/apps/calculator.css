@@ -14,7 +14,7 @@
 
 .cr-calc__display {
   flex: none;
-  padding: 20px 20px 14px;
+  padding: var(--space-6) var(--space-6) 14px;
   border-bottom: 1px solid var(--border-subtle);
   background-color: var(--surface-1);
   background-image: var(--surface-sheen);
@@ -55,15 +55,15 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 14px 20px 16px;
+  gap: var(--space-3);
+  padding: 14px var(--space-6) var(--space-5);
   overflow-y: auto;
 }
 
 .cr-calc__key-row,
 .cr-calc__key-grid {
   display: grid;
-  gap: 8px;
+  gap: var(--space-3);
 }
 
 /* Backspace gets a wider cell: it is the one key reached for by aim, not by
@@ -85,7 +85,7 @@
   align-items: center;
   justify-content: center;
   min-height: 46px;
-  padding: 0 8px;
+  padding: 0 var(--space-3);
   border-radius: var(--radius-medium);
   border: 1px solid var(--border-subtle);
   background-color: var(--surface-2);
@@ -148,7 +148,7 @@
   flex: none;
   max-height: 34%;
   overflow-y: auto;
-  padding: 10px 20px 16px;
+  padding: 10px var(--space-6) var(--space-5);
   border-top: 1px solid var(--border-subtle);
   background: var(--window-bg);
 }
@@ -157,7 +157,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 4px;
+  margin-bottom: var(--space-1);
   font-size: var(--fs-xxs);
   font-weight: 600;
   letter-spacing: 0.06em;
@@ -184,9 +184,9 @@
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-4);
   width: 100%;
-  padding: 6px 8px;
+  padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-small);
   color: var(--text-tertiary);
   font-size: var(--fs-sm);

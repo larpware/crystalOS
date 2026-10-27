@@ -59,6 +59,8 @@ interface ServerUser {
   bio?: string;
   avatar?: string;
   rarity?: string;
+  role?: string;
+  tags?: string[];
   createdAt: number;
 }
 
@@ -74,6 +76,8 @@ function toProfile(user: ServerUser): AccountProfile {
     // than stored, so a stale cached profile cannot paint a tier that does not
     // exist in this build's table.
     rarity: isRarityId(user.rarity) ? user.rarity : undefined,
+    role: user.role === "admin" ? "admin" : "user",
+    tags: Array.isArray(user.tags) ? user.tags : undefined,
     createdAt: user.createdAt,
   };
 }

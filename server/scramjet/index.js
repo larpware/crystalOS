@@ -148,7 +148,13 @@ const vpn = createVpnApi();
    settings change applies to the next request and never to one already in
    flight. When the user has asked for protection and the VPN is not up, the
    socket refuses to connect rather than falling back to a direct dial. */
-const VpnTCPSocket = createRoutedTCPSocket({ decide: (hostname, port) => vpn.controller.decideRoute(hostname, port) });
+const VpnTCPSocket = createRoutedTCPSocket({
+  decide: (hostname, port) => vpn.controller.decideRoute(hostname, port),
+  // A stream that had to move to another exit, or that no exit could carry, is
+  // the difference between a page that loaded and one that did not — so it is
+  // reported rather than silently handled.
+  log: (message) => process.stderr.write(`[crescent] ${message}\n`),
+});
 
 /* Wisp reads `options.allow_udp_streams` per stream (server/filter.mjs), so a
    datagram stream is refused for as long as the VPN is enforcing. Without this
@@ -213,7 +219,13 @@ const server = createServer(async (req, res) => {
 
   // Built shell (production). In dev, Vite serves the app and only the paths
   // above are proxied to this server.
-  if (req.method === "GET" || req.method === "HEAD") {
+  //
+  // Never the Scramjet scope prefix: those URLs are answered by the service
+  // worker. Serving the shell for one would boot a second CrystalOS inside a
+  // proxied frame whenever a navigation outran the worker's activation, so
+  // they are refused outright — an honest failure the client can retry.
+  const underProxyScope = url.pathname.startsWith("/~");
+  if ((req.method === "GET" || req.method === "HEAD") && !underProxyScope) {
     const file = await readDistFile(decodeURIComponent(url.pathname));
     if (file) {
       res.writeHead(200, {

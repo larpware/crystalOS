@@ -24,6 +24,7 @@ export function WindowManager() {
   const activeWorkspaceId = useWorkspaceStore((state) => state.activeId);
   const closeWindow = useWindowStore((state) => state.close);
   const minimize = useWindowStore((state) => state.minimize);
+  const toggleFullScreen = useWindowStore((state) => state.toggleFullScreen);
 
   const [preview, setPreview] = useState<WindowPreview>(null);
   const [closingWindows, setClosingWindows] = useState<Set<string>>(new Set());
@@ -81,7 +82,21 @@ export function WindowManager() {
   const menuItems: MenuItem[] = useMemo(() => {
     if (!menu) return [];
     const meta = metaFor(menu.appId);
+    /*
+       The window's own bar is the only place the four controls normally live,
+       and full screen unmounts it — so the menu is where close, minimize and
+       the way back out of full screen have to be reachable. It leads with the
+       mode the window is actually in: full screen to enter it, exit full
+       screen to leave it, with the other two always present underneath. */
+    const target = windows.find((window) => window.id === menu.windowId);
+    const full = target?.full === true;
     const items: MenuItem[] = [
+      {
+        id: "full-screen",
+        label: full ? "Exit full screen" : "Full screen",
+        icon: full ? "collapse" : "expand",
+        run: () => toggleFullScreen(menu.windowId),
+      },
       {
         id: "minimize",
         label: "Minimize",
@@ -104,7 +119,7 @@ export function WindowManager() {
       },
     ];
     return items;
-  }, [menu, minimize, closeWindow]);
+  }, [menu, minimize, closeWindow, toggleFullScreen, windows]);
 
   return (
     <div className="cr-window-layer">

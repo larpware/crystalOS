@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Options Page :: Popup Blocker (strict)</title>
+  <meta charset="utf-8">
+  <link rel="stylesheet" type="text/css" href="index.css">
+</head>
+
+<body>
+  <table width=100% class="rtl">
+    <colgroup>
+      <col>
+      <col width="10">
+    </colgroup>
+    <tr>
+      <td><span data-i18n="options_item1"></span></td>
+      <td><input type="number" id="numbers" min=1></td>
+    </tr>
+    <tr>
+      <td><span data-i18n="options_item2"></span><sup><a href="#n1">1</a></sup></td>
+      <td><input type="number" id="timeout" min=5></td>
+    </tr>
+    <tr>
+      <td><span data-i18n="options_item9"></span><sup><a href="#n2">2</a></sup></td>
+      <td><input type="number" id="countdown" min=0></td>
+    </tr>
+    <tr>
+      <td><span data-i18n="options_item17"></span></td>
+      <td>
+      <select id="default-action">
+        <option value="ignore" data-i18n="options_item18"></option>
+        <option value="popup-denied" data-i18n="options_item19"></option>
+        <option value="open-tab" data-i18n="options_item20"></option>
+        <option value="popup-redirect" data-i18n="options_item21"></option>
+      </select>
+      </td>
+    <tr>
+      <td><span data-i18n="options_item31"></span></td>
+      <td>
+      <select id="whitelist-mode">
+        <option value="popup-hosts" data-i18n="options_item32"></option>
+        <option value="top-hosts" data-i18n="options_item33"></option>
+      </select>
+      </td>
+    <tr>
+      <td><span data-i18n="options_item22"></span></td>
+      <td><input type="color" id="badge-color"></td>
+    </tr>
+
+    </tr>
+  </table>
+
+  <div class="checks">
+    <input type="checkbox" id="domain">
+    <label for="domain"><span data-i18n="options_item3"></span><sup><a href="#n1">1</a></sup></label>
+    <input type="checkbox" id="badge">
+    <label for="badge"><span data-i18n="options_item5"></span><sup><a href="#n1">1</a></sup></label>
+    <input type="checkbox" id="block-page-redirection">
+    <label for="block-page-redirection"><span data-i18n="options_item15"></span><sup><a href="#n6">6</a></sup></label>
+    <input type="checkbox" id="immediate-action">
+    <label for="immediate-action"><span data-i18n="options_item23"></span><sup><a href="#n7">7</a></sup></label>
+    <input type="checkbox" id="wot" disabled>
+    <label for="wot"><span data-i18n="options_item29"></span></label>
+    <input type="checkbox" id="simulate-allow">
+    <label for="simulate-allow"><span data-i18n="options_item30"></span></label>
+    <input type="checkbox" id="faqs">
+    <label for="faqs"><span data-i18n="options_item26"></span></label>
+  </div>
+
+  <p>
+    <span data-i18n="options_item6"></span><sup><a href="#n1">1</a>, <a href="#n3">3</a></sup>
+    <textarea id="popup-hosts" rows="2"></textarea>
+  </p>
+  <p>
+    <span data-i18n="options_item7"></span><sup><a href="#n1">1</a>, <a href="#n4">4</a></sup>
+    <textarea id="top-hosts" rows="2"></textarea>
+  </p>
+  <p>
+    <span data-i18n="options_item27"></span><sup><a href="#n1">1</a>, <a href="#n8">8</a></sup>
+    <textarea id="protocols" rows="2"></textarea>
+  </p>
+  <p>
+    <span data-i18n="options_item13"></span><sup><a href="#n1">1</a>, <a href="#n5">5</a></sup>
+    <textarea id="blacklist" rows="2"></textarea>
+  </p>
+  <p>
+    <span data-i18n="options_item34"></span><sup><a href="#n1">1</a>, <a href="#n5">9</a></sup>
+    <textarea id="silent" rows="2"></textarea>
+  </p>
+
+  <p style="display: flex">
+    <button id="import" data-i18n="options_import"></button>
+    <button id="export" data-i18n="options_export"></button>
+  </p>
+  <p style="display: flex">
+    <button id="review" data-i18n="options_review"></button>
+    <button id="page" data-i18n="options_page"></button>
+  </p>
+  <p style="display: flex">
+    <button id="support" data-i18n="options_support"></button>
+    <button id="reset" data-i18n="options_reset"></button>
+    <span style="flex: 1"></span>
+    <span id="status"></span>
+    <button id="save" data-i18n="options_save"></button>
+  </p>
+
+  <hr>
+
+  <details>
+    <summary data-i18n="options_item25"></summary>
+    <p>
+      1: <span data-i18n="options_item8" id="n1"></span>
+      <br>
+      2: <span data-i18n="options_item10" id="n2"></span>
+      <br>
+      3: <span data-i18n="options_item11" id="n3"></span>
+      <br>
+      4: <span data-i18n="options_item12" id="n4"></span>
+      <br>
+      5: <span data-i18n="options_item14" id="n5"></span>
+      <br>
+      6: <span data-i18n="options_item16" id="n6"></span>
+      <br>
+      7: <span data-i18n="options_item24" id="n7"></span>
+      <br>
+      8: <span data-i18n="options_item28" id="n8"></span>
+      <br>
+      9: <span data-i18n="options_item35" id="n9"></span>
+    </p>
+  </details>
+
+  <script src="/config.js"></script>
+  <script src="index.js"></script>
+</body>
+</html>

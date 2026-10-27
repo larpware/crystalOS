@@ -27,7 +27,11 @@ import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { createId } from "./ids.mjs";
 import { formatFriendCode, generateFriendCode } from "./codes.mjs";
-import { rollRarity } from "./rarity.mjs";
+import { RARITY_IDS, RARITY_TOTAL_WEIGHT, rollRarity } from "./rarity.mjs";
+import { parseTags, tagsOf } from "./tags.mjs";
+import { createSocialStore } from "./social.mjs";
+import { createServersStore } from "./servers.mjs";
+import { createAppStore } from "./store.mjs";
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -138,6 +142,34 @@ function backfillRarity(db) {
   }
 }
 
+/** The rarest tier the generator can draw — the top of the published table. */
+export const RAREST_RARITY_ID = RARITY_IDS[RARITY_IDS.length - 1];
+
+/**
+ * The project owner's account (username "kiyaan") carries the owner identity:
+ * moderation authority, the rarest friend-code tier that exists, and the
+ * "owner" tag shown beside the name everywhere it appears. Applied on every
+ * open so an account created before any of this existed still carries it —
+ * the username itself is reserved in security.mjs, so nobody else can register
+ * or rename into it.
+ */
+function upgradeOwnerAccount(db) {
+  const owner = db.prepare("SELECT id, tags FROM users WHERE username_lower = ?").get("kiyaan");
+  if (!owner) return;
+  // The owner tag is merged, not overwritten, so tags granted to the owner
+  // later (via the admin route) survive the next open.
+  const current = parseTags(owner.tags);
+  const merged = current.includes("owner") ? current : ["owner", ...current].slice(0, 3);
+  db.prepare("UPDATE users SET role = 'admin', rarity = ?, rarity_roll = ?, tags = ? WHERE id = ?").run(
+    RAREST_RARITY_ID,
+    // The top roll of the published table — the draw that maps to the
+    // rarest tier — so the stored roll never contradicts the stored tier.
+    RARITY_TOTAL_WEIGHT - 1,
+    JSON.stringify(merged),
+    owner.id,
+  );
+}
+
 /** Canonical pair ordering, so (a,b) and (b,a) are the same row. */
 export function orderedPair(first, second) {
   return first < second ? [first, second] : [second, first];
@@ -163,6 +195,10 @@ export function publicUser(row, now = Date.now()) {
     bio: row.bio ?? undefined,
     avatar: row.avatar ?? undefined,
     rarity: row.rarity ?? undefined,
+    tags: tagsOf(row),
+    private: Boolean(row.private_account),
+
+    role: row.role ?? "user",
     createdAt: row.created_at,
     online: row.last_seen_at > now - PRESENCE_WINDOW_MS,
     lastSeenAt: row.last_seen_at,
@@ -187,7 +223,16 @@ export function openAccountsStore(options = {}) {
   // Databases created before rarity existed have no such columns.
   ensureColumn(db, "users", "rarity", "TEXT");
   ensureColumn(db, "users", "rarity_roll", "INTEGER");
+  // Crystal Social: accounts are public unless the owner says otherwise.
+  ensureColumn(db, "users", "private_account", "INTEGER NOT NULL DEFAULT 0");
+  // Moderation: the first account to register becomes the administrator; the
+  // CRESCENT_ADMINS environment variable can name more by username.
+  ensureColumn(db, "users", "role", "TEXT NOT NULL DEFAULT 'user'");
+  // Account tags (owner, staff, …) shown beside the name; empty for everyone
+  // the owner has not been asked about yet.
+  ensureColumn(db, "users", "tags", "TEXT NOT NULL DEFAULT '[]'");
   backfillRarity(db);
+  upgradeOwnerAccount(db);
 
   /** Runs `fn` inside a transaction; rolls back if it throws. */
   function transaction(fn) {
@@ -211,6 +256,13 @@ export function openAccountsStore(options = {}) {
     file,
     transaction,
     close: () => db.close(),
+
+    /* Crystal Social — posts, likes, comments, follows, notifications. */
+    social: createSocialStore(db, transaction),
+
+    /* Crystal Chat — servers, channels, roles, invites, moderation. */
+    servers: createServersStore(db, transaction),
+    appStore: createAppStore(db),
 
     /* ---- users -------------------------------------------------------- */
 
@@ -295,6 +347,10 @@ export function openAccountsStore(options = {}) {
       if (patch.avatar !== undefined) {
         fields.push("avatar = ?");
         values.push(patch.avatar ?? null);
+      }
+      if (patch.privateAccount !== undefined) {
+        fields.push("private_account = ?");
+        values.push(patch.privateAccount ? 1 : 0);
       }
       if (fields.length === 0) return store.userById(id);
       values.push(id);

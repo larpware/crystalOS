@@ -17,36 +17,37 @@
 
 :root {
   /* ---- base surfaces --------------------------------------------------- */
-  --bg-root: #08090b;
-  --bg-desktop: #0b0d10;
+  --bg-root: #131110;
+  --bg-desktop: #171412;
 
-  --surface-0: #101216;
-  --surface-1: #14171c;
-  --surface-2: #191c22;
-  --surface-3: #20242b;
-  --surface-hover: #252a32;
-  --surface-active: #2b3039;
-  --surface-sunken: #0c0e11;
+  --surface-0: #1b1816;
+  --surface-1: #201c19;
+  --surface-2: #272220;
+  --surface-3: #2f2a26;
+  --surface-hover: #352f2a;
+  --surface-active: #3c352f;
+  --surface-sunken: #161311;
 
   /* ---- text ------------------------------------------------------------ */
-  --text-primary: #f4f5f7;
-  --text-secondary: #c4c8cf;
-  --text-tertiary: #8e949e;
-  --text-muted: #656b75;
-  --text-disabled: #464b54;
+  --text-primary: #f3ede4;
+  --text-secondary: #cfc4b6;
+  --text-tertiary: #9a8e80;
+  --text-muted: #6e6558;
+  --text-disabled: #554b40;
   --text-on-accent: #ffffff;
 
-  /* ---- borders --------------------------------------------------------- */
-  --border-subtle: rgba(255, 255, 255, 0.055);
-  --border-default: rgba(255, 255, 255, 0.085);
-  --border-strong: rgba(255, 255, 255, 0.13);
-  --border-focus: rgba(255, 255, 255, 0.2);
+  /* ---- borders ---------------------------------------------------------
+     Warm cream hairlines — never a cool grey sitting on warm brown. */
+  --border-subtle: rgba(255, 232, 200, 0.06);
+  --border-default: rgba(255, 232, 200, 0.10);
+  --border-strong: rgba(255, 232, 200, 0.15);
+  --border-focus: rgba(255, 232, 200, 0.24);
 
   /* ---- lighting --------------------------------------------------------
      Directional light comes from above: a hairline of light on the top edge of
      a raised surface, a soft shadow inside a recessed one. */
-  --inner-highlight: rgba(255, 255, 255, 0.055);
-  --edge-light: rgba(255, 255, 255, 0.14);
+  --inner-highlight: rgba(255, 232, 200, 0.055);
+  --edge-light: rgba(255, 232, 200, 0.15);
   --inset-highlight: inset 0 1px 0 var(--inner-highlight);
   --inset-sunken: inset 0 1px 2px rgba(0, 0, 0, 0.32);
 
@@ -54,17 +55,20 @@
      Fallback accent, used for the instant before a theme is applied. The
      running value is derived per theme in `themes/apply.ts`, which also picks
      `--text-on-accent` so a light accent gets dark label ink. */
-  --accent-primary: #0a84ff;
-  --accent-primary-hover: #3d9bff;
-  --accent-primary-active: #0069cc;
-  --accent-primary-muted: rgba(10, 132, 255, 0.22);
-  --accent-primary-muted-strong: rgba(10, 132, 255, 0.34);
-  --accent-on-muted: #a8c9ff;
+  --accent-primary: #43915c;
+  --accent-primary-hover: #56a86e;
+  --accent-primary-active: #357949;
+  --accent-primary-muted: rgba(67, 145, 92, 0.24);
+  --accent-primary-muted-strong: rgba(67, 145, 92, 0.36);
+  --accent-on-muted: #a2d9b4;
 
-  --accent-success: #42d879;
-  --accent-warning: #f4c95d;
-  --accent-danger: #ff5f57;
-  --accent-info: #62b0ff;
+  /* Semantic colours are tuned into the warm family: success leans moss,
+     warning is the ochre partner, danger a brick-leaning red. Info stays blue —
+     the one cool signal, so it keeps reading as "information" everywhere. */
+  --accent-success: #4fbf71;
+  --accent-warning: #e0a84f;
+  --accent-danger: #ff6455;
+  --accent-info: #6ab0f3;
 
   /* ---- window controls ------------------------------------------------- */
   --traffic-red: #ff5f57;
@@ -77,7 +81,7 @@
   --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px rgba(0, 0, 0, 0.22);
   --shadow-popover: 0 18px 40px -12px rgba(0, 0, 0, 0.58), 0 4px 12px rgba(0, 0, 0, 0.38);
   --shadow-window: 0 28px 60px -18px rgba(0, 0, 0, 0.62), 0 5px 14px rgba(0, 0, 0, 0.38);
-  --shadow-tint: #000000;
+  --shadow-tint: #170e06;
   --shadow-window-focused: 0 32px 72px -18px color-mix(in srgb, var(--shadow-tint) 74%, transparent),
     0 3px 10px color-mix(in srgb, var(--shadow-tint) 42%, transparent);
 
@@ -139,18 +143,18 @@
     inset 0 -1px 0 color-mix(in srgb, var(--edge-light) 14%, transparent);
 
   /* ---- chrome materials ------------------------------------------------ */
-  --panel-bg: #0e1014;
-  --dock-bg: #14171c;
+  --panel-bg: #181413;
+  --dock-bg: #211c18;
   --window-bg: var(--surface-0);
   --modal-bg: var(--surface-1);
   --chrome-bar: var(--surface-1);
 
   /* ---- overlays ---------------------------------------------------------- */
-  --launcher-scrim: rgba(4, 5, 8, 0.42);
+  --launcher-scrim: rgba(4, 3, 2, 0.42);
 
   /* ---- icon treatment -------------------------------------------------- */
-  --icon-surface: #1b1f26;
-  --icon-surface-strong: #23282f;
+  --icon-surface: #27211c;
+  --icon-surface-strong: #302923;
 
   /* ---- document tints (desktop + file artwork) ------------------------- */
   --file-text: #6fa8ff;
@@ -195,12 +199,16 @@
   --dur-slow: 280ms;
   --motion-scale: 1;
 
-  /* ---- typography ------------------------------------------------------ */
-  --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
+  /* ---- typography ------------------------------------------------------
+     Bundled in src/styles/fonts.css: DM Sans for the interface, Instrument
+     Serif for display faces, JetBrains Mono for fixed-width text. The
+     system stacks after them are only fallbacks for the instant before the
+     font files load. */
+  --font-ui: "DM Sans", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
     Inter, system-ui, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: "JetBrains Mono", "SFMono-Regular", "SF Mono", Consolas,
+  --font-mono: "JetBrains Mono", "Cascadia Code", "SFMono-Regular", "SF Mono", Consolas,
     "Liberation Mono", monospace;
-  --font-display: var(--font-ui);
+  --font-display: "Instrument Serif", Georgia, "Times New Roman", ui-serif, serif;
 
   --fs-xxs: 10.5px;
   --fs-xs: 11.5px;
@@ -307,9 +315,29 @@
 }
 
 /* --------------------------------------------------------------------------
+   Performance mode — backdrop filters
+
+   One frosted surface is a full-screen blur pass on every frame it sits over,
+   and the chrome has accumulated a lot of them: the shell's own frost, the
+   glass themes' whole layer, the launcher and the new-tab page fields. The
+   shell's frost was already written to apply only while performance mode is
+   off; rather than keep extending that gate by hand across every surface
+   added since, performance mode drops the filter everywhere at once, the way
+   the scale-settle flag suspends transitions below. Materials keep their own
+   tint — only the blur goes, which is what the shell's own guard already did.
+   -------------------------------------------------------------------------- */
+:root[data-perf="on"] *,
+:root[data-perf="on"] *::before,
+:root[data-perf="on"] *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* --------------------------------------------------------------------------
    Motion presets — performance mode and reduced-motion collapse these.
    -------------------------------------------------------------------------- */
-:root[data-motion="reduced"] {
+:root[data-motion="reduced"],
+:root[data-perf="on"] {
   --dur-instant: 0ms;
   --dur-fast: 0ms;
   --dur-normal: 0ms;
@@ -337,35 +365,35 @@
    correct even before a theme is applied.
    -------------------------------------------------------------------------- */
 :root[data-appearance="light"] {
-  --bg-root: #e9ebee;
-  --bg-desktop: #dfe2e7;
+  --bg-root: #efe9df;
+  --bg-desktop: #e7e1d5;
 
-  --surface-0: #ffffff;
-  --surface-1: #f7f8fa;
-  --surface-2: #eef0f3;
-  --surface-3: #e4e7eb;
-  --surface-hover: #e7eaee;
-  --surface-active: #dcdfe4;
-  --surface-sunken: #f2f3f6;
+  --surface-0: #faf6ef;
+  --surface-1: #f4efe6;
+  --surface-2: #ece6da;
+  --surface-3: #e2dbcd;
+  --surface-hover: #e8e1d4;
+  --surface-active: #ddd5c6;
+  --surface-sunken: #f5f1e8;
 
-  --text-primary: #16181c;
-  --text-secondary: #3d434c;
-  --text-tertiary: #626974;
-  --text-muted: #878e99;
-  --text-disabled: #adb3bc;
+  --text-primary: #211b12;
+  --text-secondary: #4e463a;
+  --text-tertiary: #7c7260;
+  --text-muted: #a49a87;
+  --text-disabled: #c1b7a6;
 
-  --border-subtle: rgba(0, 0, 0, 0.06);
-  --border-default: rgba(0, 0, 0, 0.12);
-  --border-strong: rgba(0, 0, 0, 0.18);
-  --border-focus: rgba(0, 0, 0, 0.28);
+  --border-subtle: rgba(60, 45, 25, 0.08);
+  --border-default: rgba(60, 45, 25, 0.13);
+  --border-strong: rgba(60, 45, 25, 0.2);
+  --border-focus: rgba(60, 45, 25, 0.28);
 
-  --inner-highlight: rgba(255, 255, 255, 0.9);
+  --inner-highlight: rgba(255, 255, 255, 0.85);
   --edge-light: rgba(255, 255, 255, 0.9);
-  --inset-sunken: inset 0 1px 2px rgba(20, 24, 32, 0.08);
+  --inset-sunken: inset 0 1px 2px rgba(48, 34, 16, 0.08);
 
   /* A light theme draws depth with shadow and a soft bottom edge rather than
      with a bright wash, which would simply disappear on a white surface. */
-  --shade-bottom: rgba(20, 24, 32, 0.06);
+  --shade-bottom: rgba(48, 34, 16, 0.06);
   --surface-sheen: linear-gradient(
     180deg,
     rgba(255, 255, 255, 0.55) 0%,
@@ -374,28 +402,154 @@
   );
   --surface-recess: linear-gradient(
     180deg,
-    rgba(20, 24, 32, 0.07) 0%,
-    rgba(20, 24, 32, 0.015) 44%,
-    rgba(20, 24, 32, 0) 72%
+    rgba(48, 34, 16, 0.07) 0%,
+    rgba(48, 34, 16, 0.015) 44%,
+    rgba(48, 34, 16, 0) 72%
   );
 
-  --panel-bg: #f7f8fa;
-  --dock-bg: #ffffff;
-  --modal-bg: #ffffff;
-  --chrome-bar: #f7f8fa;
+  --panel-bg: #f6f1e8;
+  --dock-bg: #faf6ef;
+  --modal-bg: #faf6ef;
+  --chrome-bar: #f4efe6;
 
   --icon-surface: #ffffff;
-  --icon-surface-strong: #eef0f3;
+  --icon-surface-strong: #f0eadd;
 
-  --shadow-soft: 0 1px 2px rgba(20, 24, 32, 0.06), 0 2px 6px rgba(20, 24, 32, 0.08);
-  --shadow-popover: 0 16px 34px -12px rgba(20, 24, 32, 0.22), 0 3px 10px rgba(20, 24, 32, 0.12);
-  --shadow-window: 0 24px 50px -18px rgba(20, 24, 32, 0.26), 0 4px 12px rgba(20, 24, 32, 0.12);
-  --shadow-tint: #1b2330;
+  --shadow-soft: 0 1px 2px rgba(48, 34, 16, 0.06), 0 2px 6px rgba(48, 34, 16, 0.08);
+  --shadow-popover: 0 16px 34px -12px rgba(48, 34, 16, 0.2), 0 3px 10px rgba(48, 34, 16, 0.11);
+  --shadow-window: 0 24px 50px -18px rgba(48, 34, 16, 0.24), 0 4px 12px rgba(48, 34, 16, 0.11);
+  --shadow-tint: #4a3a22;
   --shadow-window-focused: 0 30px 60px -18px color-mix(in srgb, var(--shadow-tint) 26%, transparent),
     0 3px 10px color-mix(in srgb, var(--shadow-tint) 14%, transparent);
 
   --wallpaper-dim: 0.06;
   --launcher-scrim: rgba(0, 0, 0, 0.32);
+}
+
+/* --------------------------------------------------------------------------
+   Solar persona — not a recolour: the readout look. Hard corners throughout
+   the radius ladder, Solarized semantic accents, a cyan focus ring and a
+   teal shadow family. Placed after the light baseline so it wins ties.
+   -------------------------------------------------------------------------- */
+:root[data-theme="deep-sea"],
+:root[data-theme="dim"],
+:root[data-theme="solar-light"] {
+  --radius-xs: 2px;
+  --radius-small: 3px;
+  --radius-medium: 4px;
+  --radius-large: 5px;
+  --radius-window: 6px;
+
+  --border-focus: rgba(38, 139, 210, 0.6);
+
+  --accent-success: #859900;
+  --accent-warning: #b58900;
+  --accent-danger: #dc322f;
+  --accent-info: #268bd2;
+
+  /* Document artwork tints join the Solarized set as well */
+  --file-text: #268bd2;
+  --file-image: #6c71c4;
+  --file-audio: #2aa198;
+  --file-video: #cb4b16;
+  --file-archive: #b58900;
+  --file-file: #93a1a1;
+}
+
+/* Dim sits on black surfaces, so its shadow family is pure black. */
+:root[data-theme="dim"] {
+  --shadow-tint: #000506;
+  --inset-sunken: inset 0 1px 2px rgba(0, 0, 0, 0.55);
+}
+
+:root[data-theme="deep-sea"] {
+  --shadow-tint: #000d12;
+  --inset-sunken: inset 0 1px 2px rgba(0, 7, 9, 0.45);
+}
+
+:root[data-theme="solar-light"] {
+  --shadow-tint: #40565e;
+  --inset-sunken: inset 0 1px 2px rgba(7, 54, 66, 0.14);
+}
+
+/* --------------------------------------------------------------------------
+   Surface texture — film grain for the editorial themes, a hairline
+   blueprint grid for the Solarized pair. One fixed composite layer over the
+   whole desktop; it is what makes flat token surfaces read as board material
+   instead of bare web backgrounds. Disabled by performance mode and high
+   contrast, which exists for clarity.
+   -------------------------------------------------------------------------- */
+#crystal-root::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  mix-blend-mode: overlay;
+  opacity: 0.06;
+  /* Film grain — fractal noise, the aged-leader look shared by Cinema. */
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.35 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+:root[data-theme="cinema-light"] #crystal-root::after {
+  mix-blend-mode: soft-light;
+  opacity: 0.05;
+}
+
+:root[data-theme="deep-sea"] #crystal-root::after,
+:root[data-theme="dim"] #crystal-root::after,
+:root[data-theme="solar-light"] #crystal-root::after {
+  mix-blend-mode: normal;
+  opacity: 0.05;
+  /* Blueprint grid — 32px hairline rules, the technical-readout texture. */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Cpath d='M.5 0V32M0 .5H32' fill='none' stroke='%2393a1a1' stroke-opacity='0.55' stroke-width='1'/%3E%3C/svg%3E");
+}
+
+:root[data-theme="solar-light"] #crystal-root::after {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Cpath d='M.5 0V32M0 .5H32' fill='none' stroke='%23586e75' stroke-opacity='0.5' stroke-width='1'/%3E%3C/svg%3E");
+}
+
+:root[data-perf="on"] #crystal-root::after,
+:root[data-contrast="high"] #crystal-root::after {
+  display: none;
+}
+
+/* --------------------------------------------------------------------------
+   Per-theme shadow families — the derived elevation ladder
+   (--shadow-2, --shadow-window-idle, --lift-*) mixes the theme's own light
+   into its shadows, so every theme stays inside its own lighting family:
+   cool nights cast cool shadow, warm rooms cast warm shadow. The static
+   :root value is Cinema's; these are the others.
+   -------------------------------------------------------------------------- */
+:root[data-theme="crescent-dark"],
+:root[data-theme="frosted_glass"],
+:root[data-theme="windowglass"] {
+  --shadow-tint: #05070a;
+}
+
+:root[data-theme="midnight"] {
+  --shadow-tint: #02060d;
+}
+
+:root[data-theme="graphite"],
+:root[data-theme="contrast"] {
+  --shadow-tint: #000000;
+}
+
+:root[data-theme="arctic"] {
+  --shadow-tint: #00141f;
+}
+
+:root[data-theme="ember"] {
+  --shadow-tint: #140a04;
+}
+
+:root[data-theme="amethyst"] {
+  --shadow-tint: #0a0514;
+}
+
+:root[data-theme="ivy"] {
+  --shadow-tint: #041009;
 }
 
 /* --------------------------------------------------------------------------

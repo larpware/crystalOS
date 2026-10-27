@@ -139,7 +139,7 @@
      title slid into the first track and the controls took the flexible one. */
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-3);
   flex: none;
   height: var(--titlebar-height);
   padding: 0 10px;
@@ -179,6 +179,74 @@
   box-shadow: none;
 }
 
+/* ---- titlebar blend ------------------------------------------------------
+   Optional: the bar stops reading as a solid strip. Its own material thins out
+   to nothing toward the bottom, and the tail under it is a live blur of what
+   the application is actually drawing, so the gradient below the controls is
+   made of the site's own colours rather than of a painted band. Geometry does
+   not change — the application keeps its space, and the tail only paints over
+   the top of it, where nothing but the site's own leading pixels sit.
+
+   Off by default; the flag is set on the root by Settings → Appearance →
+   Window chrome. The two modes where surfaces are meant to stay solid come
+   first: reduced transparency and high contrast both fall back to the crisp
+   bar. That gate is also what keeps these ahead of the glass titlebar rules —
+   they are the same specificity, and the extra :not()s decide it instead of
+   the order the stylesheets happen to load in. */
+:root[data-titlebar="blend"]:not([data-transparency="reduced"]):not([data-contrast="high"])
+  .cr-window__titlebar {
+  background-color: transparent;
+  background-image: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--window-bg) 92%, transparent) 0%,
+    color-mix(in srgb, var(--window-bg) 62%, transparent) 58%,
+    color-mix(in srgb, var(--window-bg) 24%, transparent) 86%,
+    transparent 100%
+  );
+  box-shadow: none;
+  border-bottom-color: transparent;
+  position: relative;
+  z-index: 2;
+}
+
+/* The tail: the application's own pixels, frosted and tinted by the window,
+   fading down into the content — this is the part of the gradient that is
+   genuinely the site rather than the theme. The mask fades the blur away with
+   the scrim, so there is no edge where the frosting stops — and it takes no
+   pointer events itself, so the top of the application stays clickable
+   underneath it. */
+:root[data-titlebar="blend"]:not([data-transparency="reduced"]):not([data-contrast="high"])
+  .cr-window__titlebar::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 44px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--window-bg) 58%, transparent) 0%,
+    color-mix(in srgb, var(--window-bg) 30%, transparent) 48%,
+    transparent 100%
+  );
+  backdrop-filter: blur(14px) saturate(1.5);
+  -webkit-backdrop-filter: blur(14px) saturate(1.5);
+  mask-image: linear-gradient(180deg, #000 0%, #000 34%, transparent 100%);
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 34%, transparent 100%);
+  pointer-events: none;
+}
+
+:root[data-titlebar="blend"]:not([data-transparency="reduced"]):not([data-contrast="high"])
+  .cr-window[data-focused="false"] .cr-window__titlebar {
+  background-color: transparent;
+  background-image: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-0) 86%, transparent) 0%,
+    color-mix(in srgb, var(--surface-0) 40%, transparent) 70%,
+    transparent 100%
+  );
+}
+
 /* An inactive window is quieter but still a real object: dim its content
    slightly instead of removing its borders entirely. */
 .cr-window[data-focused="false"] .cr-window__body {
@@ -211,7 +279,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: var(--space-2);
   flex: 1;
   min-width: 0;
   font-size: var(--fs-sm);
@@ -311,6 +379,54 @@
    pointer is actually on one, which should still light up. */
 .cr-window[data-focused="false"] .cr-window__control:not(:hover) {
   filter: saturate(0.5) brightness(0.88);
+}
+
+/* The full-screen control sits beside the dots as a quiet glyph rather than a
+   fourth traffic light, in the place a header bar keeps its own actions. The
+   cluster reverses for right-hand controls, and a flex item takes the end of
+   whichever order that is — so the button lands on the inner side, facing the
+   title, in both layouts. */
+.cr-window__fullscreen {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex: none;
+  border: 0;
+  border-radius: var(--radius-small);
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: default;
+  transition: background var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard);
+}
+
+.cr-window__fullscreen svg {
+  opacity: 0.7;
+  transition: opacity var(--dur-fast) var(--ease-standard);
+}
+
+.cr-window__fullscreen:hover {
+  background: color-mix(in srgb, var(--text-primary) 10%, transparent);
+  color: var(--text-primary);
+}
+
+.cr-window__fullscreen:hover svg,
+.cr-window__controls:hover .cr-window__fullscreen svg {
+  opacity: 1;
+}
+
+/* ---- full screen ------------------------------------------------------
+   The window owns the whole viewport, so the frame it normally draws against
+   the desk — radius, border, contact shadow — has no edge left to sit on. The
+   shell's own bars are not excluded by this: the panel and the dock keep their
+   stacking order and stay painted above the window, which is what leaves the
+   desk with its chrome while the application reaches every edge. */
+.cr-window[data-full="true"] {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .cr-window__body {
@@ -418,7 +534,8 @@
   }
 }
 
-:root[data-motion="reduced"] .cr-snap-preview {
+:root[data-motion="reduced"] .cr-snap-preview,
+:root[data-perf="on"] .cr-snap-preview {
   animation: none;
 }
 

@@ -1,0 +1,224 @@
+{
+  "app_description": {
+    "message": "Strictly block all popup requests from any website"
+  },
+  "context_item2": {
+    "message": "Allow the last popup request"
+  },
+  "context_item3": {
+    "message": "Deny the last popup request"
+  },
+  "options_item1": {
+    "message": "Maximum number of popup requests for a single page"
+  },
+  "options_item2": {
+    "message": "Timeout for displaying each popup (in seconds)"
+  },
+  "options_item3": {
+    "message": "Do not block popup requests from same origin"
+  },
+  "options_item5": {
+    "message": "Display the total number of blocked requests in the toolbar icon"
+  },
+  "options_item6": {
+    "message": "Whitelist destinations:"
+  },
+  "options_item7": {
+    "message": "Whitelist sources:"
+  },
+  "options_item8": {
+    "message": "For this change to take effect, refresh the tab."
+  },
+  "options_item9": {
+    "message": "Countdown for performing the last action (in seconds)"
+  },
+  "options_item10": {
+    "message": "Use zero number to disable the countdown to perform the previous action."
+  },
+  "options_item11": {
+    "message": "Comma-separated list of hostnames that are not going to be blocked (these hostnames can issue popups on any website)."
+  },
+  "options_item12": {
+    "message": "Comma-separated list of hostnames that the popup blocker extension is completely disabled on them."
+  },
+  "options_item13": {
+    "message": "Blacklist sources (reverse operation mode):"
+  },
+  "options_item14": {
+    "message": "Comma-separated list of hostnames that the popup blocker should only be active on them. This means that the popup blocker is disabled on ALL other hostnames. To disable this mode, clear the blacklist input completely."
+  },
+  "options_item15": {
+    "message": "Prevent page redirection for 2 seconds after a popup is requested"
+  },
+  "options_item16": {
+    "message": "Some websites redirect the user to the advertisement page if the popup request to display an advertisement is blocked. This option can prevent this by not allowing page redirection for the specified time."
+  },
+  "options_item17": {
+    "message": "Default action when a popup is requested"
+  },
+  "options_item18": {
+    "message": "do nothing"
+  },
+  "options_item19": {
+    "message": "deny request"
+  },
+  "options_item20": {
+    "message": "open in background"
+  },
+  "options_item21": {
+    "message": "redirect page"
+  },
+  "options_item22": {
+    "message": "Badge background-color"
+  },
+  "options_item23": {
+    "message": "Ignore popup notification when possible (not recommended)"
+  },
+  "options_item24": {
+    "message": "This will \"ignore\" or \"accept\" a popup without user interaction (not recommended)"
+  },
+  "options_item25": {
+    "message": "Descriptions"
+  },
+  "options_item26": {
+    "message": "Display FAQs page on updates"
+  },
+  "options_item27": {
+    "message": "Whitelist protocols:"
+  },
+  "options_item28": {
+    "message": "The listed protocols can be opened in a new browser tab. For instance add 'magnet:' to allow magnet links to be opened in a browser tab."
+  },
+  "options_item29": {
+    "message": "Use Web of Trust (WOT) service to decide either popup is from a trusted hostname or not"
+  },
+  "options_item30": {
+    "message": "Simulate the 'allow' button to prevent your browser's internal popup blocker from blocking these requests"
+  },
+  "options_item31": {
+    "message": "When 'trust' button is pressed, add hostname to"
+  },
+  "options_item32": {
+    "message": "Whitelist destinations"
+  },
+  "options_item33": {
+    "message": "Whitelist sources"
+  },
+  "options_item34": {
+    "message": "Notification blacklist"
+  },
+  "options_item35": {
+    "message": "Comma-separated list of hostnames that the popup blocker will not display notification if a popup is requested"
+  },
+  "options_item36": {
+    "message": "Enable aggressive static IFrame detection"
+  },
+  "options_item37": {
+    "message": "When this mode is enabled, the extension installs a mutation observer to monitor static IFrames with 'JavaScript:' src attributes. This enhances the blocking power but has performance drawbacks."
+  },
+  "options_item38": {
+    "message": "This feature is deprecated! If you don't want this extension to globally block pages, right-click on the action button and limit the access to particular websites from the \"This can read and change site data\" context menu item."
+  },
+  "options_support": {
+    "message": "Support Development"
+  },
+  "options_import": {
+    "message": "Import"
+  },
+  "options_export": {
+    "message": "Export"
+  },
+  "options_reset": {
+    "message": "Reset to Defaults"
+  },
+  "options_save": {
+    "message": "Save"
+  },
+  "options_msg": {
+    "message": "Options are saved"
+  },
+  "options_review": {
+    "message": "YouTube Review"
+  },
+  "options_page": {
+    "message": "FAQs Page"
+  },
+  "ui_msg": {
+    "message": "Popup is requested for"
+  },
+  "ui_button_allow": {
+    "message": "Allow this popup"
+  },
+  "ui_button_allow_value": {
+    "message": "allow"
+  },
+  "ui_button_redirect": {
+    "message": "Redirect current page to the new destination instead of opening it in a new tab or popup"
+  },
+  "ui_button_redirect_value": {
+    "message": "redirect"
+  },
+  "ui_button_background": {
+    "message": "Open the link in a background tab"
+  },
+  "ui_button_background_value": {
+    "message": "background"
+  },
+  "ui_button_deny": {
+    "message": "Decline the popup or tab opening"
+  },
+  "ui_button_deny_value": {
+    "message": "deny"
+  },
+  "ui_button_trust": {
+    "message": "White-list this domain to open popups"
+  },
+  "ui_button_trust_value": {
+    "message": "trust"
+  },
+  "bg_msg_state_1": {
+    "message": "Popup Blocker (strict) is globally enabled and protects this tab"
+  },
+  "bg_msg_state_2": {
+    "message": "Popup Blocker (strict) is globally enabled but does not protect this tab"
+  },
+  "bg_msg_state_3": {
+    "message": "Popup Blocker (strict) is globally disabled and does not protect this tab"
+  },
+  "bg_msg_state_4": {
+    "message": "Popup Blocker (strict) is globally disabled but protects this tab"
+  },
+  "pp_enabled_g": {
+    "message": "Enabled (Globally)"
+  },
+  "pp_enabled_c": {
+    "message": "Enabled (This Hostname)"
+  },
+  "pp_silent": {
+    "message": "Display Notifications"
+  },
+  "pp_ignore": {
+    "message": "Ignore when Possible"
+  },
+  "pp_last_request": {
+    "message": "Last Request"
+  },
+  "pp_test": {
+    "message": "Test Blocker"
+  },
+  "pp_homepage": {
+    "message": "Homepage"
+  },
+  "pp_options": {
+    "message": "Options"
+  },
+  "pp_shadow": {
+    "message": "Use Shadow"
+  },
+  "pp_allow": {
+    "message": "Allow"
+  },
+  "pp_block": {
+    "message": "Block"
+  }
+}

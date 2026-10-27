@@ -27,6 +27,7 @@ import {
   type AppResolution,
 } from "./installs";
 import { openApp, openNode } from "@/services/os";
+import { getAppComponent, isImplemented, unlistedComponentIds } from "@/apps/registry";
 import { getScramjetState } from "@/services/scramjet";
 import {
   deviceMemoryGb,
@@ -85,6 +86,8 @@ export interface CommandDefinition {
   summary: string;
   usage?: string;
   group: "files" | "system" | "store" | "shell" | "help";
+  /** When true, the command is omitted from `help` output (secret commands). */
+  hidden?: boolean;
   run: (args: string[], ctx: CommandContext) => void | Promise<void>;
 }
 
@@ -235,7 +238,7 @@ export const commands: CommandDefinition[] = [
         help: "Help",
       };
       for (const group of ["files", "system", "store", "shell", "help"] as const) {
-        const list = commands.filter((command) => command.group === group);
+        const list = commands.filter((command) => command.group === group && !command.hidden);
         if (list.length === 0) continue;
         ctx.print(line(groups[group], "heading"));
         for (const command of list) {
@@ -1087,6 +1090,92 @@ export const commands: CommandDefinition[] = [
           "muted",
         ),
       );
+    },
+  },
+  /* ---- kiyudebug (secret) ---------------------------------------------- */
+  {
+    name: "kiyudebug",
+    summary: "Debug and admin tools.",
+    usage: "kiyudebug [list|apps|open <id>|info]",
+    group: "shell",
+    hidden: true,
+    run: (args, ctx) => {
+      const sub = args[0];
+
+      if (sub === "list") {
+        const unlisted = unlistedComponentIds();
+        if (unlisted.length === 0) {
+          ctx.print(line("No unlisted applications found.", "muted"));
+          return;
+        }
+        ctx.print(line("Unlisted applications (not on homepage or store)", "heading"));
+        for (const id of unlisted) {
+          const implemented = getAppComponent(id) != null;
+          ctx.print(line(`  ${id.padEnd(16)} ${implemented ? "implemented" : "no component"}`, "muted"));
+        }
+        ctx.print(line("Launch one with: kiyudebug open <id>", "muted"));
+        return;
+      }
+
+      if (sub === "apps") {
+        ctx.print(line("All registered applications", "heading"));
+        for (const meta of appCatalog) {
+          const implemented = isImplemented(meta.id);
+          ctx.print(
+            line(
+              `  ${meta.id.padEnd(12)} ${meta.name}  ${implemented ? "implemented" : "not bundled"}${meta.system ? "  ·  system" : ""}`,
+              implemented ? "accent" : "muted",
+            ),
+          );
+        }
+        const unlisted = unlistedComponentIds();
+        if (unlisted.length > 0) {
+          ctx.print(line("\nUnlisted (in build, not in catalogue)", "heading"));
+          for (const id of unlisted) {
+            ctx.print(line(`  ${id.padEnd(16)} implemented`, "muted"));
+          }
+        }
+        return;
+      }
+
+      if (sub === "open") {
+        const id = args[1];
+        if (!id) {
+          ctx.print(line("kiyudebug: usage kiyudebug open <id>", "error"));
+          return;
+        }
+        const component = getAppComponent(id);
+        if (!component) {
+          ctx.print(line(`kiyudebug: no component for application '${id}'`, "error"));
+          return;
+        }
+        openApp(id);
+        ctx.print(line(`launched ${id}`, "success"));
+        return;
+      }
+
+      if (sub === "info") {
+        const system = useSystemStore.getState();
+        const windows = useWindowStore.getState().windows.length;
+        const nodes = useFsStore.getState().nodes.length;
+        const apps = useAppsStore.getState();
+        ctx.print(line("Kiyo debug info", "heading"));
+        ctx.print(line(`  version   ${SYSTEM_VERSION.version}`, "muted"));
+        ctx.print(line(`  build     ${SYSTEM_VERSION.build}`, "muted"));
+        ctx.print(line(`  windows   ${windows}`, "muted"));
+        ctx.print(line(`  fs nodes  ${nodes}`, "muted"));
+        ctx.print(line(`  installed ${apps.installed.length}`, "muted"));
+        ctx.print(line(`  removed   ${apps.removed.length}`, "muted"));
+        ctx.print(line(`  session   ${formatClockDuration(Date.now() - system.sessionStartedAt)}`, "muted"));
+        return;
+      }
+
+      ctx.print(line("Kiyo debug console — admin tools", "heading"));
+      ctx.print(line(`  Unlisted applications: ${unlistedComponentIds().length}`, "muted"));
+      ctx.print(line(`  kiyudebug list   — show unlisted applications`, "muted"));
+      ctx.print(line(`  kiyudebug apps   — show all registered applications`, "muted"));
+      ctx.print(line(`  kiyudebug open <id>  — launch an application by id`, "muted"));
+      ctx.print(line(`  kiyudebug info   — system debug information`, "muted"));
     },
   },
 ];

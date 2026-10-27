@@ -45,6 +45,12 @@ interface WindowStore {
   restore: (id: string) => void;
   toggleMinimize: (id: string) => void;
   toggleMaximize: (id: string) => void;
+  /**
+   * Full screen: the window takes the whole viewport, panel and dock included.
+   * The bars themselves are not hidden by this — they simply stay on top, so the
+   * desk keeps the chrome it always had while the application reaches every edge.
+   */
+  toggleFullScreen: (id: string) => void;
   setRect: (id: string, rect: Rect) => void;
   snap: (id: string, zone: SnapZone) => void;
   unmaximize: (id: string) => void;
@@ -374,6 +380,35 @@ export const useWindowStore = create<WindowStore>()((set, get) => ({
               minimized: false,
             }
           : { ...window, focused: false },
+      ),
+    });
+  },
+
+  toggleFullScreen: (id) => {
+    const { windows } = get();
+    const target = windows.find((window) => window.id === id);
+    if (!target) return;
+    const z = get().topZ + 1;
+    const entering = target.full !== true;
+
+    set({
+      topZ: z,
+      windows: windows.map((window) =>
+        window.id === id
+          ? {
+              ...window,
+              // Entering sets the flag; leaving clears it outright, so a window
+              // carries `full` only while it is actually on the screen.
+              full: entering ? true : undefined,
+              z,
+              // Full screen is a presentation of the window in front: it takes
+              // focus the way maximising does, and never leaves a window
+              // minimised underneath it.
+              focused: true,
+              minimized: false,
+            }
+          : // Only one window can own the screen at a time.
+            { ...window, full: undefined, focused: false },
       ),
     });
   },

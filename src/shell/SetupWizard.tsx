@@ -324,6 +324,12 @@ export function SetupWizard() {
                       <span style={{ background: theme.tokens.accent }} />
                     </span>
                     <span className="cr-setup__theme-name">{theme.name}</span>
+                    {theme.recommended && <span className="cr-setup__theme-flag">recommended</span>}
+                    {theme.deprecated && (
+                      <span className="cr-setup__theme-flag cr-setup__theme-flag--deprecated">
+                        deprecated
+                      </span>
+                    )}
                     <span className="cr-setup__theme-desc">{theme.description}</span>
                   </button>
                 ))}

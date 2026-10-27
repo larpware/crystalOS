@@ -18,6 +18,7 @@ import { NotificationCenter, ToastStack } from "./Notifications";
 import { WidgetLayer } from "./WidgetLayer";
 import { DesktopIcons } from "./DesktopIcons";
 import { HzReadout } from "./HzReadout";
+import { Standby } from "./Standby";
 import { OFFLINE_BANNER_HEIGHT, OfflineBanner } from "./OfflineBanner";
 import { panelReservedTop, useShellStore } from "@/state/shell";
 import { useSystemStore } from "@/state/system";
@@ -26,6 +27,7 @@ import { useWindowStore } from "@/state/windows";
 import { desktopFolderId, useFsStore } from "@/state/fs";
 import { builtInWallpapers, gradientWallpapers } from "@/wallpapers/library";
 import { useAppearanceStore } from "@/state/appearance";
+import { useElementTheme } from "@/themes/scope";
 import { listCustomWallpapers } from "@/wallpapers/custom";
 import { desktopSlot } from "./desktopGrid";
 import {
@@ -37,7 +39,7 @@ import {
   openNode,
 } from "@/services/os";
 import { metaFor } from "@/apps/catalog";
-import { useViewport } from "@/hooks/useUi";
+import { useFullScreenChrome, useViewport } from "@/hooks/useUi";
 import { useOffline } from "@/hooks/useOffline";
 
 /* ==========================================================================
@@ -52,6 +54,7 @@ export function Desktop() {
   const dock = useShellStore((state) => state.dock);
   const contextMenu = useShellStore((state) => state.contextMenu);
   const closeContextMenu = useShellStore((state) => state.closeContextMenu);
+  const overlayTheme = useElementTheme("overlays");
   const setSafeArea = useShellStore((state) => state.setSafeArea);
   const desktop = useShellStore((state) => state.desktop);
   const dockSize = useShellStore((state) => state.dockSize);
@@ -62,6 +65,10 @@ export function Desktop() {
   const viewport = useViewport();
   const setWorkArea = useWindowStore((state) => state.setWorkArea);
   const offline = useOffline();
+  /* The panel and the dock belong to the same chrome layer this component
+     lays out, so the mode that takes them off the screen in full screen is
+     driven from here: see useFullScreenChrome. */
+  useFullScreenChrome();
 
   /* ---- layout contract -------------------------------------------------
      Laid out before paint: the reserved strip has to be in the store in the
@@ -324,9 +331,15 @@ export function Desktop() {
       <CommandPalette />
       <WorkspaceOverview />
       <ToastStack />
+      <Standby />
 
       {contextMenu && (
-        <Menu x={contextMenu.x} y={contextMenu.y} items={contextItems} onClose={closeContextMenu} />
+        <div
+          data-element-theme={overlayTheme.themeId ?? undefined}
+          style={overlayTheme.style}
+        >
+          <Menu x={contextMenu.x} y={contextMenu.y} items={contextItems} onClose={closeContextMenu} />
+        </div>
       )}
 
       {dim > 0 && (

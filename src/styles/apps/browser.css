@@ -12,17 +12,17 @@
 
 /* ---- tabs ---------------------------------------------------------------
    The strip is rendered into the window's titlebar, so it has no surface of
-   its own: it is a row of pills resting on the bar, and the selected one is a
-   raised pane of the same material every other selected surface in the OS
-   uses. The old shape — rounded on top, welded to the toolbar underneath —
-   only made sense when the tabs had a bar to themselves. */
+   its own: a row of quiet boxes in the language of the design mock — a dim
+   pane per idle tab, a lit pane with a full-colour title for the one that is
+   selected, the close control revealing itself on hover. */
 
 .cr-browser__tabs {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   height: 100%;
   min-width: 0;
+  padding: 4px 2px 4px 6px;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -36,19 +36,11 @@
   align-items: center;
   flex: 0 1 auto;
   height: 26px;
-  max-width: 190px;
-  min-width: 96px;
-  padding: 0 2px 0 3px;
+  max-width: 200px;
+  min-width: 88px;
+  padding: 0 2px 0 6px;
   border: 1px solid transparent;
-  border-radius: var(--radius-small);
-  /*
-   * Every tab is a box on the bar, the way Chrome draws them. The ladder runs
-   * from the bar's own material, through a dim pane for an inactive tab, to the
-   * lit pane of the selected one — so "you are not here" is a quieter version
-   * of "you are here" rather than the absence of anything at all. An inactive
-   * tab used to be fully transparent, which left its title floating on the
-   * titlebar looking like a label instead of a tab.
-   */
+  border-radius: 7px;
   background-color: color-mix(in srgb, var(--surface-3) 45%, transparent);
   transition: background-color var(--dur-fast) var(--ease-standard),
     border-color var(--dur-fast) var(--ease-standard),
@@ -71,7 +63,7 @@
 .cr-browser__tab-button {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   flex: 1;
   min-width: 0;
   height: 100%;
@@ -80,9 +72,31 @@
   background: transparent;
   color: var(--text-tertiary);
   font: inherit;
-  font-size: var(--fs-sm);
+  font-size: 12px;
+  font-weight: 500;
   text-align: left;
   cursor: default;
+}
+
+/* The tab favicon: real site icons where a page was loaded, the browser's own
+   mark on a new tab, the spinner while it is in flight. */
+.cr-browser__tab-favicon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 15px;
+  height: 15px;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.cr-browser__tab-favicon svg {
+  color: var(--text-muted);
+}
+
+.cr-browser__tab[data-active="true"] .cr-browser__tab-favicon svg {
+  color: var(--accent-primary);
 }
 
 .cr-browser__tab[data-active="true"] .cr-browser__tab-button {
@@ -204,6 +218,18 @@
   font: inherit;
   font-size: var(--fs-sm);
   outline: none;
+}
+
+/* The small CrystalOS mark the design mock carries inside the address field. */
+.cr-browser__omnibox-brand {
+  flex: none;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent-primary);
+  opacity: 0.7;
+  white-space: nowrap;
 }
 
 .cr-browser__star {
@@ -338,114 +364,238 @@
   white-space: nowrap;
 }
 
-/* ---- start page --------------------------------------------------------
-   A new tab is the search field, the shortcuts under it, and nothing else.
-   Everything else the browser can do lives in the corner menu. */
+/* ---- new tab page --------------------------------------------------------
+   Full-bleed starfield under the chrome: the gem wordmark, one greeting, a
+   single wide search field, the shortcut tiles, then the sites this user has
+   actually been to. Everything is sized to float inside a window, and each
+   grid collapses on its own as the pane narrows. */
 
-.cr-browser__start {
+.cr-ntp {
+  position: relative;
   height: 100%;
   overflow-y: auto;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 48px 20px 40px;
+  overflow-x: hidden;
   background: var(--surface-0);
 }
 
-.cr-browser__start-inner {
-  width: 100%;
-  max-width: 560px;
+.cr-ntp__wallpaper {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 55% 50% at 25% 85%, color-mix(in srgb, var(--accent-primary) 16%, transparent) 0%, transparent 65%),
+    radial-gradient(ellipse 50% 45% at 78% 15%, color-mix(in srgb, var(--accent-primary) 13%, transparent) 0%, transparent 65%),
+    radial-gradient(ellipse 35% 35% at 50% 50%, color-mix(in srgb, var(--accent-primary) 7%, transparent) 0%, transparent 60%),
+    linear-gradient(155deg, var(--surface-0) 0%, var(--surface-1) 45%, var(--surface-0) 100%);
+}
+
+/* The starfield: a scatter of pinpricks on top of the wash. */
+.cr-ntp__wallpaper::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(1px 1px at 12% 8%, color-mix(in srgb, var(--text-primary) 50%, transparent) 0%, transparent 100%),
+    radial-gradient(1px 1px at 38% 22%, color-mix(in srgb, var(--text-primary) 40%, transparent) 0%, transparent 100%),
+    radial-gradient(1px 1px at 65% 5%, color-mix(in srgb, var(--text-primary) 45%, transparent) 0%, transparent 100%),
+    radial-gradient(1px 1px at 82% 18%, color-mix(in srgb, var(--text-primary) 35%, transparent) 0%, transparent 100%),
+    radial-gradient(1px 1px at 5% 45%, color-mix(in srgb, var(--text-primary) 30%, transparent) 0%, transparent 100%),
+    radial-gradient(1px 1px at 92% 55%, color-mix(in srgb, var(--text-primary) 40%, transparent) 0%, transparent 100%),
+    radial-gradient(1px 1px at 28% 72%, color-mix(in srgb, var(--text-primary) 35%, transparent) 0%, transparent 100%),
+    radial-gradient(1px 1px at 75% 88%, color-mix(in srgb, var(--text-primary) 30%, transparent) 0%, transparent 100%),
+    radial-gradient(1.5px 1.5px at 50% 60%, color-mix(in srgb, var(--text-primary) 25%, transparent) 0%, transparent 100%),
+    radial-gradient(1px 1px at 18% 92%, color-mix(in srgb, var(--text-primary) 30%, transparent) 0%, transparent 100%);
+}
+
+.cr-ntp__content {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
-  gap: 18px;
-}
-
-.cr-browser__start-head {
-  display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
+  width: 100%;
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 48px 20px 40px;
 }
 
-.cr-browser__start-head svg {
+/* ---- brand ------------------------------------------------------------ */
+
+.cr-ntp__brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 30px;
+}
+
+.cr-ntp__gem {
+  width: 52px;
+  height: 52px;
+}
+
+.cr-ntp__brand-name {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  color: var(--text-primary);
+  text-shadow: 0 0 30px color-mix(in srgb, var(--accent-primary) 30%, transparent);
+}
+
+.cr-ntp__brand-name span {
   color: var(--accent-primary);
 }
 
-.cr-browser__start-head h2 {
+.cr-ntp__brand-sub {
   margin: 0;
-  font-size: var(--fs-base);
-  font-weight: 600;
-  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 450;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 
-.cr-browser__start-form {
+.cr-ntp__greeting {
+  margin: 0 0 28px;
+  font-size: 13px;
+  letter-spacing: 0.01em;
+  color: var(--text-muted);
+}
+
+.cr-ntp__greeting strong {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* ---- search ------------------------------------------------------------ */
+
+.cr-ntp__search {
   display: flex;
   align-items: center;
-  gap: 9px;
-  height: 36px;
-  padding: 0 14px;
+  gap: 10px;
+  width: 100%;
+  height: 48px;
+  padding: 0 10px 0 16px;
   border: 1px solid var(--border-default);
   border-radius: var(--radius-pill);
   background: var(--surface-sunken);
-  box-shadow: var(--inset-sunken);
+  box-shadow: var(--field-shadow);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: background var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard),
+    box-shadow var(--dur-fast) var(--ease-standard);
 }
 
-.cr-browser__start-form:focus-within {
+.cr-ntp__search:focus-within {
   border-color: var(--border-focus);
   background: var(--surface-1);
-  box-shadow: var(--shadow-2), 0 0 0 2px var(--accent-primary-muted);
+  box-shadow: var(--shadow-2), 0 0 0 3px var(--accent-primary-muted), 0 8px 32px color-mix(in srgb, black 45%, transparent);
 }
 
-.cr-browser__start-form-icon {
-  color: var(--text-muted);
+.cr-ntp__search-icon {
   flex: none;
+  color: var(--text-muted);
 }
 
-.cr-browser__start-form input {
+.cr-ntp__search input {
   flex: 1;
   min-width: 0;
+  height: 100%;
   border: 0;
   background: transparent;
   color: var(--text-primary);
   font: inherit;
-  font-size: 13.5px;
+  font-size: 15px;
   outline: none;
+  caret-color: var(--accent-primary);
 }
 
-/* ---- shortcuts ---------------------------------------------------------
-   Small squares directly under the search field. A name that does not fit is
-   ellipsised and carried in full by the tooltip above it. */
+.cr-ntp__search input::placeholder {
+  color: var(--text-muted);
+}
 
-.cr-browser__shortcuts {
+.cr-ntp__search-submit {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
   justify-content: center;
-  gap: 6px;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 16px;
+  background: var(--accent-primary);
+  color: var(--text-on-accent);
+  cursor: default;
+  opacity: 0;
+  transform: scale(0.85);
+  transition: opacity var(--dur-fast) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-standard);
 }
 
-/* Each shortcut is a small tile resting on the page, which lifts toward the
-   pointer. The lift is the affordance; the shadow follows it. */
-.cr-browser__shortcut {
+.cr-ntp__search:focus-within .cr-ntp__search-submit {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* ---- sections ------------------------------------------------------------ */
+
+.cr-ntp__section {
+  align-self: stretch;
+  margin: 30px 0 12px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.cr-ntp__empty {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+/* ---- shortcuts ------------------------------------------------------------
+   Tiles in a grid that reflows on its own: fixed minimum widths, no media
+   queries, so a half-size window still lays out cleanly. */
+
+.cr-ntp__shortcuts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: 12px;
+  width: 100%;
+}
+
+.cr-ntp__shortcut {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  width: 72px;
-  padding: 8px 5px 7px;
+  gap: 8px;
+  min-width: 0;
+  padding: 14px 8px 12px;
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-medium);
+  border-radius: 14px;
   background: var(--surface-1);
   color: var(--text-secondary);
   font: inherit;
   cursor: default;
   box-shadow: var(--shadow-1), var(--inset-highlight);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   transition: background var(--dur-fast) var(--ease-standard),
     border-color var(--dur-fast) var(--ease-standard),
     box-shadow var(--dur-fast) var(--ease-standard),
     transform var(--dur-fast) var(--ease-standard);
 }
 
-.cr-browser__shortcut:hover {
+/* Hover previews the selection: the same pane, a step brighter. */
+.cr-ntp__shortcut:hover {
   background: var(--surface-2);
   border-color: var(--border-strong);
   color: var(--text-primary);
@@ -453,30 +603,140 @@
   transform: translateY(-2px);
 }
 
-.cr-browser__shortcut:active {
+.cr-ntp__shortcut:active {
   box-shadow: var(--inset-sunken);
-  transform: translateY(0);
+  transform: scale(0.96);
 }
 
-.cr-browser__shortcut-icon {
+.cr-ntp__shortcut-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: 44px;
+  height: 44px;
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-medium);
+  border-radius: 12px;
   background: var(--surface-0);
   box-shadow: var(--inset-highlight);
+  overflow: hidden;
 }
 
-.cr-browser__shortcut-name {
+/* The favicon fills the round-cornered tile; fallback letters centre too. */
+.cr-ntp__shortcut-icon .cr-browser__site-icon {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.cr-ntp__shortcut-name {
   max-width: 100%;
-  font-size: 10.5px;
-  line-height: 1.3;
+  font-size: 11.5px;
+  line-height: 1.2;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* ---- recently visited -----------------------------------------------------
+   Cards built from the browser's own history: the favicon carried large on a
+   hue drawn from the host, the host and page below it. */
+
+.cr-ntp__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 12px;
+  width: 100%;
+}
+
+.cr-ntp__card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: var(--surface-1);
+  font: inherit;
+  text-align: left;
+  cursor: default;
+  overflow: hidden;
+  box-shadow: var(--shadow-1), var(--inset-highlight);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: background var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard),
+    box-shadow var(--dur-fast) var(--ease-standard),
+    transform var(--dur-fast) var(--ease-standard);
+}
+
+.cr-ntp__card:hover {
+  background: var(--surface-2);
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-2), var(--inset-highlight);
+  transform: translateY(-2px);
+}
+
+.cr-ntp__card:active {
+  transform: scale(0.97);
+}
+
+.cr-ntp__card-thumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 80px;
+}
+
+.cr-ntp__card-thumb .cr-browser__site-icon {
+  border-radius: 10px;
+  background: color-mix(in srgb, white 10%, transparent);
+  padding: 5px;
+  box-sizing: content-box;
+}
+
+.cr-ntp__card-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px 12px;
+  min-width: 0;
+}
+
+.cr-ntp__card-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cr-ntp__card-path {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Only when a window is short on real estate do the grids tighten. */
+@media (max-width: 560px) {
+  .cr-ntp__content {
+    padding-top: 32px;
+  }
+  .cr-ntp__brand-name {
+    font-size: 18px;
+  }
+  .cr-ntp__gem {
+    width: 44px;
+    height: 44px;
+  }
+  .cr-ntp__shortcuts {
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 8px;
+  }
 }
 
 .cr-browser__site-icon {
@@ -763,7 +1023,7 @@
   align-items: center;
   gap: 6px;
   padding: 4px 9px;
-  border-radius: var(--radius-small, 6px);
+  border-radius: var(--radius-small);
   border: 1px solid var(--border-subtle);
   font-size: var(--fs-xs);
   color: var(--text-secondary);
@@ -791,4 +1051,228 @@
   height: 26px;
   padding: 0;
   justify-content: center;
+}
+
+/* ---- Shield ---------------------------------------------------------------
+   The toolbar button is square like the proxy switch beside it: the state is in
+   the glyph and the count, not in a label competing with the address field. The
+   panel is a popover on the desk's deepest elevation, the same material as the
+   context menu, because it floats above the page rather than inside it. */
+
+.cr-browser__shield {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-small);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: default;
+  transition: background var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard);
+}
+
+.cr-browser__shield:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+/* Off is a dimmed glyph, the same language the proxy toggle uses: no colour is
+   spent on a state the person did not ask to be told about. */
+.cr-browser__shield[data-on="false"] {
+  color: var(--text-muted);
+}
+
+.cr-browser__shield[data-active="true"] {
+  color: var(--accent-primary);
+}
+
+.cr-browser__shield-badge {
+  position: absolute;
+  top: -3px;
+  right: -5px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-primary);
+  color: var(--text-on-accent);
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 14px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 0 0 1.5px var(--surface-1);
+}
+
+.cr-browser__shield-panel {
+  position: fixed;
+  z-index: var(--z-context);
+  width: 330px;
+  max-height: min(520px, calc(100vh - 24px));
+  overflow-y: auto;
+  padding: 10px 10px 8px;
+  background-color: var(--surface-1);
+  background-image: var(--surface-sheen);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-medium);
+  box-shadow: var(--shadow-popover), var(--inset-highlight);
+  animation: cr-pop-in var(--dur-fast) var(--ease-snappy);
+}
+
+.cr-browser__shield-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 2px 8px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.cr-browser__shield-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.cr-browser__shield-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 2px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.cr-browser__shield-label {
+  font-size: var(--fs-sm);
+  color: var(--text-secondary);
+  line-height: 1.35;
+}
+
+.cr-browser__shield-label strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.cr-browser__shield-stat {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 10px 2px 8px;
+}
+
+.cr-browser__shield-count {
+  font-size: var(--fs-xl);
+  font-weight: 600;
+  line-height: 1;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.cr-browser__shield-stat-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+}
+
+.cr-browser__shield-last {
+  color: var(--text-muted);
+  font-size: var(--fs-xxs);
+  word-break: break-all;
+}
+
+.cr-browser__shield-type {
+  padding: 0 4px;
+  border-radius: var(--radius-xs);
+  background: var(--surface-3);
+  color: var(--text-tertiary);
+}
+
+.cr-browser__shield-popups {
+  padding: 6px 2px 8px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.cr-browser__shield-popups-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--fs-xs);
+  color: var(--text-tertiary);
+  padding-bottom: 4px;
+}
+
+.cr-browser__shield-popup-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 168px;
+  overflow-y: auto;
+}
+
+.cr-browser__shield-popup {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 6px;
+  border-radius: var(--radius-small);
+  background: var(--surface-2);
+}
+
+.cr-browser__shield-popup-url {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-xs);
+  color: var(--text-secondary);
+}
+
+.cr-browser__shield-popup-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+.cr-browser__shield-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent-info);
+  font: inherit;
+  font-size: var(--fs-xs);
+  cursor: default;
+}
+
+.cr-browser__shield-link:hover {
+  color: var(--accent-primary-hover);
+  text-decoration: underline;
+}
+
+.cr-browser__shield-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 2px 0;
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--fs-xxs);
+  color: var(--text-muted);
 }

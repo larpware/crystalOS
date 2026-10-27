@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -13,6 +14,8 @@ import { useSystemStore } from "@/state/system";
 import { useWindowStore } from "@/state/windows";
 import type { Rect, SnapZone, WindowInstance } from "@/types";
 import { WindowChromeContext } from "./titlebarChrome";
+import { useElementTheme } from "@/themes/scope";
+import { useViewport } from "@/hooks/useUi";
 import {
   applyResize,
   constrainToWorkArea,
@@ -84,6 +87,7 @@ export function Window({
   const closeWindow = useWindowStore((state) => state.close);
   const minimize = useWindowStore((state) => state.minimize);
   const toggleMaximize = useWindowStore((state) => state.toggleMaximize);
+  const toggleFullScreen = useWindowStore((state) => state.toggleFullScreen);
   const setRect = useWindowStore((state) => state.setRect);
   const snapWindow = useWindowStore((state) => state.snap);
   const storedWorkArea = useWindowStore((state) => state.workArea);
@@ -109,7 +113,16 @@ export function Window({
   const activePreview = useRef<WindowPreview>(null);
 
   const isMaximized = instance.state === "maximized";
+  const isFull = instance.full === true;
   const rect = instance.rect;
+  /* Full screen is measured from the viewport rather than the work area: this is
+     the one geometry that deliberately includes the strips the panel and the
+     dock reserve everywhere else. */
+  const viewport = useViewport();
+  /* A per-element theme scopes the whole window, apps included: the tokens land
+     as custom properties on the window element, so every surface inside it
+     recomputes against the picked palette. */
+  const windowTheme = useElementTheme("windows");
 
   /* The middle of the titlebar belongs to the application if it wants it — see
      window-manager/titlebarChrome. `setReplacesTitle` is a state setter and so
@@ -317,8 +330,9 @@ export function Window({
       close: handle(() => closeWindow(instance.id)),
       minimize: handle(() => minimize(instance.id)),
       maximize: handle(() => toggleMaximize(instance.id)),
+      full: handle(() => toggleFullScreen(instance.id)),
     };
-  }, [closeWindow, focus, instance.id, minimize, toggleMaximize]);
+  }, [closeWindow, focus, instance.id, minimize, toggleMaximize, toggleFullScreen]);
 
   const controls = (
     <div className="cr-window__controls" data-no-drag>
@@ -349,6 +363,20 @@ export function Window({
       >
         <Icon name={isMaximized ? "restore" : "maximize"} size={8} strokeWidth={2.6} />
       </button>
+      {/*
+        Not a fourth traffic light: a quiet glyph beside the dots, in the place a
+        header bar keeps its own actions. Full screen takes the whole viewport —
+        panel and dock included, and both of them stay painted above the window.
+      */}
+      <button
+        type="button"
+        className="cr-window__fullscreen"
+        aria-label="Full screen"
+        title="Full screen — the whole screen, with the dock and panel on top"
+        {...controlHandlers.full}
+      >
+        <Icon name="expand" size={11} strokeWidth={2.2} />
+      </button>
     </div>
   );
 
@@ -367,33 +395,53 @@ export function Window({
    * `scale`/`translate` properties, so collapsing a window never fights with
    * the transform that places it.
    */
-  const style = useMemo(
-    () =>
-      ({
-        transform: `translate3d(${Math.round(rect.x)}px, ${Math.round(rect.y)}px, 0)`,
-        width: Math.round(rect.width),
-        height: Math.round(rect.height),
-        zIndex: instance.z,
-        opacity: isClosing || minimized ? 0 : 1,
-        scale: isClosing ? 0.92 : minimized ? 0.94 : 1,
-        translate: minimized ? "0 26px" : "0 0",
-        visibility: minimized ? "hidden" : undefined,
-        pointerEvents: minimized ? "none" : undefined,
-      }) as CSSProperties,
-    [rect, instance.z, isClosing, minimized],
-  );
+  const style = useMemo(() => {
+    const box = isFull ? { x: 0, y: 0, width: viewport.width, height: viewport.height } : rect;
+    return {
+      transform: `translate3d(${Math.round(box.x)}px, ${Math.round(box.y)}px, 0)`,
+      width: Math.round(box.width),
+      height: Math.round(box.height),
+      zIndex: instance.z,
+      opacity: isClosing || minimized ? 0 : 1,
+      scale: isClosing ? 0.92 : minimized ? 0.94 : 1,
+      translate: minimized ? "0 26px" : "0 0",
+      visibility: minimized ? "hidden" : undefined,
+      pointerEvents: minimized ? "none" : undefined,
+    } as CSSProperties;
+  }, [isFull, rect, viewport.height, viewport.width, instance.z, isClosing, minimized]);
+
+  /*
+   * Escape leaves full screen the way it does everywhere else. It listens in the
+   * bubble phase on purpose: an application that has its own use for Escape — a
+   * game opening its menu, a browser leaving pointer lock — stops the event first
+   * and keeps it, and an open launcher, quick settings or notification centre
+   * swallows the key for itself before this ever sees it.
+   */
+  useEffect(() => {
+    if (!isFull) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || useWindowStore.getState().focusedId !== instance.id) return;
+      const shell = useShellStore.getState();
+      if (shell.launcherOpen || shell.quickSettingsOpen || shell.notificationCenterOpen) return;
+      useWindowStore.getState().toggleFullScreen(instance.id);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [instance.id, isFull]);
 
   return (
     <section
       className={`cr-window${isClosing ? " cr-window--closing" : ""}`}
       data-focused={instance.focused}
       data-state={instance.state}
+      data-full={isFull || undefined}
       data-minimized={minimized}
       data-workspace-hidden={hidden || undefined}
       data-interacting={interacting}
       data-controls={windowControls}
       data-motion={performanceMode ? "off" : "on"}
-      style={style}
+      data-element-theme={windowTheme.themeId ?? undefined}
+      style={windowTheme.style ? { ...style, ...windowTheme.style } : style}
       role="dialog"
       aria-label={instance.title}
       aria-hidden={minimized || undefined}
@@ -409,38 +457,47 @@ export function Window({
         it.
       */}
       <WindowChromeContext.Provider value={chromeApi}>
-        <header
-          className="cr-window__titlebar"
-          onPointerDown={titlePointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={endSession}
-          onPointerCancel={endSession}
-          onLostPointerCapture={endSession}
-          onDoubleClick={onTitleDoubleClick}
-        >
-          {windowControls === "left" ? controls : null}
-          {/*
-            The middle of the bar: application chrome when there is any, the
-            window's own icon and title when there is not. The slot is always
-            rendered so an application has something to portal into on its very
-            first paint.
-          */}
-          <div className="cr-window__lead">
-            <div className="cr-window__chrome" ref={setChromeSlot} />
-            {!titleReplaced && (
-              <div className="cr-window__title">
-                <Icon name={instance.icon} size={13} className="cr-window__title-icon" />
-                <span className="cr-truncate">{instance.title}</span>
-              </div>
-            )}
-          </div>
-          {windowControls === "right" ? controls : null}
-        </header>
+        {/*
+          Full screen has no bar of its own: the shell's top panel is the chrome
+          that stays — it carries the application's name and the control that
+          leaves full screen — so a second bar at the same edge would only sit
+          under it. Everything the bar hosted unmounts with it; an application
+          portalling into the slot simply renders nothing.
+        */}
+        {!isFull && (
+          <header
+            className="cr-window__titlebar"
+            onPointerDown={titlePointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={endSession}
+            onPointerCancel={endSession}
+            onLostPointerCapture={endSession}
+            onDoubleClick={onTitleDoubleClick}
+          >
+            {windowControls === "left" ? controls : null}
+            {/*
+              The middle of the bar: application chrome when there is any, the
+              window's own icon and title when there is not. The slot is always
+              rendered so an application has something to portal into on its very
+              first paint.
+            */}
+            <div className="cr-window__lead">
+              <div className="cr-window__chrome" ref={setChromeSlot} />
+              {!titleReplaced && (
+                <div className="cr-window__title">
+                  <Icon name={instance.icon} size={13} className="cr-window__title-icon" />
+                  <span className="cr-truncate">{instance.title}</span>
+                </div>
+              )}
+            </div>
+            {windowControls === "right" ? controls : null}
+          </header>
+        )}
 
         <div className="cr-window__body">{children}</div>
       </WindowChromeContext.Provider>
 
-      {resizable && !isMaximized && (
+      {resizable && !isMaximized && !isFull && (
         <>
           {resizeHandles.map((handle) => (
             <span

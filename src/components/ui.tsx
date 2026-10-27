@@ -303,6 +303,29 @@ interface BadgeProps {
   icon?: IconName;
 }
 
+interface UserTagProps {
+  tags?: string[];
+}
+
+/**
+ * The small labels worn beside a display name — the owner's tag first.
+ * Presentation only: authority lives on the server, and nothing in the UI
+ * grants power because a name carries a chip.
+ */
+export function UserTag({ tags }: UserTagProps) {
+  const list = (tags ?? []).filter((tag) => typeof tag === "string" && tag).slice(0, 3);
+  if (list.length === 0) return null;
+  return (
+    <>
+      {list.map((tag) => (
+        <span key={tag} className={tag === "owner" ? "cr-tag cr-tag--owner" : "cr-tag"}>
+          {tag}
+        </span>
+      ))}
+    </>
+  );
+}
+
 export function Badge({ children, tone = "default", icon }: BadgeProps) {
   return (
     <span className={["cr-badge", tone !== "default" && `cr-badge--${tone}`].filter(Boolean).join(" ")}>

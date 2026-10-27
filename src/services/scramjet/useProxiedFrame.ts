@@ -8,6 +8,7 @@ import {
   type ProxiedFrameHandle,
   type ScramjetState,
 } from "@/services/scramjet";
+import { describeRequestFailure, readFrameFailure, readShellRecapture } from "@/services/scramjet/frameError";
 
 /* ==========================================================================
    useProxiedFrame
@@ -38,6 +39,15 @@ export interface ProxiedFrameResult {
 }
 
 const LOAD_TIMEOUT_MS = 25_000;
+
+/**
+ * How long a rendered transport error is given to be replaced by the real page.
+ *
+ * A frame was measured settling on the client's error document and then moving on
+ * to the site it was asked for; reporting the error instantly would put an error
+ * pane over a page that arrived.
+ */
+const FAILURE_SETTLE_MS = 500;
 
 /* ---- URL reports ---------------------------------------------------------
    A few sites hand `undefined` straight to `location.replace` or to a history
@@ -78,6 +88,8 @@ export function useScramjetState(): ScramjetState {
 export interface UseProxiedFrameOptions {
   /** Called with the URL the frame actually settled on. */
   onUrlChange?: (url: string) => void;
+  /** What Shield's counters belong to: usually the browser tab's id. */
+  owner?: string | null;
 }
 
 export function useProxiedFrame(
@@ -93,11 +105,19 @@ export function useProxiedFrame(
   const [attempt, setAttempt] = useState(0);
 
   const handleRef = useRef<ProxiedFrameHandle | null>(null);
+  /** How many times a frame that received the OS itself was recreated. */
+  const shellRecapturesRef = useRef(0);
   /** Last URL that was actually real, used to judge suspicious reports. */
   const lastGoodUrlRef = useRef(destination);
   const generationRef = useRef(0);
   const historyRef = useRef<{ entries: string[]; index: number }>({ entries: [], index: -1 });
   const timerRef = useRef<number | null>(null);
+  /**
+   * The transport's own reason for the document failure, once the frame has
+   * reported one. Kept so the load timeout does not overwrite a precise reason
+   * ("no exit in the pool could carry this site") with "nothing loaded in time".
+   */
+  const failureRef = useRef<string | null>(null);
 
   const attach = useCallback((next: HTMLIFrameElement | null) => {
     setElement(next);
@@ -121,13 +141,50 @@ export function useProxiedFrame(
   const armTimeout = useCallback((frame: HTMLIFrameElement) => {
     if (timerRef.current) window.clearTimeout(timerRef.current);
     timerRef.current = null;
+    // A new navigation gets a clean slate: a reason reported for the last one
+    // must not be attached to this one.
+    failureRef.current = null;
     setStatus("loading");
     setError(null);
     waitForFrameLoad(frame, LOAD_TIMEOUT_MS)
-      .then(() => setStatus("ready"))
+      .then(async () => {
+        /*
+         * The document that settled may be the transport's own error page rather
+         * than the site. It renders as a real document, so the readiness check
+         * accepts it and the loading overlay comes down over a one-line internal
+         * message — or, where that message is white on white, over nothing at all.
+         * Recognising it turns that into the shell's own error, which has the ways
+         * out on it. The second recogniser covers the frame that received
+         * CrystalOS itself when its first navigation outran the service worker.
+         */
+        const failure = readFrameFailure(frame) ?? readShellRecapture(frame);
+        if (!failure) {
+          setStatus("ready");
+          return;
+        }
+        // A frame can be between documents: a failure, then the real page. One
+        // tick is enough for that to show itself, and believing the worst
+        // instantly would put an error over a page that arrived.
+        await new Promise((resolve) => window.setTimeout(resolve, FAILURE_SETTLE_MS));
+        const settled = readFrameFailure(frame) ?? readShellRecapture(frame);
+        if (!settled) {
+          setStatus("ready");
+          return;
+        }
+        // A shell recapture is a race the next attempt normally wins: by the
+        // time this settled, the worker has activated. Recreate the frame once
+        // automatically; a second recapture is reported, not retried.
+        if (readShellRecapture(frame) && shellRecapturesRef.current < 1) {
+          shellRecapturesRef.current += 1;
+          setAttempt((value) => value + 1);
+          return;
+        }
+        setStatus("error");
+        setError(settled);
+      })
       .catch((failure: Error) => {
         setStatus("error");
-        setError(failure.message);
+        setError(failureRef.current ?? failure.message);
       });
   }, []);
 
@@ -142,6 +199,7 @@ export function useProxiedFrame(
     setError(null);
 
     createProxiedFrame(element, {
+      owner: options.owner ?? null,
       onUrl: (next) => {
         if (disposed) return;
         // A dropped URL is withheld from the caller too: a consumer that stored
@@ -155,6 +213,22 @@ export function useProxiedFrame(
       onEscapedLink: (target) => {
         if (disposed) return;
         handleRef.current?.frame.go(target.href);
+      },
+      /*
+       * The frame's own document could not be fetched at all. Nothing will be
+       * rendered for it, so the pane would sit empty until the load timeout —
+       * which is precisely the "blank page" this reports its way out of. The
+       * readiness check is left running: if a document does arrive after all
+       * (a retried navigation, a later page) it still sets "ready" and takes
+       * the error down, and if nothing arrives the timeout reports this same
+       * reason rather than a generic one.
+       */
+      onFailure: (failure) => {
+        if (disposed || generationRef.current !== generation) return;
+        const reason = describeRequestFailure(failure.message);
+        failureRef.current = reason;
+        setStatus("error");
+        setError(reason);
       },
     })
       .then((handle) => {

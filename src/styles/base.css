@@ -29,6 +29,9 @@ body {
   font-size: var(--fs-base);
   line-height: 1.45;
   color: var(--text-primary);
+  /* DM Sans carries an optical-size axis: at the OS's small text sizes it
+     tightens counters and spacing adaptively. */
+  font-optical-sizing: auto;
   background: var(--bg-desktop);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

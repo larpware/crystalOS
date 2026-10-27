@@ -1,0 +1,374 @@
+/* global config */
+
+if (typeof importScripts !== 'undefined') {
+  self.importScripts('config.js');
+  self.importScripts('badge.js');
+}
+
+/* enable or disable the blocker */
+const activate = async () => {
+  if (activate.busy) {
+    return;
+  }
+  activate.busy = true;
+
+  const prefs = await config.get(['enabled', 'top-hosts', 'scope']);
+  try {
+    await chrome.scripting.unregisterContentScripts();
+
+    if (prefs.enabled) {
+      // exception list
+      const th = [];
+      for (const hostname of prefs['top-hosts']) {
+        try {
+          await activate.test('*://' + hostname + '/*');
+          th.push('*://' + hostname + '/*');
+        }
+        catch (e) {
+          console.warn('Cannot use ' + hostname + ' rule. Reason: ' + e.message);
+        }
+        try {
+          await activate.test('*://*.' + hostname + '/*');
+          th.push('*://*.' + hostname + '/*');
+        }
+        catch (e) {
+          console.warn('Cannot use *.' + hostname + ' rule. Reason: ' + e.message);
+        }
+      }
+
+      const props = {
+        'matches': prefs.scope,
+        'excludeMatches': th,
+        'allFrames': true,
+        'matchOriginAsFallback': true,
+        'runAt': 'document_start'
+      };
+
+      await chrome.scripting.registerContentScripts([{
+        'id': 'main',
+        'js': ['/data/inject/block/main.js'],
+        'world': 'MAIN',
+        ...props
+      }, {
+        'id': 'isolated',
+        'js': ['/config.js', '/data/inject/block/isolated.js'],
+        'css': ['/data/inject/block/isolated.css'],
+        'world': 'ISOLATED',
+        ...props
+      }]);
+
+      // only on top frame
+      if (th.length) {
+        await chrome.scripting.registerContentScripts([{
+          'id': 'disabled',
+          'js': ['/data/inject/disabled.js'],
+          'world': 'ISOLATED',
+          'matches': th,
+          'runAt': 'document_start'
+        }]);
+      }
+    }
+  }
+  catch (e) {
+    // the last known blocker might be still installed
+    await chrome.scripting.unregisterContentScripts().catch(() => {});
+
+    const props = {
+      'allFrames': true,
+      'matchOriginAsFallback': true,
+      'runAt': 'document_start'
+    };
+    const register = async patterns => {
+      props['matches'] = patterns;
+      await chrome.scripting.registerContentScripts([{
+        'id': 'main',
+        'js': ['/data/inject/block/main.js'],
+        'world': 'MAIN',
+        ...props
+      }, {
+        'id': 'isolated',
+        'js': ['/config.js', '/data/inject/block/isolated.js'],
+        'world': 'ISOLATED',
+        ...props
+      }]);
+    };
+
+    // attempt 1: use the saved scope
+    // attempt 2 (on failure): use the default scope
+    try {
+      await register(prefs.scope);
+    }
+    catch (e2) {
+      console.warn('Registration with the saved scope failed; retrying with the default scope', e2);
+      try {
+        await register(config['scope']);
+      }
+      catch (e3) {
+        console.error('Registration with the default scope failed', e3);
+      }
+    }
+
+    chrome.action.setBadgeBackgroundColor({color: '#b16464'});
+    chrome.action.setBadgeText({text: 'E'});
+    chrome.action.setTitle({title: chrome.i18n.getMessage('bg_msg_reg') + '\n\n' + e.message});
+    console.error('Blocker Registration Failed', e);
+  }
+  activate.busy = false;
+};
+activate.test = async pattern => {
+  await chrome.scripting.registerContentScripts([{
+    'id': 'test',
+    'js': ['/data/inject/test.js'],
+    'world': 'MAIN',
+    'matches': ['*://*/*'],
+    'excludeMatches': [pattern]
+  }]);
+  await chrome.scripting.unregisterContentScripts({
+    ids: ['test']
+  }).catch(() => {});
+};
+chrome.runtime.onStartup.addListener(activate);
+chrome.runtime.onInstalled.addListener(activate);
+config.changed(ps => {
+  if (ps.enabled || ps['top-hosts'] || ps.scope) {
+    activate();
+  }
+});
+
+chrome.runtime.onMessage.addListener((request, sender, response) => {
+  if (request.cmd === 'popup-request') {
+    // "Display Notifications" only controls visibility. The request pipeline
+    // (rules, default-action, last-request shortcuts) must always run; when
+    // notifications are hidden we keep injecting the interface but invisible
+    config.get(['issue', 'placement', 'width']).then(prefs => {
+      request.frameId = sender.frameId;
+      chrome.tabs.sendMessage(sender.tab.id, request, response => {
+        chrome.runtime.lastError;
+        // iframe is not present or it is not loaded yet
+
+        if (response !== true) {
+          chrome.scripting.executeScript({
+            target: {
+              tabId: sender.tab.id
+            },
+            func: (request, tabId, prefs) => {
+              /* global scope */
+              scope.requests.push(request);
+
+              const post = () => {
+                if (scope.container?.ready) {
+                  scope.container.contentWindow.postMessage({
+                    requests: [...scope.requests]
+                  }, chrome.runtime.getURL('*'));
+                  scope.requests.length = 0;
+                }
+              };
+              // what if there is an element with id "container" in DOM
+              if (!scope.container) {
+                const container = scope.container = document.createElement('iframe');
+                container.classList.add('pp-blocker');
+                container.style = `
+                  --width: ${prefs.width}px;
+
+                  ${prefs.placement.includes('t') ? 'top' : 'bottom'}: 5px !important;
+                  ${prefs.placement.includes('l') ? 'left' : 'right'}: 5px !important;
+                  ${prefs.issue === false ? 'display: none' : ''}
+                `;
+                container.addEventListener('load', () => {
+                  container.ready = true;
+                  post();
+                }, {once: true});
+                const args = new URLSearchParams(location.search);
+                args.set('tabId', tabId);
+                args.set('parent', location.href);
+                args.set('placement', prefs.placement);
+                container.src = chrome.runtime.getURL('/data/ui/index.html') + '?' + args.toString();
+                // do not attach to body to make sure the notification is visible
+                document.documentElement.append(container);
+              }
+              post();
+            },
+            args: [request, sender.tab.id, prefs]
+          });
+        }
+      });
+    });
+  }
+  // popup is accepted
+  else if (request.cmd === 'popup-accepted') {
+    if (request.url.startsWith('http') || request.url.startsWith('ftp')) {
+      config.get(['simulate-allow']).then(prefs => {
+        if (prefs['simulate-allow'] && request.sameContext !== true) {
+          chrome.tabs.create({
+            url: request.url,
+            openerTabId: sender.tab.id
+          });
+        }
+        else {
+          chrome.tabs.sendMessage(sender.tab.id, request, {
+            frameId: request.frameId
+          });
+        }
+      });
+    }
+    else {
+      chrome.tabs.sendMessage(sender.tab.id, request, {
+        frameId: request.frameId
+      });
+    }
+  }
+  // resize
+  else if (request.cmd === 'popup-resize') {
+    chrome.scripting.executeScript({
+      target: {
+        tabId: sender.tab.id
+      },
+      func: height => {
+        if (scope.container) {
+          scope.container.style.setProperty('--height', height + 'px');
+        }
+      },
+      args: [request.height]
+    });
+  }
+  // terminate
+  else if (request.cmd === 'popup-terminate') {
+    chrome.scripting.executeScript({
+      target: {
+        tabId: sender.tab.id
+      },
+      func: () => {
+        scope.container.remove();
+        scope.container = null;
+      }
+    });
+  }
+  else if (request.cmd === 'run-records') {
+    chrome.scripting.executeScript({
+      target: {
+        tabId: sender.tab.id,
+        frameIds: [sender.frameId]
+      },
+      world: 'MAIN',
+      func: (records, href, args) => {
+        if (records) {
+          const w = window.open(...args);
+          for (const record of records) {
+            let c = w;
+            for (const name of record.tree) {
+              c = c[name];
+            }
+            const {method, args} = record.action;
+            if (method) {
+              c[method](...args);
+            }
+            const {prop, value} = record.action;
+            if (prop) {
+              c[prop] = value;
+            }
+          }
+        }
+        else {
+          const a = document.createElement('a');
+          a.target = '_blank';
+          a.href = href;
+          a.click();
+        }
+      },
+      args: [request.records || false, request.url, request.args]
+    }).finally(() => response(true));
+
+    return true;
+  }
+  // open a new tab or redirect current tab
+  else if (request.cmd === 'popup-redirect' || request.cmd === 'open-tab') {
+    const url = request.url;
+    // validating request before proceeding
+    if (url.startsWith('http') || url.startsWith('ftp') || url === 'about:blank') {
+      if (request.cmd === 'popup-redirect') {
+        // make sure redirect prevent is off (this needs {frameId: 1} when Edge supports it)
+        chrome.tabs.sendMessage(sender.tab.id, {
+          cmd: 'release-beforeunload'
+        }, () => {
+          chrome.tabs.update(sender.tab.id, {
+            url
+          });
+        });
+      }
+      else {
+        chrome.tabs.create({
+          url,
+          active: false,
+          index: sender.tab.index + 1
+        });
+      }
+    }
+  }
+  else if (request.cmd === 'white-list') {
+    config.get(['whitelist-mode', 'top-hosts', 'popup-hosts']).then(prefs => {
+      const mode = prefs['whitelist-mode'];
+
+      const {hostname} = new URL(mode === 'popup-hosts' ? request.url : request.parent);
+      prefs[mode].push(hostname);
+      prefs[mode] = prefs[mode].filter((h, i, l) => l.indexOf(h) === i);
+      config.set({
+        [mode]: prefs[mode]
+      });
+      if (mode === 'top-hosts') {
+        chrome.scripting.executeScript({
+          target: {
+            tabId: sender.tab.id,
+            allFrames: true
+          },
+          func: () => {
+            if (typeof prefs !== 'undefined') {
+              prefs.enabled = false;
+            }
+          }
+        });
+      }
+    });
+  }
+  else if (request.method === 'echo') {
+    response(true);
+  }
+});
+
+/* commands */
+chrome.commands.onCommand.addListener(cmd => chrome.tabs.query({
+  active: true,
+  lastFocusedWindow: true
+}, tabs => tabs && tabs[0] && chrome.tabs.sendMessage(tabs[0].id, {
+  cmd
+})));
+
+/* FAQs & Feedback */
+{
+  chrome.management = chrome.management || {
+    getSelf(c) {
+      c({installType: 'normal'});
+    }
+  };
+  if (navigator.webdriver !== true) {
+    const {homepage_url: page, name, version} = chrome.runtime.getManifest();
+    chrome.runtime.onInstalled.addListener(({reason, previousVersion}) => {
+      chrome.management.getSelf(({installType}) => installType === 'normal' && chrome.storage.local.get({
+        'faqs': true,
+        'last-update': 0
+      }, prefs => {
+        if (reason === 'install' || (prefs.faqs && reason === 'update')) {
+          const doUpdate = (Date.now() - prefs['last-update']) / 1000 / 60 / 60 / 24 > 45;
+          if (doUpdate && previousVersion !== version) {
+            chrome.tabs.query({active: true, lastFocusedWindow: true}, tbs => chrome.tabs.create({
+              url: page + '?version=' + version + (previousVersion ? '&p=' + previousVersion : '') + '&type=' + reason,
+              active: reason === 'install',
+              ...(tbs && tbs.length && {index: tbs[0].index + 1})
+            }));
+            chrome.storage.local.set({'last-update': Date.now()});
+          }
+        }
+      }));
+    });
+    chrome.runtime.setUninstallURL(page + '?rd=feedback&name=' + encodeURIComponent(name) + '&version=' + version);
+  }
+}

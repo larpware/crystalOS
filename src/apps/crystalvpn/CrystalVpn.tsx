@@ -7,7 +7,7 @@ import { useNetworkStatus } from "@/hooks/useNetwork";
 import { useBrowserStore } from "@/state/browser";
 import { useSystemStore } from "@/state/system";
 import { useVpnStore } from "@/state/vpn";
-import type { VpnEndpointSummary } from "@/services/vpn/types";
+import type { VpnEndpointSummary, VpnSnapshot } from "@/services/vpn/types";
 import type { AppProps } from "@/types";
 
 /* ==========================================================================
@@ -61,6 +61,25 @@ const SEARCH_HOSTS: Record<string, string> = {
   bing: "www.bing.com",
   wikipedia: "www.wikipedia.org",
 };
+
+/**
+ * How to describe the exit a connection ended up on.
+ *
+ * An automatic connection is not one server: the backend proves a ranked set of
+ * free exits, reports the best one, and lets a stream move to the next when the
+ * preferred one cannot carry a host. Naming a single address for traffic that may
+ * have left through another one would be a claim the controller cannot back, so a
+ * pool is named as a pool and the preferred exit is labelled as preferred.
+ */
+function exitPhrase(snapshot: VpnSnapshot | null): string {
+  const server = snapshot?.server;
+  const exits = snapshot?.poolSize ?? 1;
+  if (!server) return "Proxied browsing is protected";
+  const where = server.proxyHost ? `${server.proxyHost}:${server.proxyPort}` : server.name;
+  return exits > 1
+    ? `Proxied browsing now exits through a pool of ${exits} free exits, preferring ${where}`
+    : `Proxied browsing now exits through ${where}`;
+}
 
 export function CrystalVpn({ args }: AppProps) {
   const snapshot = useVpnStore((state) => state.snapshot);
@@ -225,7 +244,7 @@ export function CrystalVpn({ args }: AppProps) {
     if (next.status === "connected") {
       notify({
         title: "VPN connected",
-        body: next.server ? `Proxied browsing now exits through ${next.server.name}.` : "Proxied browsing is protected.",
+        body: `${exitPhrase(next)}.`,
         icon: "shield",
       });
       return;
@@ -249,12 +268,9 @@ export function CrystalVpn({ args }: AppProps) {
     const next = await quickConnect({ country: country || undefined, canary });
     if (!next) return;
     if (next.status === "connected") {
-      const where = next.server?.proxyHost
-        ? `Proxied browsing now exits through ${next.server.proxyHost}:${next.server.proxyPort}`
-        : "Proxied browsing is protected";
       notify({
         title: country ? `VPN connected · ${countryLabel}` : "VPN connected",
-        body: `${where}.`,
+        body: `${exitPhrase(next)}.`,
         icon: "shield",
       });
       return;
@@ -292,7 +308,9 @@ export function CrystalVpn({ args }: AppProps) {
             <h2 className="cr-vpn__hero-title">{coverage.headline}</h2>
             <p className="cr-vpn__hero-sub">
               {connected && snapshot?.server
-                ? `${snapshot.server.name} · ${snapshot.server.proxyHost}:${snapshot.server.proxyPort}${snapshot.server.exitCountry ? ` · ${snapshot.server.exitCountry}` : ""}`
+                ? `${snapshot.server.name} · ${snapshot.server.proxyHost}:${snapshot.server.proxyPort}${
+                    snapshot.server.exitCountry ? ` · ${snapshot.server.exitCountry}` : ""
+                  }${(snapshot.poolSize ?? 1) > 1 ? ` · ${snapshot.poolSize} exits proved` : ""}`
                 : stored
                   ? country
                     ? `Picked ${countryLabel} — Connect to switch the exit, or Clear endpoint to go automatic.`

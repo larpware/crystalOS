@@ -218,7 +218,10 @@ export const useChatStore = create<ChatState>()(
             (friend, index) =>
               friend.id === friends[index].id &&
               friend.displayName === friends[index].displayName &&
-              friend.avatar === friends[index].avatar,
+              friend.avatar === friends[index].avatar &&
+              // Tags ride the name chip; a tag granted later must still land
+              // even when nothing else about the friend changed.
+              (friend.tags ?? []).join("\u0000") === (friends[index].tags ?? []).join("\u0000"),
           );
         if (!unchanged) set({ friends });
       },

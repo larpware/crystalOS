@@ -439,3 +439,65 @@ coverage map already states `hostApplications: out-of-scope`.
 * The MITM absolute control: direct TLS to `www.google.com` → `Google Trust
   Services`; through the previously-chosen proxy → `SELF_SIGNED_CERT_IN_CHAIN`.
   That proxy is now rejected by the scan.
+
+### Verified live: the exit that only completed handshakes
+
+The failure this section exists for — **the VPN says connected and the sites come up
+blank** — was reproduced on this machine and traced to the *proof*, not to the TLS
+check or the tunnel:
+
+* the scan accepted `172.105.149.160:5000` (handshake-only proof: *"carried a
+  verified TLS session"*). Through the same exit, direct control requests worked
+  (`example.com` 931 B, `www.youtube.com` 963,732 B, `www.google.com` 86,530 B),
+  while every tunnelled **TLS** request to Google/YouTube failed with
+  `tls_get_more_records: decryption failed or bad record mac` — Google 3/3,
+  YouTube 1/4 — and `https://www.google.com/generate_204` came back as **zero
+  bytes**. So the exit was completing handshakes and then corrupting the stream.
+* plain HTTP through the *same* exit was byte-identical to a direct request
+  (`sha256` of `example.com/` matched), and the CONNECT/CONNECT-reader tests pass,
+  which rules out the tunnel and points at the exit itself.
+* a handshake-only proof cannot see any of that: the handshake *succeeds*.
+
+**What changed.** `verifyTlsThroughProxy` now carries one real request over the
+session it just built (`GET /`, `Host`, `Connection: close`) and requires a
+complete, well-formed HTTP status line back — nothing is read past the head and
+the session is destroyed immediately. `docs`-level detail: the request is
+`CrystalOS-VPN-proof`'s own, so an exit sees the host it is asked to carry, which
+it already sees from the CONNECT.
+
+**Verified after the change** (same machine, same minute):
+
+* `npm run vpn -- --canary www.youtube.com` → connected to `5.129.254.129:8888`
+  in ~2 s, `verified.tunnel` = *"carried a verified TLS session and answered a
+  request over it"*.
+* through that exit, driven through the real `RoutedTCPSocket`:
+  `www.youtube.com` → `HTTP/1.1 200 OK`, 962,380 bytes;
+  `www.google.com` → `HTTP/1.1 200 OK`, 87,834 bytes;
+  `duckduckgo.com` → `HTTP/1.1 200 OK`, 237,005 bytes. All three full documents,
+  where the previous exit could not deliver one of them.
+* unit tests: a session that answers is accepted; one that handshakes and stays
+  silent is refused; one whose stream is mangled is refused; a refused credential
+  never reaches a session (`server/vpn/tunnel.tls.test.mjs`, real TLS on loopback
+  with a throwaway CA).
+
+### What a proof still cannot promise
+
+A proof is one small request. An exit can pass it and still fail a *particular*
+page — public proxies are flaky by nature, and corruption can begin after the
+first kilobytes. So the second half of the fix does not depend on the proof:
+when the frame's own document request fails, the client's `error.request` hook is
+tapped (`src/services/scramjet/frameFailure.ts`) and the shell shows the
+transport's own reason at once — *"No exit in the pool could carry this site
+(No exit could carry www.youtube.com:443.)"*, *"The connection came through
+corrupted, so the page could not be assembled (… bad record mac)"* — instead of
+leaving an empty pane until the load timeout. The error overlay also offers **Try
+a different VPN exit**, which drops the stored endpoint and rescans with the
+failing host as the canary, so the next exit is chosen against *that* site.
+
+Not yet observed live: the hook firing in a real browser. It is verified against
+the shipped client bundle (`controller.api.js` dispatches
+`hooks.error.request` with `{ rawrequest, error }` and `{ setResponse,
+suppressError }` props) and unit-tested with a fake plugin host, but the browser
+step needs the desktop app. The frame-side behaviour it replaces (reading the
+rendered `Internal Service Worker Error:` page) is unchanged and still runs.
+

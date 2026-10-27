@@ -15,7 +15,7 @@ import {
   type CrystalOSGame,
   type GameCategory,
 } from "./catalogue";
-import { gameDisplayTitle, launchGame } from "./launch";
+import { gameDisplayTitle, launchGame, launchGameInWindow } from "./launch";
 import { GameCard, GameCover, GameDetail, GamePlayer } from "./parts";
 
 /* ==========================================================================
@@ -28,12 +28,17 @@ import { GameCard, GameCover, GameDetail, GamePlayer } from "./parts";
 
 type View = "store" | "favourites" | "recent";
 
-export function Games({ windowId }: AppProps) {
+export function Games({ windowId, args }: AppProps) {
+  const launchGameId = typeof args?.playGameId === "string" ? args.playGameId : null;
+  const isPlayerWindow = Boolean(launchGameId);
+
   const [view, setView] = useState<View>("store");
   const [category, setCategory] = useState<GameCategory | "all">("all");
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
-  const [playing, setPlaying] = useState<CrystalOSGame | null>(null);
+  const [playing, setPlaying] = useState<CrystalOSGame | null>(() =>
+    launchGameId ? (gameById.get(launchGameId) ?? null) : null,
+  );
   const [detail, setDetail] = useState<CrystalOSGame | null>(null);
 
   const favourites = useGamesStore((state) => state.favourites);
@@ -41,7 +46,9 @@ export function Games({ windowId }: AppProps) {
   const sessions = useGamesStore((state) => state.sessions);
   const recordSession = useGamesStore((state) => state.recordSession);
   const profiles = useGamesStore((state) => state.profiles);
+  const windowPerGame = useGamesStore((state) => state.windowPerGame);
   const setWindowTitle = useWindowStore((state) => state.setTitle);
+  const closeWindow = useWindowStore((state) => state.close);
 
   /**
    * Every Play path goes through here. A profile set to "Browser tab" or
@@ -49,7 +56,21 @@ export function Games({ windowId }: AppProps) {
    * `playing` is only set for the games that really run in this window.
    */
   const startGame = (game: CrystalOSGame) => {
-    if (launchGame(game) === "embedded") setPlaying(game);
+    if (launchGame(game) !== "embedded") return;
+    if (windowPerGame) {
+      launchGameInWindow(game);
+      return;
+    }
+    setPlaying(game);
+  };
+
+  /** Closing a player window ends the programme, not just the frame. */
+  const closePlayer = () => {
+    if (isPlayerWindow) {
+      closeWindow(windowId);
+      return;
+    }
+    setPlaying(null);
   };
 
   const titleOf = (game: CrystalOSGame) =>
@@ -62,7 +83,11 @@ export function Games({ windowId }: AppProps) {
   useEffect(() => {
     setWindowTitle(
       windowId,
-      playing ? `${titleOf(playing)} — CrystalOS Games` : "CrystalOS Games",
+      playing
+        ? isPlayerWindow
+          ? titleOf(playing)
+          : `${titleOf(playing)} — CrystalOS Games`
+        : "CrystalOS Games",
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playing, setWindowTitle, windowId]);
@@ -95,8 +120,9 @@ export function Games({ windowId }: AppProps) {
     <div className="cr-games">
       {playing ? (
         <GamePlayer
+          windowId={windowId}
           game={playing}
-          onClose={() => setPlaying(null)}
+          onClose={closePlayer}
           onSession={(seconds) => recordSession({ gameId: playing.id, at: Date.now(), seconds })}
         />
       ) : (

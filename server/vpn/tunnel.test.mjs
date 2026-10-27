@@ -140,6 +140,138 @@ describe("BoundedQueue", () => {
 });
 
 describe("createRoutedTCPSocket", () => {
+  /*
+   * The failover tests below are the socket-level half of "the VPN is on and the
+   * page came up blank": an exit that completes a handshake but cannot carry the
+   * site has to be passed over, and when none can carry it the stream has to fail
+   * with the transport's own reason — which is what the shell renders instead of
+   * an empty pane.
+   */
+  function buildFailover({ proofs, tunnels }) {
+    const calls = { proofs: [], tunnels: [] };
+    const Routed = createRoutedTCPSocket({
+      decide: async () => ({
+        mode: "proxy",
+        proxy: { host: "first.example", port: 8080 },
+        alternatives: [{ host: "second.example", port: 8080 }],
+        prove: true,
+      }),
+      proveTls: async ({ proxy, target }) => {
+        calls.proofs.push(`${proxy.host}->${target.host}`);
+        const outcome = proofs?.(proxy, target) ?? true;
+        if (outcome instanceof Error) throw outcome;
+        if (outcome === false) throw new Error(`${proxy.host} carried no answer.`);
+      },
+      openTunnel: async ({ proxy }) => {
+        calls.tunnels.push(proxy.host);
+        const allowed = tunnels ? tunnels(proxy) : true;
+        if (allowed instanceof Error) throw allowed;
+        const socket = new FakeSocket();
+        return { socket, reader: fakeReader(socket, Buffer.alloc(0)) };
+      },
+      log: () => undefined,
+    });
+    return { Routed, calls };
+  }
+
+  test("an exit whose proof fails is passed over for the next one", async () => {
+    const { Routed, calls } = buildFailover({
+      proofs: (proxy) => (proxy.host === "first.example" ? new Error("carried no answer") : true),
+    });
+    const socket = new Routed("www.example.com", 443);
+    await socket.connect();
+
+    assert.equal(socket.exit.host, "second.example");
+    assert.deepEqual(calls.tunnels, ["second.example"]);
+    assert.deepEqual(calls.proofs, ["first.example->www.example.com", "second.example->www.example.com"]);
+  });
+
+  test("an exit that fails the CONNECT is passed over too", async () => {
+    const { Routed, calls } = buildFailover({
+      tunnels: (proxy) => (proxy.host === "first.example" ? new Error("refused a CONNECT") : true),
+    });
+    const socket = new Routed("www.example.com", 443);
+    await socket.connect();
+
+    assert.equal(socket.exit.host, "second.example");
+    assert.deepEqual(calls.tunnels, ["first.example", "second.example"]);
+  });
+
+  test("when no exit can carry the site the stream fails with the transport's reason", async () => {
+    const { Routed, calls } = buildFailover({
+      proofs: (proxy) => new Error(`The proxy at ${proxy.host} carried no answer to a request over it.`),
+    });
+    const socket = new Routed("www.example.com", 443);
+    await assert.rejects(() => socket.connect(), /carried no answer/);
+    // No tunnel was opened: the proof is what stopped it.
+    assert.deepEqual(calls.tunnels, []);
+    assert.equal(socket.connected, false);
+  });
+
+  test("a proven exit is not proven again for the same host", async () => {
+    const { Routed, calls } = buildFailover({});
+    await new Routed("www.example.com", 443).connect();
+    await new Routed("www.example.com", 443).connect();
+    // One proof for the host, not one per stream: a page makes many requests to
+    // one origin and must not pay the round trip for each.
+    assert.deepEqual(calls.proofs, ["first.example->www.example.com"]);
+  });
+
+  test("an exit that failed this host is not tried again for it straight away", async () => {
+    let phase = "fail";
+    const { Routed, calls } = buildFailover({
+      proofs: (proxy) => (proxy.host === "first.example" && phase === "fail" ? new Error("no answer") : true),
+    });
+    const first = new Routed("www.example.com", 443);
+    await first.connect();
+    assert.equal(first.exit.host, "second.example");
+    const afterFirst = calls.proofs.length;
+
+    phase = "work";
+    const second = new Routed("www.example.com", 443);
+    await second.connect();
+    // The refusal is remembered, so the failed exit is skipped rather than
+    // re-proven on every request — and the exit that passed is remembered too,
+    // so the second stream pays for no proof at all.
+    assert.equal(second.exit.host, "second.example");
+    assert.equal(
+      calls.proofs.slice(afterFirst).includes("first.example->www.example.com"),
+      false,
+    );
+  });
+
+  test("a non-TLS port is never proven, because there is no certificate to check", async () => {
+    const calls = [];
+    const Routed = createRoutedTCPSocket({
+      decide: async () => ({ mode: "proxy", proxy: { host: "first.example", port: 8080 }, prove: true }),
+      proveTls: async () => {
+        calls.push("proved");
+      },
+      openTunnel: async () => {
+        const socket = new FakeSocket();
+        return { socket, reader: fakeReader(socket, Buffer.alloc(0)) };
+      },
+    });
+    await new Routed("example.com", 80).connect();
+    assert.deepEqual(calls, []);
+  });
+
+  test("an IP literal target is never proven, because a certificate can only name a host", async () => {
+    const calls = [];
+    const Routed = createRoutedTCPSocket({
+      decide: async () => ({ mode: "proxy", proxy: { host: "first.example", port: 8080 }, prove: true }),
+      proveTls: async () => {
+        calls.push("proved");
+      },
+      openTunnel: async () => {
+        const socket = new FakeSocket();
+        return { socket, reader: fakeReader(socket, Buffer.alloc(0)) };
+      },
+    });
+    await new Routed("93.184.216.34", 443).connect();
+    assert.deepEqual(calls, []);
+  });
+
   test("a block decision refuses to connect, so nothing escapes unprotected", async () => {
     const { Routed, sockets } = buildSocket({
       route: { mode: "block", reason: "The VPN is not connected." },

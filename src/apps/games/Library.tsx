@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Badge, Button, EmptyState, Segmented, TextInput } from "@/components/ui";
+import { Badge, Button, EmptyState, Segmented, Switch, TextInput } from "@/components/ui";
 import { Icon } from "@/icons/Icon";
 import { useGamesStore } from "@/state/games";
 import { useWindowStore } from "@/state/windows";
@@ -14,7 +14,7 @@ import {
   type CrystalOSGame,
 } from "./catalogue";
 import { GameCard, GameCover, GamePlayer } from "./parts";
-import { gameDisplayTitle, launchGame } from "./launch";
+import { gameDisplayTitle, launchGame, launchGameInWindow } from "./launch";
 
 /* ==========================================================================
    Game Library
@@ -27,13 +27,20 @@ import { gameDisplayTitle, launchGame } from "./launch";
 type Sort = "recent" | "name" | "playtime";
 type Filter = "all" | "favourites" | "played" | "never";
 
-export function GameLibrary({ windowId }: AppProps) {
+export function GameLibrary({ windowId, args }: AppProps) {
+  /* A window launched with `playGameId` is a player window, not a library: it
+     opens straight onto that game and closing the player closes the window. */
+  const launchGameId = typeof args?.playGameId === "string" ? args.playGameId : null;
+  const isPlayerWindow = Boolean(launchGameId);
+
   const [collection, setCollection] = useState<string>("all");
   const [sort, setSort] = useState<Sort>("recent");
   const [filter, setFilter] = useState<Filter>("all");
   const [layout, setLayout] = useState<"grid" | "list">("grid");
   const [query, setQuery] = useState("");
-  const [playing, setPlaying] = useState<CrystalOSGame | null>(null);
+  const [playing, setPlaying] = useState<CrystalOSGame | null>(() =>
+    launchGameId ? (gameById.get(launchGameId) ?? null) : null,
+  );
   const [focusedId, setFocusedId] = useState<string>(featuredGames[0]?.id ?? games[0].id);
 
   const favourites = useGamesStore((state) => state.favourites);
@@ -43,21 +50,43 @@ export function GameLibrary({ windowId }: AppProps) {
   const hidden = useGamesStore((state) => state.hidden);
   const clearHistory = useGamesStore((state) => state.clearHistory);
   const profiles = useGamesStore((state) => state.profiles);
+  const windowPerGame = useGamesStore((state) => state.windowPerGame);
+  const setWindowPerGame = useGamesStore((state) => state.setWindowPerGame);
   const setWindowTitle = useWindowStore((state) => state.setTitle);
+  const closeWindow = useWindowStore((state) => state.close);
 
   /** The name a game is shown under: the profile's override, else the catalogue's. */
   const titleOf = (game: CrystalOSGame) => gameDisplayTitle(game, profiles[game.id]?.title ?? "");
 
   /** Every Play path goes through launchGame, so a profile set to open in a
-      Browser tab never ends up in this window's frame. */
+      Browser tab never ends up in this window's frame. Embedded games either
+      take over this window or open a player window of their own. */
   const startGame = (game: CrystalOSGame) => {
-    if (launchGame(game) === "embedded") setPlaying(game);
+    if (launchGame(game) !== "embedded") return;
+    if (windowPerGame) {
+      launchGameInWindow(game);
+      return;
+    }
+    setPlaying(game);
+  };
+
+  /** Closing a player window ends the programme, not just the frame. */
+  const closePlayer = () => {
+    if (isPlayerWindow) {
+      closeWindow(windowId);
+      return;
+    }
+    setPlaying(null);
   };
 
   useEffect(() => {
     setWindowTitle(
       windowId,
-      playing ? `${gameDisplayTitle(playing, profiles[playing.id]?.title ?? "")} — Game Library` : "Game Library",
+      playing
+        ? isPlayerWindow
+          ? gameDisplayTitle(playing, profiles[playing.id]?.title ?? "")
+          : `${gameDisplayTitle(playing, profiles[playing.id]?.title ?? "")} — Game Library`
+        : "Game Library",
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playing, profiles, setWindowTitle, windowId]);
@@ -115,8 +144,9 @@ export function GameLibrary({ windowId }: AppProps) {
     <div className="cr-library">
       {playing ? (
         <GamePlayer
+          windowId={windowId}
           game={playing}
-          onClose={() => setPlaying(null)}
+          onClose={closePlayer}
           onSession={(seconds) => recordSession({ gameId: playing.id, at: Date.now(), seconds })}
         />
       ) : (
@@ -165,6 +195,23 @@ export function GameLibrary({ windowId }: AppProps) {
             <p className="cr-library__rail-note">
               Session lengths come from the player. CrystalOS never estimates play time it did
               not measure.
+            </p>
+
+            <div className="cr-library__rail-head cr-library__rail-head--spaced">
+              <Icon name="sliders" size={16} />
+              <span>Library settings</span>
+            </div>
+            <label className="cr-library__rail-toggle">
+              <span>Open games in their own window</span>
+              <Switch
+                label="Open games in their own window"
+                checked={windowPerGame}
+                onChange={setWindowPerGame}
+              />
+            </label>
+            <p className="cr-library__rail-note">
+              On, the library stays put and every Play opens a player window of its own. Off, the
+              player takes over this window.
             </p>
           </aside>
 

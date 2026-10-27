@@ -25,7 +25,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
+  gap: var(--space-5);
 }
 
 .cr-boot__mark {
@@ -40,6 +40,18 @@
   box-shadow: var(--inset-highlight), var(--shadow-1);
   color: #fff;
   animation: cr-boot-mark 520ms var(--ease-snappy) both;
+}
+
+/* Boot's entrance, the mark's rise and the bar's fill all ride fixed
+   durations instead of the motion tokens, and performance mode has already
+   dropped the hold — so the screen draws straight to its final frame. */
+:root[data-perf="on"] .cr-boot,
+:root[data-perf="on"] .cr-boot__mark {
+  animation: none;
+}
+
+:root[data-perf="on"] .cr-boot__fill {
+  transition: none;
 }
 
 @keyframes cr-boot-mark {
@@ -81,6 +93,7 @@
   transition: transform 420ms var(--ease-standard);
 }
 
+
 .cr-boot__step {
   font-size: var(--fs-xs);
   color: var(--text-tertiary);
@@ -106,7 +119,7 @@
   display: flex;
   align-items: baseline;
   justify-content: center;
-  gap: 8px;
+  gap: var(--space-3);
   width: min(560px, 82vw);
   text-align: center;
   font-size: var(--fs-xs);
@@ -129,6 +142,10 @@
   }
 }
 
+:root[data-perf="on"] .cr-boot__tip {
+  animation: none;
+}
+
 /* ---- lock screen ------------------------------------------------------- */
 .cr-lock {
   position: absolute;
@@ -146,6 +163,10 @@
   --lock-fg-soft: rgba(255, 255, 255, 0.72);
   --lock-fg-dim: rgba(255, 255, 255, 0.6);
   animation: cr-fade-in 320ms var(--ease-standard);
+}
+
+:root[data-perf="on"] .cr-lock {
+  animation: none;
 }
 
 .cr-lock[data-bg="solid"] {
@@ -200,7 +221,7 @@
   align-items: center;
   justify-content: center;
   gap: 46px;
-  padding: 40px 24px;
+  padding: 40px var(--space-7);
   transition: align-items var(--dur-normal) var(--ease-standard),
     justify-content var(--dur-normal) var(--ease-standard);
 }
@@ -226,11 +247,23 @@
 }
 
 .cr-lock__time {
+  font-family: var(--font-display);
   font-size: calc(84px * var(--lock-clock-scale, 1));
-  font-weight: 300;
-  letter-spacing: -0.045em;
+  font-weight: 400;
+  /* Instrument Serif is naturally narrow — a fraction of the tracking the
+     system face needed, so huge digits don't crush. */
+  letter-spacing: -0.012em;
   line-height: 1.05;
   color: var(--lock-fg);
+}
+
+/* The Solarized pair uses Space Grotesk for display: medium weight and a
+   little tracking, rather than the serif's 400. */
+:root[data-theme^="solar"] .cr-lock__time,
+:root[data-theme="deep-sea"] .cr-lock__time,
+:root[data-theme="dim"] .cr-lock__time {
+  font-weight: 500;
+  letter-spacing: -0.015em;
 }
 
 .cr-lock[data-bg="solid"] .cr-lock__clock {
@@ -247,7 +280,7 @@
 }
 
 .cr-lock__message {
-  margin-top: 6px;
+  margin-top: var(--space-2);
   font-size: var(--fs-sm);
   color: var(--lock-fg-soft);
 }
@@ -260,9 +293,9 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-4);
   width: min(420px, 100%);
-  padding: 22px 20px;
+  padding: 22px var(--space-6);
   border-radius: 22px;
   border: 1px solid color-mix(in srgb, var(--edge-light) 45%, transparent);
   background: linear-gradient(
@@ -273,7 +306,7 @@
 }
 
 @media not (prefers-reduced-motion: reduce) {
-  :root:not([data-motion="reduced"]):not([data-transparency="reduced"]) .cr-lock__identity {
+  :root:not([data-motion="reduced"]):not([data-perf="on"]):not([data-transparency="reduced"]) .cr-lock__identity {
     backdrop-filter: blur(24px) saturate(1.25);
     -webkit-backdrop-filter: blur(24px) saturate(1.25);
   }
@@ -339,7 +372,7 @@
 
 .cr-lock__form {
   display: flex;
-  gap: 8px;
+  gap: var(--space-3);
   width: 100%;
 }
 
@@ -353,7 +386,7 @@
 
 .cr-lock__actions {
   display: flex;
-  gap: 8px;
+  gap: var(--space-3);
   flex-wrap: wrap;
   justify-content: center;
 }
@@ -375,7 +408,7 @@
 .cr-lock__power {
   position: relative;
   display: flex;
-  gap: 6px;
+  gap: var(--space-2);
   padding: 0 0 26px;
 }
 
@@ -384,7 +417,7 @@
   flex-direction: column;
   align-items: center;
   gap: 5px;
-  padding: 8px 14px;
+  padding: var(--space-3) 14px;
   border-radius: var(--radius-medium);
   border: 1px solid transparent;
   font-size: var(--fs-xs);
@@ -427,7 +460,7 @@
   flex-direction: column;
   width: 236px;
   flex: none;
-  padding: 20px 16px;
+  padding: var(--space-6) var(--space-5);
   border-right: 1px solid var(--border-subtle);
   background: var(--surface-1);
 }
@@ -462,7 +495,7 @@
   display: flex;
   align-items: center;
   gap: 9px;
-  padding: 7px 8px;
+  padding: 7px var(--space-3);
   border-radius: var(--radius-small);
   font-size: var(--fs-sm);
   color: var(--text-muted);
@@ -531,13 +564,13 @@
 }
 
 .cr-setup__content-body {
-  margin-top: 24px;
+  margin-top: var(--space-7);
 }
 
 .cr-setup__cards {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: var(--space-4);
 }
 
 .cr-setup__cards--stack {
@@ -548,7 +581,7 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-2);
   padding: 18px;
   border-radius: var(--radius-medium);
   border: 1px solid var(--border-default);
@@ -616,7 +649,7 @@
 .cr-setup__theme {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-2);
   padding: 10px;
   border-radius: var(--radius-medium);
   border: 1px solid var(--border-default);
@@ -663,6 +696,22 @@
   color: var(--text-primary);
 }
 
+.cr-setup__theme-flag {
+  margin: var(--space-1) 0 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xxs);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-on-muted);
+}
+
+/* Deprecated: a neutral status label rather than the accent-coloured
+   recommendation it sits next to. */
+.cr-setup__theme-flag--deprecated {
+  color: var(--text-muted);
+}
+
 .cr-setup__theme-desc {
   font-size: var(--fs-xs);
   color: var(--text-muted);
@@ -673,7 +722,7 @@
 .cr-setup__scale {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-4);
   margin-top: 22px;
 }
 
@@ -684,7 +733,7 @@
 
 .cr-setup__accents {
   display: flex;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .cr-setup__accent {
@@ -706,7 +755,7 @@
 .cr-setup__form {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-5);
   max-width: 420px;
 }
 
@@ -714,7 +763,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--space-5);
   padding: 14px;
   border-radius: var(--radius-medium);
   border: 1px solid var(--border-subtle);
@@ -743,8 +792,8 @@
 .cr-setup__checklist {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 24px;
+  gap: var(--space-2);
+  margin-top: var(--space-7);
   padding-top: 18px;
   border-top: 1px solid var(--border-subtle);
 }
@@ -752,7 +801,7 @@
 .cr-setup__check {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
   padding: 5px 9px;
   border-radius: var(--radius-small);
   border: 1px solid var(--border-subtle);
@@ -769,9 +818,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--space-4);
   flex: none;
-  padding: 14px 24px;
+  padding: 14px var(--space-7);
   border-top: 1px solid var(--border-subtle);
   background: var(--surface-1);
 }
@@ -779,7 +828,7 @@
 .cr-setup__footer-right {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-4);
 }
 
 .cr-setup__step-count {
@@ -792,9 +841,36 @@
     display: none;
   }
   .cr-setup__content {
-    padding: 22px 20px 14px;
+    padding: 22px var(--space-6) 14px;
   }
   .cr-setup__title {
     font-size: var(--fs-xl);
   }
+}
+
+/* ==========================================================================
+   TV interface (alpha)
+
+   Set by Settings → Appearance when the 10-foot profile is on. The scale
+   itself rides the normal UI scale mechanism; what lives here is the part a
+   sofa demands that a desk does not: focus you can see from across the room,
+   and generous hit targets for arrow-key and remote navigation.
+   ========================================================================== */
+
+html[data-tv="true"]:focus-visible {
+  outline: none;
+}
+
+html[data-tv="true"] :focus-visible {
+  outline: 3px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+html[data-tv="true"] .cr-launcher__tile {
+  border-radius: var(--radius-large);
+}
+
+html[data-tv="true"] .cr-launcher__tile[data-cursor="true"] {
+  outline: 3px solid var(--accent-primary);
+  outline-offset: 2px;
 }

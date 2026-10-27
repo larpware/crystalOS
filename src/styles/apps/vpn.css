@@ -26,7 +26,7 @@
   gap: 14px;
   height: 100%;
   min-height: 0;
-  padding: 18px 20px 26px;
+  padding: 18px var(--space-6) 26px;
   overflow-y: auto;
   background: var(--window-bg);
   color: var(--text-primary);
@@ -60,7 +60,7 @@
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 18px;
-  padding: 18px 20px;
+  padding: 18px var(--space-6);
   border-radius: var(--radius-large);
   border: 1px solid var(--border-subtle);
   background-color: var(--surface-1);
@@ -102,7 +102,7 @@
 .cr-vpn__hero-main {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: var(--space-5);
   min-width: 0;
 }
 
@@ -173,7 +173,7 @@
 .cr-vpn__hero-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-3);
   flex-wrap: wrap;
   justify-content: flex-end;
 }
@@ -240,7 +240,7 @@
 .cr-vpn .cr-section {
   flex: none;
   margin: 0;
-  padding: 16px 18px 18px;
+  padding: var(--space-5) 18px 18px;
   border-radius: var(--radius-large);
   border: 1px solid var(--border-subtle);
   background-color: var(--surface-1);
@@ -291,7 +291,7 @@
 .cr-vpn__form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: var(--space-4);
 }
 
 .cr-vpn__form-wide {
@@ -301,8 +301,8 @@
 .cr-vpn__form-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 16px;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
 }
 
 @media (max-width: 640px) {
@@ -326,7 +326,7 @@
 .cr-vpn__more {
   flex: none;
   margin: 0;
-  padding: 16px 18px 18px;
+  padding: var(--space-5) 18px 18px;
   border-radius: var(--radius-large);
   border: 1px solid var(--border-subtle);
   background-color: var(--surface-1);
@@ -390,7 +390,7 @@
 
 .cr-vpn__list li {
   position: relative;
-  padding-left: 16px;
+  padding-left: var(--space-5);
 }
 
 .cr-vpn__list li::before {
@@ -494,7 +494,7 @@
   justify-content: center;
   gap: 10px;
   height: 100%;
-  padding: 32px;
+  padding: var(--space-8);
   text-align: center;
   background: var(--surface-sunken);
   color: var(--text-secondary);
@@ -513,8 +513,22 @@
   line-height: 1.6;
 }
 
+/* The controller's own reason, quoted rather than paraphrased: "no free server
+   answered" belongs on the page that failed, not only in the VPN window. The
+   element is a `p`, so the selector carries its class twice to outrank the rule
+   above. */
+.cr-browser__vpn-block p.cr-browser__vpn-block-reason {
+  max-width: 52ch;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-medium);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+}
+
 .cr-browser__vpn-block-actions {
   display: flex;
-  gap: 8px;
-  margin-top: 4px;
+  gap: var(--space-3);
+  margin-top: var(--space-1);
 }

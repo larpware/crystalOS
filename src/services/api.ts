@@ -46,7 +46,7 @@ function failure(status: number | null, code: string, message: string, offline =
 }
 
 export interface RequestOptions {
-  method?: "GET" | "POST" | "PATCH" | "DELETE";
+  method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
   body?: unknown;
   signal?: AbortSignal;
   /** Milliseconds before the request is abandoned. Defaults to 12s. */

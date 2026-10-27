@@ -17,6 +17,7 @@ import { appCatalog, metaFor, optionalApps, systemApps, type AppMeta } from "@/a
 import { isImplemented } from "@/apps/registry";
 import { openApp } from "@/services/os";
 import { useAppsStore } from "@/state/apps";
+import { useGamesStore } from "@/state/games";
 import { useNotificationStore } from "@/state/notifications";
 import {
   LAUNCHER_ICON_RANGE,
@@ -794,6 +795,8 @@ export function KeyboardPage() {
 export function ApplicationsPage() {
   const { installed, removed, install, remove, recents, clearRecents, launchCounts } =
     useAppsStore();
+  const windowPerGame = useGamesStore((state) => state.windowPerGame);
+  const setWindowPerGame = useGamesStore((state) => state.setWindowPerGame);
   const [query, setQuery] = useState("");
 
   const term = query.trim().toLowerCase();
@@ -814,6 +817,23 @@ export function ApplicationsPage() {
             onChange={(event) => setQuery(event.target.value)}
           />
         </Row>
+      </Section>
+
+      <Section
+        title="Games"
+        description="How the Game Library hands a game over once Play is pressed."
+      >
+        <Row
+          label="Open games in their own window"
+          description="On, the library stays open and every Play opens a player window of its own, filled to the work area so the dock and panel stay reachable. Off, the player takes over the library window."
+          control={
+            <Switch
+              label="Open games in their own window"
+              checked={windowPerGame}
+              onChange={setWindowPerGame}
+            />
+          }
+        />
       </Section>
 
       <Section

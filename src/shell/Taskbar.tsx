@@ -14,6 +14,7 @@ import { useShellStore } from "@/state/shell";
 import { useWindowStore } from "@/state/windows";
 import { APP_DRAG_TYPE, activateApp } from "@/services/os";
 import { useElementBox } from "@/hooks/useUi";
+import { useElementTheme } from "@/themes/scope";
 
 /* ==========================================================================
    Taskbar
@@ -40,7 +41,7 @@ const taskbarItems: TaskbarItem[] = [
   { appId: "browser", icon: "/icons/taskbar/browser.png" },
   { appId: "drive", icon: "/icons/taskbar/googledrive.png" },
   { appId: "messages", icon: "/icons/taskbar/chat.png" },
-  { appId: "games", icon: "/icons/taskbar/crystalgames.png" },
+  { appId: "library", icon: "/icons/taskbar/crystalgames.png" },
   { appId: "store", icon: "/icons/taskbar/appstore.png" },
   { appId: "terminal", icon: "/icons/taskbar/terminal.png" },
   { appId: "settings", icon: "/icons/taskbar/Settings.png" },
@@ -91,6 +92,7 @@ export function Taskbar() {
   const windows = useWindowStore((state) => state.windows);
   const focusWindow = useWindowStore((state) => state.focus);
   const restoreWindow = useWindowStore((state) => state.restore);
+  const dockTheme = useElementTheme("taskbar");
 
   const [hovered, setHovered] = useState<HoverCard | null>(null);
   /** Artwork that failed to load, so the tile can fall back to the drawn icon. */
@@ -254,6 +256,8 @@ export function Taskbar() {
       data-mode={dock.mode ?? "dock"}
       data-align={dock.align ?? "center"}
       aria-label="Taskbar"
+      data-element-theme={dockTheme.themeId ?? undefined}
+      style={dockTheme.style}
       onPointerLeave={() => setHovered(null)}
     >
       <div className="cr-taskbar__strip" ref={stripRef} style={style} data-mode={dock.mode ?? "dock"}>

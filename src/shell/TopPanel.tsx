@@ -10,6 +10,7 @@ import { openApp } from "@/services/os";
 import { useShellStore } from "@/state/shell";
 import { useSystemStore } from "@/state/system";
 import { useNotificationStore } from "@/state/notifications";
+import { useElementTheme } from "@/themes/scope";
 import { useWindowStore } from "@/state/windows";
 import { formatDateLong, formatTime } from "@/utils/format";
 import { HzReadout } from "./HzReadout";
@@ -39,6 +40,11 @@ export function TopPanel() {
   const focusedWindow = useWindowStore((state) => state.windows.find((window) => window.focused) ?? null);
   const focusedTitle = focusedWindow?.title ?? null;
   const focusedApp = focusedWindow ? metaFor(focusedWindow.appId) : undefined;
+  /* A window in full screen has no bar of its own — the titlebar unmounts so the
+     application can reach every edge — so this bar, which stays, is where full
+     screen is left from. It is the only chrome the mode does not cover. */
+  const focusedFull = focusedWindow?.full === true;
+  const toggleFullScreen = useWindowStore((state) => state.toggleFullScreen);
 
   const battery = useBattery();
   const offline = useOffline();
@@ -49,6 +55,7 @@ export function TopPanel() {
     () => ({ "--panel-surface-opacity": `${Math.round(panel.opacity * 100)}%` }) as CSSProperties,
     [panel.opacity],
   );
+  const panelTheme = useElementTheme("panel");
 
   /* The clock is one button placed in whichever group the user picked, so it
      moves between the left, centre and right of the bar without duplicating
@@ -66,7 +73,12 @@ export function TopPanel() {
   const clockPosition = panel.clockPosition ?? "center";
 
   return (
-    <header className="cr-panel" role="banner" style={surfaceStyle}>
+    <header
+      className="cr-panel"
+      role="banner"
+      data-element-theme={panelTheme.themeId ?? undefined}
+      style={panelTheme.style ? { ...surfaceStyle, ...panelTheme.style } : surfaceStyle}
+    >
       <div className="cr-panel__left">
         {clockPosition === "left" && clockButton}
         {panel.showActivities && (
@@ -92,6 +104,17 @@ export function TopPanel() {
             {focusedApp ? <AppIcon appId={focusedApp.id} name={focusedApp.icon} size={16} /> : null}
             <span className="cr-truncate">{focusedTitle}</span>
           </span>
+        )}
+        {focusedFull && focusedWindow && (
+          <button
+            type="button"
+            className="cr-panel__indicator cr-panel__indicator--action"
+            title="Exit full screen"
+            aria-label="Exit full screen"
+            onClick={() => toggleFullScreen(focusedWindow.id)}
+          >
+            <Icon name="collapse" size={14} />
+          </button>
         )}
       </div>
 

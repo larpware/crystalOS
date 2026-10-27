@@ -13,9 +13,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: var(--space-2);
   height: 30px;
-  padding: 0 12px;
+  padding: 0 var(--space-4);
   border-radius: var(--radius-small);
   border: 1px solid var(--btn-border);
   background-color: var(--btn-bg);
@@ -85,7 +85,7 @@
 .cr-btn--danger {
   --btn-bg: color-mix(in srgb, var(--accent-danger) 16%, transparent);
   --btn-bg-hover: color-mix(in srgb, var(--accent-danger) 26%, transparent);
-  --btn-fg: #ffb4af;
+  --btn-fg: color-mix(in srgb, var(--accent-danger) 72%, white);
   --btn-border: color-mix(in srgb, var(--accent-danger) 30%, transparent);
 }
 
@@ -97,7 +97,7 @@
 
 .cr-btn--lg {
   height: 36px;
-  padding: 0 16px;
+  padding: 0 var(--space-5);
   font-size: var(--fs-base);
   /* A taller button needs a softer corner or it reads as a slab. */
   border-radius: var(--radius-medium);
@@ -172,7 +172,7 @@
 .cr-textarea {
   height: auto;
   min-height: 74px;
-  padding: 8px 10px;
+  padding: var(--space-3) 10px;
   resize: vertical;
   line-height: 1.5;
 }
@@ -229,7 +229,7 @@
 
 .cr-field__error {
   font-size: var(--fs-xs);
-  color: #ff9a94;
+  color: color-mix(in srgb, var(--accent-danger) 75%, white);
 }
 
 .cr-input-group {
@@ -258,7 +258,7 @@
 /* ---- select ------------------------------------------------------------ */
 .cr-select {
   appearance: none;
-  padding-right: 24px;
+  padding-right: var(--space-7);
   /* A muted caret. Drawn in the foreground colour it read as content competing
      with the value sitting next to it; a tertiary grey reads as the affordance
      it actually is. */
@@ -398,7 +398,7 @@
 }
 
 .cr-segmented__item {
-  padding: 4px 12px;
+  padding: var(--space-1) var(--space-4);
   border-radius: calc(var(--radius-small) - 2px);
   font-size: var(--fs-xs);
   font-weight: 500;
@@ -425,7 +425,7 @@
 .cr-code {
   display: inline-block;
   max-width: 100%;
-  padding: 1px 6px;
+  padding: 1px var(--space-2);
   border-radius: var(--radius-xs);
   border: 1px solid var(--border-subtle);
   background-color: var(--surface-sunken);
@@ -441,7 +441,7 @@
 .cr-badge {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
   height: 20px;
   padding: 0 7px;
   /* Squared rather than a capsule, and flat rather than outlined. A status tag
@@ -551,8 +551,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 9px 12px;
+  gap: var(--space-3);
+  padding: 9px var(--space-4);
   border-bottom: 1px solid var(--border-subtle);
 }
 
@@ -565,7 +565,7 @@
 }
 
 .cr-popover__body {
-  padding: 10px 12px;
+  padding: 10px var(--space-4);
 }
 
 /* ---- modal ------------------------------------------------------------- */
@@ -576,7 +576,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: var(--space-7);
   animation: cr-fade-in var(--dur-normal) var(--ease-standard);
 }
 
@@ -620,8 +620,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 13px 16px;
+  gap: var(--space-4);
+  padding: 13px var(--space-5);
   border-bottom: 1px solid var(--border-subtle);
 }
 
@@ -631,7 +631,7 @@
 }
 
 .cr-modal__body {
-  padding: 16px;
+  padding: var(--space-5);
   overflow: auto;
   color: var(--text-secondary);
   font-size: var(--fs-base);
@@ -641,8 +641,8 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
-  padding: 12px 16px;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
   border-top: 1px solid var(--border-subtle);
   background: var(--surface-0);
 }
@@ -656,7 +656,7 @@
 .cr-row {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-4);
   min-height: 46px;
   padding: 9px 0;
   border-bottom: 1px solid var(--border-subtle);
@@ -692,13 +692,13 @@
   flex: none;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-3);
 }
 
 .cr-row--stack {
   flex-direction: column;
   align-items: stretch;
-  gap: 8px;
+  gap: var(--space-3);
 }
 
 .cr-section {
@@ -711,7 +711,7 @@
 .cr-section__title {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-4);
   font-size: var(--fs-base);
   font-weight: 600;
   letter-spacing: -0.008em;
@@ -730,7 +730,7 @@
 .cr-section__desc {
   font-size: var(--fs-xs);
   color: var(--text-tertiary);
-  margin-bottom: 12px;
+  margin-bottom: var(--space-4);
   max-width: 74ch;
   line-height: 1.55;
 }
@@ -771,15 +771,15 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 42px 24px;
+  gap: var(--space-2);
+  padding: 42px var(--space-7);
   text-align: center;
   color: var(--text-tertiary);
 }
 
 .cr-empty__icon {
   color: var(--text-disabled);
-  margin-bottom: 4px;
+  margin-bottom: var(--space-1);
 }
 
 .cr-empty__title {
@@ -816,6 +816,10 @@
   animation-duration: 1400ms;
 }
 
+:root[data-perf="on"] .cr-spinner {
+  animation: none;
+}
+
 .cr-skeleton {
   background: linear-gradient(
     90deg,
@@ -826,6 +830,12 @@
   background-size: 400% 100%;
   border-radius: var(--radius-small);
   animation: cr-shimmer 1.6s ease-in-out infinite;
+}
+
+/* The shimmer runs on a fixed duration rather than a motion token, and it runs
+   forever — while performance mode is on it stops and the block sits still. */
+:root[data-perf="on"] .cr-skeleton {
+  animation: none;
 }
 
 @keyframes cr-shimmer {
@@ -856,7 +866,7 @@
 .cr-tooltip {
   position: fixed;
   z-index: var(--z-context);
-  padding: 4px 8px;
+  padding: var(--space-1) var(--space-3);
   background: var(--surface-3);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-small);
@@ -888,7 +898,7 @@
   align-items: center;
   gap: 9px;
   width: 100%;
-  padding: 6px 9px;
+  padding: var(--space-2) 9px;
   border-radius: var(--radius-small);
   font-size: var(--fs-sm);
   color: var(--text-secondary);
@@ -906,12 +916,12 @@
 }
 
 .cr-menu__item--danger {
-  color: #ff9d97;
+  color: color-mix(in srgb, var(--accent-danger) 78%, white);
 }
 
 .cr-menu__item--danger:hover {
   background: color-mix(in srgb, var(--accent-danger) 16%, transparent);
-  color: #ffc0bb;
+  color: color-mix(in srgb, var(--accent-danger) 88%, white);
 }
 
 .cr-menu__label {
@@ -930,7 +940,7 @@
 
 .cr-menu__sep {
   height: 1px;
-  margin: 5px 4px;
+  margin: 5px var(--space-1);
   background: var(--border-subtle);
 }
 
@@ -983,9 +993,9 @@
 .cr-app__header {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-3);
   flex: none;
-  padding: 9px 12px;
+  padding: 9px var(--space-4);
   border-bottom: 1px solid var(--border-subtle);
   background-color: var(--surface-1);
   background-image: var(--surface-sheen);
@@ -1009,7 +1019,7 @@
   border-right: 1px solid var(--border-subtle);
   background: var(--surface-0);
   overflow: auto;
-  padding: 8px;
+  padding: var(--space-3);
 }
 
 .cr-split {
@@ -1019,7 +1029,7 @@
 }
 
 .cr-pad {
-  padding: 14px 16px;
+  padding: 14px var(--space-5);
 }
 
 .cr-divider {
@@ -1064,7 +1074,7 @@
 .cr-account-form {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-4);
   width: 100%;
   max-width: 360px;
 }
@@ -1084,7 +1094,7 @@
 .cr-friend-code {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-3);
 }
 
 .cr-friend-code .cr-btn {
@@ -1110,13 +1120,13 @@
   --rarity: #9aa4b2;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 2px 8px 2px 7px;
+  gap: var(--space-2);
+  padding: 2px var(--space-3) 2px 7px;
   border: 1px solid color-mix(in srgb, var(--rarity) 40%, transparent);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--rarity) 13%, transparent);
   color: var(--rarity);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-weight: 650;
   letter-spacing: 0.02em;
   line-height: 1.5;
@@ -1195,15 +1205,15 @@
 .cr-rarity-guide {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin: 10px 0 12px;
+  gap: var(--space-1);
+  margin: 10px 0 var(--space-4);
 }
 
 .cr-rarity-guide__row {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  padding: 8px 10px;
+  padding: var(--space-3) 10px;
   border-radius: 10px;
   background: color-mix(in srgb, var(--text-primary) 4%, transparent);
 }
@@ -1222,7 +1232,7 @@
 }
 
 .cr-rarity-guide__odds {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
@@ -1231,5 +1241,32 @@
   font-size: 11.5px;
   line-height: 1.45;
   opacity: 0.72;
+}
+
+/* ---- Account tags ----
+   Small, muted chips worn beside a display name. The owner's tag carries the
+   accent; everything else stays quiet enough to ignore. ---- */
+
+.cr-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 5px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 9.5px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  line-height: 15px;
+  text-transform: uppercase;
+  vertical-align: 1px;
+  white-space: nowrap;
+}
+
+.cr-tag--owner {
+  border-color: color-mix(in srgb, var(--accent-primary) 55%, transparent);
+  background: color-mix(in srgb, var(--accent-primary) 14%, transparent);
+  color: var(--accent-primary);
 }
 

@@ -1,0 +1,75 @@
+{
+  "name": "Popup Blocker (strict)",
+  "description": "__MSG_app_description__",
+  "version": "0.9.2",
+  "manifest_version": 3,
+  "default_locale": "en",
+  "permissions": [
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "worker.js",
+    "scripts": [
+      "config.js",
+      "badge.js",
+      "worker.js"
+    ]
+  },
+  "action": {
+    "default_popup": "/data/popup/index.html"
+  },
+  "homepage_url": "https://webextension.org/listing/popup-blocker.html",
+  "icons": {
+    "16": "/data/icons/16.png",
+    "32": "/data/icons/32.png",
+    "48": "/data/icons/48.png",
+    "64": "/data/icons/64.png",
+    "128": "/data/icons/128.png",
+    "256": "/data/icons/256.png",
+    "512": "/data/icons/512.png"
+  },
+  "options_ui": {
+    "page": "/data/options/index.html",
+    "open_in_tab": true
+  },
+  "web_accessible_resources": [{
+    "resources": ["data/ui/index.html"],
+    "matches": ["*://*/*"]
+  }],
+  "commands": {
+    "_execute_action": {
+      "description": "Execute Action"
+    },
+    "allow-last-request": {
+      "description": "__MSG_context_item2__"
+    },
+    "deny-last-request": {
+      "description": "__MSG_context_item3__"
+    },
+    "background-last-request": {
+      "description": "__MSG_context_item4__"
+    },
+    "redirect-last-request": {
+      "description": "__MSG_context_item5__"
+    },
+    "focus-last-request": {
+      "description": "__MSG_context_item6__"
+    }
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "{de22fd49-c9ab-4359-b722-b3febdc3a0b0}",
+      "strict_min_version": "128.0",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    },
+    "gecko_android": {
+      "strict_min_version": "128.0"
+    }
+  }
+}

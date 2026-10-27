@@ -18,7 +18,7 @@
 .cr-proxy__bar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-3);
   padding: 7px 10px;
   flex: none;
   background: var(--chrome-bar);
@@ -84,10 +84,10 @@
 .cr-proxy__status {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
   flex: none;
   height: 24px;
-  padding: 0 9px 0 8px;
+  padding: 0 9px 0 var(--space-3);
   border-radius: var(--radius-pill);
   font-size: var(--fs-xs);
   letter-spacing: .01em;
@@ -135,9 +135,9 @@
 }
 
 .cr-proxy__retry {
-  margin-left: 4px;
+  margin-left: var(--space-1);
   border: 0;
-  padding: 0 6px;
+  padding: 0 var(--space-2);
   height: 18px;
   border-radius: var(--radius-small);
   background: var(--surface-3);
@@ -165,7 +165,7 @@
   height: 26px;
   padding: 0;
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-small, 6px);
+  border-radius: var(--radius-small);
   background: var(--surface-2);
   color: var(--text-secondary);
   cursor: pointer;
@@ -225,8 +225,8 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 32px;
+  gap: var(--space-3);
+  padding: var(--space-8);
   text-align: center;
   background: var(--surface-0);
   color: var(--text-primary);
@@ -237,7 +237,7 @@
 }
 
 .cr-proxy__overlay h3 {
-  margin: 4px 0 0;
+  margin: var(--space-1) 0 0;
   font-size: var(--fs-md);
   font-weight: 600;
 }
@@ -269,7 +269,7 @@
 
 .cr-proxy__overlay-actions {
   display: flex;
-  gap: 8px;
+  gap: var(--space-3);
   margin-top: 10px;
 }
 
@@ -287,7 +287,9 @@
 }
 
 :root[data-motion="reduced"] .cr-proxy__spinner,
-:root[data-motion="reduced"] .cr-proxy__status-dot {
+:root[data-motion="reduced"] .cr-proxy__status-dot,
+:root[data-perf="on"] .cr-proxy__spinner,
+:root[data-perf="on"] .cr-proxy__status-dot {
   animation: none;
 }
 
@@ -298,7 +300,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 7px 12px;
+  padding: 7px var(--space-4);
   font-size: var(--fs-xs);
   color: var(--text-secondary);
   background: color-mix(in srgb, var(--accent-warning) 12%, transparent);

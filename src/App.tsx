@@ -246,6 +246,22 @@ export function App() {
     return () => window.clearTimeout(id);
   }, [osScale]);
 
+  /* TV interface (alpha): the attribute lets the shell paint remote-grade
+     focus rings and anything else a 10-foot profile needs, while the scale
+     itself rides the normal UI scale mechanism. */
+  const tvMode = useAppearanceStore((state) => state.tvMode);
+  useEffect(() => {
+    document.documentElement.dataset.tv = tvMode ? "true" : "false";
+  }, [tvMode]);
+
+  /* Window titlebars can fade into the application beneath them instead of
+     reading as a solid strip. Published as a root flag; the stylesheet decides
+     what "blend" means, so every window follows one rule. */
+  const titlebarBlend = useAppearanceStore((state) => state.titlebarBlend);
+  useLayoutEffect(() => {
+    document.documentElement.dataset.titlebar = titlebarBlend ? "blend" : "solid";
+  }, [titlebarBlend]);
+
   /* A brief hint points at the way back whenever the scale is not 100%, so a
      desktop magnified by accident is never a trap. Whatever the entry point —
      slider, wizard or terminal — the same hint answers it. */

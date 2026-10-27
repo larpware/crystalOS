@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "@/icons/Icon";
 import { Button, EmptyState, Switch } from "@/components/ui";
+import { useElementTheme } from "@/themes/scope";
 import { useNotificationStore } from "@/state/notifications";
 import { useShellStore } from "@/state/shell";
 import type { OsNotification } from "@/types";
@@ -97,6 +98,7 @@ function Toast({
 export function NotificationCenter() {
   const open = useShellStore((state) => state.notificationCenterOpen);
   const setOpen = useShellStore((state) => state.setNotificationCenterOpen);
+  const overlayTheme = useElementTheme("overlays");
   const prefs = useNotificationStore((state) => state.prefs);
   const setPrefs = useNotificationStore((state) => state.setPrefs);
   const history = useNotificationStore((state) => state.history);
@@ -122,7 +124,13 @@ export function NotificationCenter() {
   return (
     <>
       <div className="cr-center-scrim" onClick={() => setOpen(false)} aria-hidden="true" />
-      <aside className="cr-center" role="dialog" aria-label="Notifications">
+      <aside
+        className="cr-center"
+        role="dialog"
+        aria-label="Notifications"
+        data-element-theme={overlayTheme.themeId ?? undefined}
+        style={overlayTheme.style}
+      >
         <header className="cr-center__header">
           <span className="cr-center__title">Notifications</span>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>

@@ -9,6 +9,7 @@ import {
   Row,
   Section,
   TextInput,
+  UserTag,
 } from "@/components/ui";
 import { AccountForm } from "@/shell/AccountForm";
 import { RarityBadge, RarityGuideModal } from "@/components/rarity";
@@ -96,7 +97,10 @@ export function AccountsPage() {
                 )}
               </div>
               <div className="cr-profile__body">
-                <div className="cr-profile__name">{account.displayName}</div>
+                <div className="cr-profile__name">
+                  {account.displayName}
+                  <UserTag tags={account.tags} />
+                </div>
                 <div className="cr-row__desc">
                   {account.guest ? "Guest session · no account and no friend code" : `@${account.username}`}
                 </div>

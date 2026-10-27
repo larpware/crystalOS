@@ -36,7 +36,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { createRoutedTCPSocket, openConnectTunnel, requestThroughTunnel } from "./tunnel.mjs";
+import { createRoutedTCPSocket, openConnectTunnel, requestThroughTunnel, verifyTlsThroughProxy } from "./tunnel.mjs";
 
 const USERNAME = "proxy-user";
 const PASSWORD = "proxy-pass";
@@ -66,6 +66,13 @@ let httpServer = null;
 let httpPort = 0;
 let chunkedServer = null;
 let chunkedPort = 0;
+/** TLS targets used by the proof tests: one answers, one stays silent. */
+let tlsAnswerServer = null;
+let tlsAnswerPort = 0;
+let tlsSilentServer = null;
+let tlsSilentPort = 0;
+let tlsNoiseServer = null;
+let tlsNoisePort = 0;
 
 function track(socket) {
   liveSockets.add(socket);
@@ -143,6 +150,40 @@ before(async () => {
   await new Promise((resolve) => chunkedServer.listen(0, "127.0.0.1", resolve));
   chunkedPort = chunkedServer.address().port;
 
+  /*
+   * TLS targets for the proof. Each one completes a real handshake with the
+   * throwaway certificate and then behaves differently — which is the whole
+   * point: a handshake alone cannot tell them apart, and telling them apart is
+   * what the proof now has to do.
+   */
+  tlsAnswerServer = createTlsServer({ key, cert: certificate }, (socket) => {
+    track(socket);
+    socket.once("data", () => {
+      socket.write("HTTP/1.1 200 OK\r\ncontent-length: 2\r\nconnection: close\r\n\r\nok");
+    });
+  });
+  await new Promise((resolve) => tlsAnswerServer.listen(0, "127.0.0.1", resolve));
+  tlsAnswerPort = tlsAnswerServer.address().port;
+
+  // Handshakes and then says nothing, ever: the exit that answers a CONNECT and
+  // black-holes the stream behind it.
+  tlsSilentServer = createTlsServer({ key, cert: certificate }, (socket) => {
+    track(socket);
+    socket.resume();
+  });
+  await new Promise((resolve) => tlsSilentServer.listen(0, "127.0.0.1", resolve));
+  tlsSilentPort = tlsSilentServer.address().port;
+
+  // Handshakes and then writes bytes that are not TLS records: the stream is
+  // mangled in transit, which is the failure that used to surface as a page
+  // that simply never rendered.
+  tlsNoiseServer = createTlsServer({ key, cert: certificate }, (socket) => {
+    track(socket);
+    socket.once("data", () => socket.write(Buffer.alloc(512, 7)));
+  });
+  await new Promise((resolve) => tlsNoiseServer.listen(0, "127.0.0.1", resolve));
+  tlsNoisePort = tlsNoiseServer.address().port;
+
   // An HTTPS CONNECT proxy with Proton's contract: TLS to the proxy, a CONNECT
   // line carrying Basic credentials, then an opaque byte pipe.
   proxyServer = createTlsServer({ key, cert: certificate }, (socket) => {
@@ -201,7 +242,7 @@ before(async () => {
 after(async () => {
   for (const socket of liveSockets) socket.destroy();
   liveSockets.clear();
-  for (const server of [proxyServer, echoServer, httpServer, chunkedServer]) {
+  for (const server of [proxyServer, echoServer, httpServer, chunkedServer, tlsAnswerServer, tlsSilentServer, tlsNoiseServer]) {
     if (server) await new Promise((resolve) => server.close(resolve));
   }
   if (directory) await rm(directory, { recursive: true, force: true });
@@ -295,6 +336,66 @@ describe("openConnectTunnel over real TLS", () => {
         target: { host: "127.0.0.1", port: echoPort },
         timeoutMs: 5_000,
       }),
+    );
+  });
+});
+
+describe("the exit proof over real TLS", () => {
+  /*
+   * These are the difference between a VPN that says "connected" and a VPN that
+   * can actually carry a page. The certificate check is one half; the answer a
+   * real request gets over the session is the other, and it is the half a
+   * public exit fails while still completing handshakes.
+   */
+  test("a session that carries a real answer is accepted", async (t) => {
+    if (skip) return t.skip(reason);
+    const proof = await verifyTlsThroughProxy({
+      proxy: { ...PROXY, port: proxyPort },
+      target: { host: "127.0.0.1", port: tlsAnswerPort },
+      connectImpl: connectTrustingTestCa,
+      timeoutMs: 6_000,
+    });
+    assert.equal(proof.status, 200);
+    assert.equal(typeof proof.subject, "string");
+  });
+
+  test("a session that answers a CONNECT and then says nothing is refused", async (t) => {
+    if (skip) return t.skip(reason);
+    await assert.rejects(
+      () =>
+        verifyTlsThroughProxy({
+          proxy: { ...PROXY, port: proxyPort },
+          target: { host: "127.0.0.1", port: tlsSilentPort },
+          connectImpl: connectTrustingTestCa,
+          timeoutMs: 1_200,
+        }),
+      /no answer to a request over it/,
+    );
+  });
+
+  test("a session whose stream is mangled is refused", async (t) => {
+    if (skip) return t.skip(reason);
+    await assert.rejects(() =>
+      verifyTlsThroughProxy({
+        proxy: { ...PROXY, port: proxyPort },
+        target: { host: "127.0.0.1", port: tlsNoisePort },
+        connectImpl: connectTrustingTestCa,
+        timeoutMs: 1_200,
+      }),
+    );
+  });
+
+  test("a proxy whose credentials are refused never gets as far as a session", async (t) => {
+    if (skip) return t.skip(reason);
+    await assert.rejects(
+      () =>
+        verifyTlsThroughProxy({
+          proxy: { host: "127.0.0.1", port: proxyPort, authorization: "Basic wrong" },
+          target: { host: "127.0.0.1", port: tlsAnswerPort },
+          connectImpl: connectTrustingTestCa,
+          timeoutMs: 1_200,
+        }),
+      /refused a CONNECT/,
     );
   });
 });

@@ -15,7 +15,7 @@ import {
 } from "@/components/ui";
 import { AppIcon, Icon } from "@/icons/Icon";
 import { metaFor } from "@/apps/catalog";
-import { useAppearanceStore, type LiveQuality } from "@/state/appearance";
+import { useAppearanceStore, elementThemeRegions, type LiveQuality } from "@/state/appearance";
 import { useShellStore } from "@/state/shell";
 import { useSystemStore } from "@/state/system";
 import {
@@ -65,6 +65,7 @@ export function AppearancePage() {
   const isGlassTheme = /glass/i.test(appearance.themeId);
   const isCustom = appearance.customThemes.find((entry) => entry.id === appearance.themeId);
   const [localScale, setLocalScale] = useState(appearance.osScale);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   useEffect(() => {
     setLocalScale(appearance.osScale);
@@ -120,7 +121,13 @@ export function AppearancePage() {
                 <span className="cr-swatch__accent" style={{ background: preset.tokens.accent }} />
               </span>
               <span className="cr-swatch__name">{preset.name}</span>
-              <span className="cr-swatch__meta">{preset.appearance}</span>
+              <span className="cr-swatch__meta">
+                {preset.recommended && <em className="cr-swatch__flag">recommended</em>}
+                {preset.deprecated && (
+                  <em className="cr-swatch__flag cr-swatch__flag--deprecated">deprecated</em>
+                )}
+                {preset.appearance}
+              </span>
             </button>
           ))}
         </div>
@@ -152,6 +159,17 @@ export function AppearancePage() {
               onChange={(value) => setLocalScale(value)}
               onCommit={(value) => appearance.setOsScale(value)}
               format={(value) => `${Math.round(value * 100)}%`}
+            />
+          }
+        />
+        <Row
+          label="TV interface (alpha)"
+          description="A 10-foot profile for televisions: raises the UI scale to sofa distance, paints remote-grade focus rings, and drives the launcher with arrow keys plus Enter. Every screen stays keyboard-reachable."
+          control={
+            <Switch
+              label="TV interface (alpha)"
+              checked={appearance.tvMode}
+              onChange={(checked) => appearance.setTvMode(checked)}
             />
           }
         />
@@ -213,6 +231,73 @@ export function AppearancePage() {
             />
           }
         />
+      </Section>
+
+      <Section
+        title="Window chrome"
+        description="How every window's titlebar meets the application underneath it."
+      >
+        <Row
+          label="Blend the titlebar into apps"
+          description="The bar thins out into the application instead of stopping at a solid edge, and the top of the app frosts up into it — the gradient under the controls is made from what the site is actually drawing, not from a painted band. Off by default, because a crisp edge is part of what makes a window read as a window; the app name and controls stay legible either way, and Reduce transparency puts the crisp bar back."
+          control={
+            <Switch
+              label="Blend the titlebar into apps"
+              checked={appearance.titlebarBlend}
+              onChange={appearance.setTitlebarBlend}
+            />
+          }
+        />
+      </Section>
+
+      <Section
+        title="Advanced · Per-element themes"
+        description="Give one part of the shell a theme of its own. A pick here is scoped to that surface only — windows, the dock, the panel, overlays, the lock screen or standby — while everything else keeps the active theme."
+      >
+        <Row
+          label="Per-element themes"
+          description="Off by default. Every surface follows the active theme until you choose otherwise."
+          control={
+            <Button
+              variant="ghost"
+              icon={advancedOpen ? "chevron-up" : "chevron-down"}
+              onClick={() => setAdvancedOpen((open) => !open)}
+            >
+              {advancedOpen ? "Hide" : "Configure"}
+            </Button>
+          }
+        />
+        {advancedOpen &&
+          elementThemeRegions.map((region) => (
+            <Row key={region.id} label={region.label} description={region.description} control={
+              <Select
+                aria-label={`Theme for ${region.label}`}
+                value={appearance.elementThemes[region.id]}
+                onChange={(event) =>
+                  appearance.setElementTheme(region.id, event.target.value)
+                }
+                options={[
+                  { value: "", label: "Follow the active theme" },
+                  ...themePresets.map((preset) => ({ value: preset.id, label: preset.name })),
+                  ...appearance.customThemes.map((preset) => ({
+                    value: preset.id,
+                    label: `${preset.name} (custom)`,
+                  })),
+                ]}
+              />
+            } />
+          ))}
+        {advancedOpen && (
+          <Row
+            label="Reset every surface"
+            description="Returns each region above to the active theme."
+            control={
+              <Button variant="ghost" onClick={() => appearance.resetElementThemes()}>
+                Follow all
+              </Button>
+            }
+          />
+        )}
       </Section>
 
       <Section
@@ -845,6 +930,14 @@ export function WallpaperPage() {
 
 export function LockScreenPage() {
   const { lock, setLock } = useShellStore();
+  const {
+    standbyEnabled,
+    setStandbyEnabled,
+    standbyIdleMinutes,
+    setStandbyIdleMinutes,
+    standbySleepMinutes,
+    setStandbySleepMinutes,
+  } = useSystemStore();
   return (
     <>
       <Section title="Lock screen layout">
@@ -1020,6 +1113,56 @@ export function LockScreenPage() {
           />
         </Row>
       </Section>
+
+      <Section
+        title="Standby"
+        description="An always-on display: after a spell without input the desk fades to a large clock, and after another spell the screen goes dark. Any pointer movement, wheel tick or key wakes it instantly, with every window exactly where it was."
+      >
+        <Row
+          label="Always-on display"
+          description="On by default. The clock uses the same face and 12/24-hour choice as the lock screen, and follows the active theme."
+          control={
+            <Switch
+              label="Always-on display"
+              checked={standbyEnabled}
+              onChange={setStandbyEnabled}
+            />
+          }
+        />
+        <Row
+          label="Enter standby after"
+          description="Minutes without keyboard, pointer or scroll input before the clock appears."
+          control={
+            <Select
+              aria-label="Enter standby after"
+              value={String(standbyIdleMinutes)}
+              onChange={(event) => setStandbyIdleMinutes(Number(event.target.value))}
+              options={[1, 2, 5, 10, 15, 30, 60].map((minutes) => ({
+                value: String(minutes),
+                label: minutes === 1 ? "1 minute" : `${minutes} minutes`,
+              }))}
+            />
+          }
+        />
+        <Row
+          label="Sleep after"
+          description="Minutes on the standby clock before the screen goes dark. Waking is the same gesture, and the desk returns where it was."
+          control={
+            <Select
+              aria-label="Sleep after"
+              value={String(standbySleepMinutes)}
+              onChange={(event) => setStandbySleepMinutes(Number(event.target.value))}
+              options={[
+                { value: "0", label: "Never" },
+                ...[5, 10, 15, 30, 60].map((minutes) => ({
+                  value: String(minutes),
+                  label: `${minutes} minutes`,
+                })),
+              ]}
+            />
+          }
+        />
+      </Section>
     </>
   );
 }
@@ -1033,7 +1176,7 @@ export function IconsPage() {
 
   // Real catalogue ids: the preview shows the pack applied to the applications
   // the shell actually ships.
-  const sample = ["drive", "browser", "terminal", "games", "music", "settings"];
+  const sample = ["drive", "browser", "terminal", "library", "music", "settings"];
 
   const importPack = async (file: File) => {
     try {

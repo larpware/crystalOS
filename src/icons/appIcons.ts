@@ -23,6 +23,9 @@ export const appIconArt: Record<string, string> = {
   discord: "/icons/apps/discord.png",
   drive: "/icons/apps/drive.png",
   games: "/icons/apps/games.png",
+  // The Game Library is the surviving copy of the games catalogue, under its own
+  // id: it keeps the same tile, so the dock row does not change shape.
+  library: "/icons/apps/games.png",
   messages: "/icons/apps/messages.png",
   music: "/icons/apps/music.png",
   notes: "/icons/apps/documents.png",

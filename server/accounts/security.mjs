@@ -28,8 +28,13 @@ export const USERNAME_PATTERN = /^[a-zA-Z0-9._-]+$/;
 export const DISPLAY_NAME_MAX = 40;
 export const BIO_MAX = 200;
 export const MESSAGE_MAX = 2000;
+export const POST_MAX = 4000;
+export const COMMENT_MAX = 1500;
+export const POST_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
+export const REPORT_REASON_MAX = 500;
 export const AVATAR_MAX_BYTES = 512 * 1024;
 const AVATAR_PATTERN = /^data:image\/(png|jpe?g|webp|gif|avif);base64,[A-Za-z0-9+/=]+$/;
+const POST_IMAGE_PATTERN = /^data:image\/(png|jpe?g|webp|gif|avif);base64,[A-Za-z0-9+/=]+$/;
 
 export const SESSION_COOKIE = "crescent_session";
 export const SESSION_TOKEN_BYTES = 32;
@@ -39,6 +44,18 @@ export const SESSION_TOKEN_BYTES = 32;
 /** Strips control characters so nothing but text is ever stored or echoed. */
 export function cleanText(value) {
   return String(value ?? "").replace(/[\u0000-\u001f\u007f-\u009f]/g, "");
+}
+
+/**
+ * Names held for the project owner. Checked case-insensitively against both
+ * usernames and display names, at registration and at every later rename, so
+ * the identity cannot be borrowed, re-registered or cosplayed by spelling
+ * around it. Display names may otherwise duplicate freely.
+ */
+export const RESERVED_NAMES = new Set(["kiyaan"]);
+
+function isReservedName(value) {
+  return RESERVED_NAMES.has(String(value ?? "").trim().toLowerCase());
 }
 
 function stringField(value) {
@@ -52,6 +69,9 @@ export function validateUsername(value) {
   if (username.length > USERNAME_MAX) return { error: "Usernames are limited to 20 characters." };
   if (!USERNAME_PATTERN.test(username)) {
     return { error: "Use letters, numbers, dot, dash or underscore only." };
+  }
+  if (isReservedName(username)) {
+    return { error: "That username is reserved for the project owner." };
   }
   return { value: username };
 }
@@ -72,6 +92,9 @@ export function validateDisplayName(value, fallback) {
   if (!raw) return { value: fallback };
   if (raw.length > DISPLAY_NAME_MAX) {
     return { error: `Display names are limited to ${DISPLAY_NAME_MAX} characters.` };
+  }
+  if (isReservedName(raw)) {
+    return { error: "That display name is reserved for the project owner." };
   }
   return { value: raw };
 }
@@ -96,6 +119,95 @@ export function validateMessageBody(value) {
   if (!body) return { error: "Messages cannot be empty." };
   if (body.length > MESSAGE_MAX) return { error: `Messages are limited to ${MESSAGE_MAX} characters.` };
   return { value: body };
+}
+
+/** A social post: text required, image optional and strictly validated. */
+export function validatePostBody(value) {
+  const body = cleanText(stringField(value) ?? "").trim();
+  if (!body) return { error: "A post needs some text." };
+  if (body.length > POST_MAX) return { error: `Posts are limited to ${POST_MAX} characters.` };
+  return { value: body };
+}
+
+export function validateCommentBody(value) {
+  const body = cleanText(stringField(value) ?? "").trim();
+  if (!body) return { error: "Comments cannot be empty." };
+  if (body.length > COMMENT_MAX) return { error: `Comments are limited to ${COMMENT_MAX} characters.` };
+  return { value: body };
+}
+
+export function validatePostImage(value) {
+  if (value === null || value === undefined || value === "") return { value: null };
+  const raw = stringField(value);
+  if (raw === null) return { error: "That image could not be read." };
+  if (raw.length > POST_IMAGE_MAX_BYTES) {
+    return { error: "Post images are limited to 2 MB. Try a smaller picture." };
+  }
+  if (!POST_IMAGE_PATTERN.test(raw)) {
+    return { error: "Post images must be a PNG, JPEG, WebP, GIF or AVIF data URL." };
+  }
+  return { value: raw };
+}
+
+export function validateReportReason(value) {
+  const reason = cleanText(stringField(value) ?? "").trim();
+  if (!reason) return { error: "Say why you are reporting this." };
+  if (reason.length > REPORT_REASON_MAX) {
+    return { error: `Report reasons are limited to ${REPORT_REASON_MAX} characters.` };
+  }
+  return { value: reason };
+}
+
+/* ---- Store submissions --------------------------------------------------
+
+   A submission proposes a web application for the catalogue. The URL is the
+   only thing that ever "runs", and only inside the Browser, so it is held to
+   the same http(s)-only rule the Browser itself enforces.
+   ------------------------------------------------------------------------ */
+
+export function validateSubmission(value) {
+  const input = value && typeof value === "object" ? value : {};
+  const name = cleanText(stringField(input.name) ?? "").trim();
+  if (name.length < 2) return { error: "The application needs a name of at least 2 characters." };
+  if (name.length > 60) return { error: "Application names are limited to 60 characters." };
+
+  const description = cleanText(stringField(input.description) ?? "").trim();
+  if (description.length < 10) {
+    return { error: "Describe the application in at least 10 characters." };
+  }
+  if (description.length > 500) {
+    return { error: "Descriptions are limited to 500 characters." };
+  }
+
+  const category = String(input.category ?? "").trim().toLowerCase();
+  if (!/^[a-z][a-z0-9-]{0,31}$/.test(category)) {
+    return { error: "Pick a category like 'games' or 'productivity'." };
+  }
+
+  const url = String(input.url ?? "").trim();
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return { error: "The application needs a valid URL." };
+  }
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+    return { error: "Only http(s) applications can be listed." };
+  }
+  if (url.length > 300) return { error: "URLs are limited to 300 characters." };
+
+  return { value: { name, description, category, url } };
+}
+
+export function validateReview(value) {
+  const input = value && typeof value === "object" ? value : {};
+  const action = String(input.action ?? "").trim();
+  if (action !== "approve" && action !== "reject") {
+    return { error: "Review decisions are approve or reject." };
+  }
+  const note = cleanText(stringField(input.note) ?? "").trim();
+  if (note.length > 500) return { error: "Review notes are limited to 500 characters." };
+  return { value: { action, note: note || null } };
 }
 
 /** Client-proposed message ids are accepted only in a narrow, safe shape. */

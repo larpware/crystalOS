@@ -82,9 +82,21 @@ export function countrySources(country) {
 export const DEFAULT_EXIT_CHECK_URL = "http://api.ipify.org/";
 
 /** The undocumented upper bound on how many candidates one scan will try. */
-export const DEFAULT_MAX_CANDIDATES = 60;
+export const DEFAULT_MAX_CANDIDATES = 120;
 
-/** What a proxy must carry a verified TLS session to before it is considered. */
+/**
+ * How long one candidate gets to prove itself.
+ *
+ * The merged lists are overwhelmingly slow hosts, and a real proxy that answers
+ * in seven seconds is still a proxy that works — measured, not guessed: a DE
+ * exit that carried DuckDuckGo end to end took 7.0s on a probe and was thrown
+ * away by the four-second budget this used to be. Batches run concurrently, so a
+ * longer per-candidate budget costs wall-clock time only for candidates that are
+ * actually slow to answer.
+ */
+export const DEFAULT_PROBE_TIMEOUT_MS = 8_000;
+
+/** What a proxy must carry a verified TLS session *and a real answer* to. */
 export const DEFAULT_PROBE_TARGET = { host: "example.com", port: 443 };
 
 /**
@@ -201,9 +213,11 @@ export function createProxyPool({
   /**
    * The whole health check, injectable as one unit. Defaults to a *verified TLS*
    * probe (`verifyTlsThroughProxy`): a proxy is only good if it can carry a real,
-   * certificate-checked TLS session to the target. A CONNECT-only probe would
-   * happily accept a proxy that black-holes the site or intercepts TLS — the two
-   * ways a proxied page goes blank or shows a certificate error.
+   * certificate-checked TLS session to the target *and* get an answer back over
+   * it. A CONNECT-only probe would happily accept a proxy that black-holes the
+   * site or intercepts TLS, and a handshake-only probe accepts one that completes
+   * handshakes and then corrupts or stalls the stream — the three ways a proxied
+   * page goes blank or shows a certificate error.
    */
   probe = null,
   tunnel = { openConnectTunnel },
@@ -214,9 +228,22 @@ export function createProxyPool({
   probeTarget = DEFAULT_PROBE_TARGET,
   probeTargets = null,
   checkUrl = DEFAULT_EXIT_CHECK_URL,
-  timeoutMs = 4_000,
+  timeoutMs = DEFAULT_PROBE_TIMEOUT_MS,
   sourceTimeoutMs = 8_000,
   maxCandidates = DEFAULT_MAX_CANDIDATES,
+  /**
+   * Shuffle the merged candidates before the bound is applied.
+   *
+   * The merged list is ordered by which source contributed each entry, and the
+   * sources disagree wildly about quality — one is a raw dump where most hosts
+   * are years dead, another only lists hosts checked in the last minutes. Taking
+   * a fixed prefix therefore tests the same dead hosts on every scan and never
+   * reaches the good ones behind them. Shuffling spreads one scan's budget across
+   * every source; because a scan also stops as soon as it has enough survivors,
+   * a pool with plenty of life in it still finishes quickly.
+   */
+  shuffle = true,
+  random = Math.random,
   concurrency = 24,
   targetWorking = 5,
   log = () => undefined,
@@ -272,10 +299,20 @@ export function createProxyPool({
         if (seen.has(key)) continue;
         seen.add(key);
         candidates.push(parsed);
-        if (candidates.length >= maxCandidates) return candidates;
       }
     }
-    return candidates;
+    // Every candidate is collected before the bound is applied, so the bound
+    // chooses *which* candidates to try rather than silently dropping the tail of
+    // every source but the first.
+    if (shuffle) {
+      for (let index = candidates.length - 1; index > 0; index -= 1) {
+        const swap = Math.floor(random() * (index + 1));
+        const held = candidates[index];
+        candidates[index] = candidates[swap];
+        candidates[swap] = held;
+      }
+    }
+    return candidates.slice(0, maxCandidates);
   }
 
   /**

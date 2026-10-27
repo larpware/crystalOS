@@ -19,7 +19,7 @@
 }
 
 .cr-settings__search {
-  padding: 10px 10px 8px;
+  padding: 10px 10px var(--space-3);
   border-bottom: 1px solid var(--border-subtle);
 }
 
@@ -27,7 +27,7 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 8px 6px 14px;
+  padding: var(--space-3) var(--space-2) 14px;
 }
 
 .cr-settings__group + .cr-settings__group {
@@ -35,7 +35,7 @@
 }
 
 .cr-settings__group-title {
-  padding: 10px 8px 4px;
+  padding: 10px var(--space-3) var(--space-1);
   font-size: var(--fs-xs);
   font-weight: 600;
   letter-spacing: -0.005em;
@@ -105,8 +105,8 @@
 .cr-settings__page-head h2 {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin: 0 0 4px;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-1);
   font-size: var(--fs-lg);
   font-weight: 600;
   letter-spacing: -.01em;
@@ -122,7 +122,7 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
   gap: 10px;
-  padding: 4px 0 10px;
+  padding: var(--space-1) 0 10px;
 }
 
 .cr-swatch {
@@ -131,8 +131,8 @@
   /* Buttons get `align-items: flex-start` from the UA stylesheet, which would
      shrink the preview swatch to its borders. Stretch it back out. */
   align-items: stretch;
-  gap: 6px;
-  padding: 8px;
+  gap: var(--space-2);
+  padding: var(--space-3);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-medium);
   background-color: var(--surface-1);
@@ -171,7 +171,7 @@
   display: flex;
   flex-direction: column;
   gap: 3px;
-  padding: 4px 5px;
+  padding: var(--space-1) 5px;
 }
 
 .cr-swatch__panel span:first-child {
@@ -210,6 +210,28 @@
   text-transform: capitalize;
 }
 
+.cr-swatch__flag {
+  margin-right: 5px;
+  margin-left: 2px;
+  padding: 1px 5px;
+  border: 1px solid var(--accent-primary-muted);
+  border-radius: var(--radius-xs);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xxs);
+  font-style: normal;
+  letter-spacing: 0.07em;
+  color: var(--accent-on-muted);
+  background: var(--accent-primary-muted);
+}
+
+/* Deprecated themes keep the same badge shape but lose the accent: the label
+   should read as a status, not as a recommendation. */
+.cr-swatch__flag--deprecated {
+  border-color: var(--border-default);
+  color: var(--text-muted);
+  background: transparent;
+}
+
 .cr-accent-picker {
   display: flex;
   align-items: center;
@@ -246,7 +268,7 @@
 }
 
 .cr-accent-dot[aria-pressed="true"] {
-  box-shadow: 0 0 0 2px var(--surface-0), 0 0 0 3px var(--text-primary);
+  box-shadow: 0 0 0 2px var(--surface-0), 0 0 0 3px var(--border-strong);
 }
 
 /* The custom swatch carries a ring so it reads as "pick any colour" rather
@@ -258,7 +280,7 @@
 .cr-accent-custom {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .cr-accent-custom .cr-input {
@@ -271,11 +293,11 @@
 .cr-credit-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-3);
 }
 
 .cr-credit {
-  padding: 12px 14px;
+  padding: var(--space-4) 14px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-medium);
   background-color: var(--surface-1);
@@ -286,7 +308,7 @@
 .cr-credit__head {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-3);
 }
 
 .cr-credit__name {
@@ -308,7 +330,7 @@
   align-items: baseline;
   gap: 10px;
   flex-wrap: wrap;
-  margin-top: 8px;
+  margin-top: var(--space-3);
   font-size: var(--fs-xs);
   color: var(--text-muted);
 }
@@ -329,7 +351,7 @@
 .cr-theme-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-2);
   padding-bottom: 10px;
 }
 
@@ -337,7 +359,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 10px;
+  padding: var(--space-3) 10px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-small);
   background-color: var(--surface-1);
@@ -361,7 +383,7 @@
 .cr-token-editor {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-1);
   max-height: 52vh;
   overflow-y: auto;
 }
@@ -370,7 +392,7 @@
   display: grid;
   grid-template-columns: 132px minmax(0, 1fr) 34px;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-3);
 }
 
 .cr-token-editor__label {
@@ -409,8 +431,8 @@
 .cr-impact-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 8px 0 2px;
+  gap: var(--space-1);
+  padding: var(--space-3) 0 2px;
 }
 
 .cr-impact {
@@ -512,7 +534,7 @@
 .cr-shortcut__tags {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
   margin-left: auto;
 }
 
@@ -526,7 +548,7 @@
   border-radius: var(--radius-xs);
   background: transparent;
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   cursor: pointer;
 }
 
@@ -550,7 +572,7 @@
 .cr-profile {
   display: flex;
   gap: 14px;
-  padding: 12px 0 16px;
+  padding: var(--space-4) 0 var(--space-5);
 }
 
 .cr-profile__avatar {
@@ -563,7 +585,7 @@
   background: var(--surface-3);
   border: 1px solid var(--border-default);
   color: var(--text-secondary);
-  font-size: 22px;
+  font-size: var(--fs-xl);
   font-weight: 500;
   overflow: hidden;
   flex: none;
@@ -576,15 +598,15 @@
 }
 
 .cr-profile__name {
-  font-size: 15px;
+  font-size: var(--fs-md);
   font-weight: 600;
 }
 
 .cr-profile__actions {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-top: 8px;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
 }
 
 /* ---- widget picker ----------------------------------------------------- */
@@ -592,7 +614,7 @@
 .cr-widget-picker {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(232px, 1fr));
-  gap: 8px;
+  gap: var(--space-3);
 }
 
 .cr-widget-picker__item {
@@ -600,8 +622,8 @@
   flex-direction: column;
   /* Same button reset quirk as the theme swatches: keep rows full width. */
   align-items: stretch;
-  gap: 6px;
-  padding: 11px 12px;
+  gap: var(--space-2);
+  padding: 11px var(--space-4);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-medium);
   background-color: var(--surface-1);
@@ -621,7 +643,7 @@
 .cr-widget-picker__head {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-3);
   font-size: var(--fs-sm);
   font-weight: 550;
 }
@@ -642,7 +664,7 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 6px 0 16px;
+  padding: var(--space-2) 0 var(--space-5);
 }
 
 .cr-about__mark {
@@ -667,13 +689,13 @@
 .cr-inline-label {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-3);
 }
 
 .cr-inline-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .cr-button-row {
@@ -690,11 +712,11 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 14px;
-  padding: 6px 0 2px;
+  padding: var(--space-2) 0 2px;
 }
 
 .cr-offline-lists h4 {
-  margin: 0 0 6px;
+  margin: 0 0 var(--space-2);
   font-size: var(--fs-xs);
   font-weight: 650;
   letter-spacing: 0.03em;
@@ -704,10 +726,10 @@
 
 .cr-offline-lists ul {
   margin: 0;
-  padding-left: 16px;
+  padding-left: var(--space-5);
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-1);
   color: var(--text-secondary);
   font-size: var(--fs-sm);
 }
@@ -715,7 +737,7 @@
 .cr-chip-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .cr-input--mono {
@@ -726,7 +748,7 @@
 .cr-icon-preview {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: var(--space-4);
   padding: 10px 0 14px;
 }
 
@@ -761,7 +783,7 @@
   justify-content: center;
   width: 14px;
   height: 14px;
-  margin-left: 4px;
+  margin-left: var(--space-1);
   padding: 0;
   border: 0;
   border-radius: 50%;
@@ -773,7 +795,7 @@
 
 .cr-badge__action:hover {
   opacity: 1;
-  background: rgba(0, 0, 0, .25);
+  background: color-mix(in srgb, var(--text-primary) 9%, transparent);
 }
 
 /* On a small viewport (the desktop itself is narrow, or the window is pinned
@@ -785,7 +807,7 @@
   }
 
   .cr-settings__page {
-    padding: 16px 16px 36px;
+    padding: var(--space-5) var(--space-5) 36px;
   }
 }
 
@@ -806,7 +828,7 @@
   }
 
   .cr-settings__page {
-    padding: 14px 14px 32px;
+    padding: 14px 14px var(--space-8);
   }
 }
 
@@ -816,8 +838,8 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 12px;
-  padding: 4px 0 10px;
+  gap: var(--space-4);
+  padding: var(--space-1) 0 10px;
 }
 
 /* ---- All Apps preview --------------------------------------------------
@@ -828,8 +850,8 @@
 .cr-allapps-preview {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 12px 12px 14px;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-4) 14px;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-medium);
   background: var(--surface-2);
@@ -858,8 +880,8 @@
 .cr-plugin {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 12px;
+  gap: var(--space-3);
+  padding: var(--space-4);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-medium);
   background: var(--surface-2);
@@ -909,7 +931,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-3);
 }
 
 .cr-plugin__actions .cr-plugin__meta {

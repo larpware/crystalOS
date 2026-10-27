@@ -8,8 +8,11 @@ import {
   useGamesStore,
 } from "@/state/games";
 import { formatRelative } from "@/utils/format";
+import { useWindowStore } from "@/state/windows";
 import { categoryLabels, tilePalette, type CrystalOSGame } from "./catalogue";
 import { gameDisplayTitle } from "./launch";
+import { BuiltinBreakout } from "./builtins/Breakout";
+import { BuiltinSnake } from "./builtins/Snake";
 
 /* ==========================================================================
    Shared Games parts
@@ -317,10 +320,12 @@ export function GameDetail({
  * reload, fullscreen, muting the frame and closing.
  */
 export function GamePlayer({
+  windowId,
   game,
   onClose,
   onSession,
 }: {
+  windowId: string;
   game: CrystalOSGame;
   onClose: () => void;
   onSession: (seconds: number) => void;
@@ -334,6 +339,14 @@ export function GamePlayer({
   const storedProfile = useGamesStore((state) => state.profiles[game.id]);
   const profile = useMemo(() => normaliseGameProfile(storedProfile), [storedProfile]);
   const title = gameDisplayTitle(game, profile.title);
+
+  /* The desk button: a window can fill the work area without leaving the shell,
+     so the panel and the dock stay reachable. The stage's own fullscreen is a
+     different, stricter mode and is still here beside it. */
+  const maximized = useWindowStore(
+    (state) => state.windows.find((window) => window.id === windowId)?.state === "maximized",
+  );
+  const toggleMaximize = useWindowStore((state) => state.toggleMaximize);
 
   useEffect(() => {
     startedAt.current = Date.now();
@@ -379,11 +392,20 @@ export function GamePlayer({
         <span className="cr-game-player__host">{game.host}</span>
         <div className="cr-game-player__controls">
           <IconButton icon="refresh" label="Reload game" onClick={() => setNonce((value) => value + 1)} />
-          <IconButton
-            icon="external"
-            label="Open on the publisher's site"
-            onClick={() => window.open(game.url, "_blank", "noopener,noreferrer")}
-          />
+          {!game.builtin && (
+            <IconButton
+              icon="external"
+              label="Open on the publisher's site"
+              onClick={() => window.open(game.url, "_blank", "noopener,noreferrer")}
+            />
+          )}
+          <Tooltip label={maximized ? "Restore window" : "Fill the desk (keeps the dock and panel)"}>
+            <IconButton
+              icon={maximized ? "restore" : "maximize"}
+              label={maximized ? "Restore window" : "Fill the desk"}
+              onClick={() => toggleMaximize(windowId)}
+            />
+          </Tooltip>
           <Tooltip label={fullscreen ? "Exit fullscreen" : "Fullscreen"}>
             <IconButton
               icon={fullscreen ? "collapse" : "expand"}
@@ -398,7 +420,12 @@ export function GamePlayer({
       </header>
 
       <div className="cr-game-player__stage" ref={hostRef}>
-        <iframe
+        {game.builtin ? (
+          <div key={nonce} className="cr-game-player__builtin">
+            {game.builtin === "snake" ? <BuiltinSnake /> : <BuiltinBreakout />}
+          </div>
+        ) : (
+          <iframe
           key={nonce}
           className="cr-game-player__frame"
           title={title}
@@ -407,7 +434,8 @@ export function GamePlayer({
           sandbox="allow-forms allow-modals allow-orientation-lock allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-presentation allow-same-origin allow-scripts"
           onError={() => setFailed(true)}
         />
-        {failed && (
+        )}
+        {failed && !game.builtin && (
           <div className="cr-game-player__error">
             <Icon name="warning" size={22} />
             <p>

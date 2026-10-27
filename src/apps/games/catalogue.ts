@@ -24,6 +24,12 @@ export interface CrystalOSGame {
   addedIndex: number;
   /** Hand-picked by the catalogue editors and labelled as such in the UI. */
   editorsChoice?: boolean;
+  /**
+   * A game this build ships and runs itself, on a canvas in the player frame.
+   * Built-ins need no host, no network and no embed permission, so they are
+   * the games that still play with the proxy off.
+   */
+  builtin?: "snake" | "breakout";
 }
 
 export type GameCategory =
@@ -143,6 +149,17 @@ export const editorsChoiceGames: CrystalOSGame[] = [
     addedIndex: -1,
     editorsChoice: true,
   },
+  {
+    id: "territorial-io",
+    title: "Territorial.io",
+    url: "https://territorial.io/",
+    category: "io",
+    collection: collectionFor.io,
+    host: "territorial.io",
+    cover: "/games/territorial-cover.png",
+    addedIndex: -3,
+    editorsChoice: true,
+  },
 ];
 
 export const games: CrystalOSGame[] = (portedGames as PortedGame[])
@@ -160,6 +177,37 @@ export const games: CrystalOSGame[] = (portedGames as PortedGame[])
       addedIndex: index,
     };
   });
+
+/**
+ * Built-in games. They carry an empty url on purpose: launch routes them to
+ * the player frame, which renders the shipped component instead of a host.
+ */
+export const builtinGames: CrystalOSGame[] = [
+  {
+    id: "crystal-snake",
+    title: "Crystal Snake",
+    url: "",
+    category: "od",
+    collection: collectionFor.od,
+    host: "CrystalOS built-in",
+    cover: null,
+    addedIndex: -2,
+    builtin: "snake",
+  },
+  {
+    id: "crystal-breakout",
+    title: "Crystal Breakout",
+    url: "",
+    category: "od",
+    collection: collectionFor.od,
+    host: "CrystalOS built-in",
+    cover: null,
+    addedIndex: -2,
+    builtin: "breakout",
+  },
+];
+
+games.unshift(...builtinGames);
 
 // Editor's Choice titles sit at the front of the catalogue, in pick order.
 games.unshift(...editorsChoiceGames);
@@ -215,6 +263,7 @@ export function searchGames(query: string, category: GameCategory | "all"): Crys
  * hero area is stable between reloads and never claims to be personalised.
  */
 const featuredIds = [
+  "crystal-snake",
   "gta-5",
   "smash-karts",
   "moto-x3m",

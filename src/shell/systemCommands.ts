@@ -1,4 +1,5 @@
 import { games } from "@/apps/games/catalogue";
+import { launchGame, launchGameInWindow } from "@/apps/games/launch";
 import { appRegistry } from "@/apps/registry";
 import { combo } from "@/services/keys";
 import { registerCommands, type Command } from "@/services/commands";
@@ -127,7 +128,13 @@ export function registerSystemCommands(): void {
       keywords: ["game", "play", game.category, game.collection, game.host],
       icon: "games",
       run: () => {
-        openApp("games", { args: { gameId: game.id } });
+        /* The palette plays a title the way the library does: `launchGame`
+           honours a profile that opens in a browser tab, and anything left over
+           runs in a player window. The old target was the app id that left the
+           catalogue when the two games libraries became one, so opening it
+           answered with "Application unavailable". */
+        if (launchGame(game) !== "embedded") return;
+        launchGameInWindow(game);
       },
     });
   }
@@ -606,6 +613,20 @@ export function shortcutDefaults(): ShortcutDefinition[] {
       run: () => {
         const window = focusedWindow();
         if (window) windows().snap(window.id, "right");
+      },
+    },
+    {
+      id: "full-screen",
+      label: "Toggle full screen for the focused window",
+      category: "Windows",
+      description:
+        "Full screen takes the whole viewport and the panel and the dock step aside. The same combination brings the window back to its normal size — right-clicking it offers the same choice, with close and minimize beside it.",
+      defaultKeys: combo("z", { shift: true }),
+      icon: "expand",
+      when: withWindow,
+      run: () => {
+        const window = focusedWindow();
+        if (window) windows().toggleFullScreen(window.id);
       },
     },
     {
