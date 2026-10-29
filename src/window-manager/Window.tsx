@@ -293,6 +293,11 @@ export function Window({
 
   const titlePointerDown = useCallback(
     (event: ReactPointerEvent<HTMLElement>) => {
+      /* A bar is furniture, not content: the browser must not select the
+         title's text nor start a native drag of the icon image, either of
+         which leaves a ghost that can steal the release this gesture needs.
+         This is not a navigation hazard — it keeps the move session clean. */
+      event.preventDefault();
       if (event.detail > 1) return;
       beginMove(event);
     },
