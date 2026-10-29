@@ -169,3 +169,138 @@ test("a localhost backend cannot be published through a Netlify proxy", (t) => {
   assert.match(errors.join(""), /unreachable from the CDN edge/);
   assert.ok(!existsSync(join(dir, "_redirects")), "no misleading rules were written");
 });
+
+/* -------------------------------------------------------------------------- */
+/* Build validation vs. production validation                                   */
+
+const outputs = () => {
+  const out = [];
+  const err = [];
+  return {
+    out,
+    err,
+    stdout: { write: (text) => out.push(text) },
+    stderr: { write: (text) => err.push(text) },
+  };
+};
+
+test("an explicit production context still fails without a backend", (t) => {
+  const dir = scratch(t);
+  const { err, stdout, stderr } = outputs();
+  const result = writeDeployConfig({
+    backendUrl: "",
+    apiOrigin: "",
+    outDir: dir,
+    isNetlify: true,
+    context: "production",
+    stdout,
+    stderr,
+  });
+  assert.equal(result.ok, false);
+  assert.match(err.join(""), /account service would be dead on deploy/);
+  assert.match(err.join(""), /build context: production/);
+});
+
+test("an unknown Netlify context is treated as production, not as a preview", (t) => {
+  const dir = scratch(t);
+  const { err, stdout, stderr } = outputs();
+  const result = writeDeployConfig({
+    backendUrl: "",
+    apiOrigin: "",
+    outDir: dir,
+    isNetlify: true,
+    context: "some-future-context",
+    stdout,
+    stderr,
+  });
+  assert.equal(result.ok, false, "silence is only allowed for known preview contexts");
+});
+
+test("a deploy preview builds without a backend, loudly and without wiring", (t) => {
+  const dir = scratch(t);
+  const { out, err, stdout, stderr } = outputs();
+  const result = writeDeployConfig({
+    backendUrl: "",
+    apiOrigin: "",
+    outDir: dir,
+    isNetlify: true,
+    context: "deploy-preview",
+    stdout,
+    stderr,
+  });
+  assert.equal(result.ok, true, "the artifact can be inspected");
+  assert.equal(result.redirects, false);
+  assert.equal(result.config, false, "nothing pretends a backend exists");
+  assert.ok(!existsSync(join(dir, "_redirects")));
+  assert.ok(!existsSync(join(dir, "config.json")));
+  assert.ok(result.warnings.length > 0, "the preview reports what it is missing");
+  assert.match(out.join(""), /not production/);
+  assert.match(out.join(""), /PRODUCTION build still fails/);
+  assert.equal(err.length, 0, "a preview is not an error");
+});
+
+test("a preview with a localhost backend writes no rules and does not fail", (t) => {
+  const dir = scratch(t);
+  const { stdout, stderr } = outputs();
+  const result = writeDeployConfig({
+    backendUrl: "http://localhost:8787",
+    outDir: dir,
+    isNetlify: true,
+    context: "branch-deploy",
+    stdout,
+    stderr,
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.redirects, false, "the edge can never reach the build machine");
+  assert.ok(!existsSync(join(dir, "_redirects")));
+});
+
+test("production is strict on any host when explicitly requested (deploy:check)", (t) => {
+  const dir = scratch(t);
+  const { err, stdout, stderr } = outputs();
+  const result = writeDeployConfig({
+    backendUrl: "",
+    apiOrigin: "",
+    outDir: dir,
+    isNetlify: false,
+    production: true,
+    stdout,
+    stderr,
+  });
+  assert.equal(result.ok, false, "a local machine is not an excuse for a dead /api/*");
+  assert.match(err.join(""), /CRESCENT_BACKEND_URL/);
+
+  // …and localhost is refused the same way, so production can never fall
+  // back to the build machine.
+  const local = scratch(t);
+  const second = outputs();
+  const refused = writeDeployConfig({
+    backendUrl: "http://localhost:8787",
+    outDir: local,
+    isNetlify: false,
+    production: true,
+    stdout: second.stdout,
+    stderr: second.stderr,
+  });
+  assert.equal(refused.ok, false);
+  assert.match(second.err.join(""), /unreachable from the CDN edge/);
+});
+
+test("a check run validates without touching the filesystem", (t) => {
+  const dir = scratch(t);
+  const { out, stdout, stderr } = outputs();
+  const result = writeDeployConfig({
+    backendUrl: "https://api.example.com",
+    outDir: dir,
+    isNetlify: true,
+    context: "production",
+    production: true,
+    write: false,
+    stdout,
+    stderr,
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.redirects, true, "it reports what production would write");
+  assert.ok(!existsSync(join(dir, "_redirects")), "a check writes nothing");
+  assert.match(out.join(""), /would be written/);
+});

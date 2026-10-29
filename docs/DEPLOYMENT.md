@@ -111,7 +111,7 @@ sign-in reports that no account server is reachable.
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `CRESCENT_PORT` | `8787` | port to listen on |
+| `CRESCENT_PORT` | `PORT`, else `8787` | port to listen on; a platform-assigned `PORT` (Render, Railway, Koyeb, Northflank) is honoured when this is unset |
 | `CRESCENT_HOST` | `127.0.0.1` | interface to bind (`0.0.0.0` behind a platform proxy) |
 | `CRESCENT_ACCOUNTS_DB` | `server/accounts/data/accounts.db` | the authoritative SQLite file; put it on a persistent volume |
 | `CRESCENT_PUBLIC_ORIGINS` | *(empty)* | comma-separated origins/bare hosts allowed to call cross-origin and receive CORS |
@@ -146,6 +146,7 @@ npm run dev            # backend + Vite dev server (http://127.0.0.1:5273)
 npm test               # full test suite (server, app, scripts)
 npm run typecheck      # tsc --noEmit
 npm run build          # typecheck + vite build + deployment wiring
+npm run deploy:check   # validate the production deployment config (writes nothing)
 npm start              # serve the built shell and the API from one process
 ```
 
@@ -214,7 +215,7 @@ accounts:  /api/accounts/* · 14 registered
 
 ## 5. Netlify, step by step
 
-1. Deploy the backend somewhere with a stable https URL (see §3). Confirm
+1. Deploy the backend somewhere with a stable https URL (see §7). Confirm
    `https://your-backend.example.com/api/accounts/me` answers JSON.
 2. In Netlify: *Add new site → Import an existing project*, this repository.
    Build command `npm run build`, publish directory `dist`.
@@ -229,6 +230,27 @@ A build without either `CRESCENT_BACKEND_URL` or `CRESCENT_API_ORIGIN` fails on
 purpose: a site whose `/api/*` has nowhere to go would deploy with a dead
 account system.
 
+### Build validation vs. production validation
+
+Two different questions, two different answers — the point being that you can
+always *inspect* the frontend without pretending a backend exists:
+
+| Command / context | Needs a backend origin? | Result |
+| --- | --- | --- |
+| `npm run build` (locally) | no | builds; writes only what the environment gives it |
+| `npm run build` on Netlify with `CONTEXT=deploy-preview` / `branch-deploy` / `dev` | no | builds, writes **no** wiring files, and logs loudly that `/api/*` has nowhere to go on that preview |
+| `npm run build` on Netlify in production (or with an unknown context) | **yes** | fails with the actionable error above |
+| `npm run deploy:check` | **yes** (on any machine) | validates the production configuration without writing anything; exit 1 with the same error when it is missing, malformed, or pointing at localhost |
+
+`npm run deploy:check` is the pre-publish gate: it runs the exact production
+path of `scripts/deploy-config.mjs` (`--production-check`), so what it accepts
+is what a production build would accept. A preview that builds is **not** a
+deployment that is ready — production stays red until a real backend origin is
+configured.
+
+Netlify's `CONTEXT` variable is what separates the rows; nothing else changed
+about the production check.
+
 ---
 
 ## 6. Production checklist
@@ -242,3 +264,60 @@ live:
 - [ ] The backend's boot line shows the expected account count
 - [ ] The database file is on a **persistent** disk, not the container's overlay
 - [ ] The backend restarts clean (WAL sidecars `-wal`/`-shm` travel with it)
+- [ ] `npm run deploy:check` passes with the production origin set
+
+---
+
+## 7. Hosting the backend
+
+The backend is plain Node — `node:http` + `node:sqlite`, no framework — so any
+host that keeps a long-lived Node 22.5+ process running works, and nothing
+serverless does: it terminates raw WebSocket upgrades itself, dials outbound TCP
+sockets itself and owns a SQLite file on disk.
+
+Whatever the host, these are the requirements:
+
+| Requirement | How it is met |
+| --- | --- |
+| Long-lived process | `npm start` → `node server/scramjet/index.js` |
+| Node 22.5+ | `node:sqlite` is the account store |
+| Port | `CRESCENT_PORT`, else the platform's own `PORT`, else `8787` |
+| Interface | `CRESCENT_HOST=0.0.0.0` — the default `127.0.0.1` is unreachable behind a platform proxy |
+| Persistent disk | `CRESCENT_ACCOUNTS_DB` must point **into a mounted volume**; container overlay storage loses every account on redeploy |
+| WebSocket | `wss://…/wisp/` on the same public port (Netlify cannot proxy the upgrade, so the transport dials it directly) |
+| Health check | `GET /api/proxy-status` → `200`, `application/json` — this is the path to enter as the host's health-check URL |
+| Cookies behind TLS | `CRESCENT_SECURE_COOKIES=1` |
+| The shell's origin | `CRESCENT_PUBLIC_ORIGINS=https://your-site.netlify.app` |
+| Direct Wisp dial | `CRESCENT_PUBLIC_WISP_URL=wss://your-backend.example/wisp/` |
+
+No secrets are needed: the backend has no API keys and calls no third-party
+services.
+
+### What the providers actually give you (checked October 2026)
+
+| Host | WebSockets | Persistent disk | Free tier | Verdict |
+| --- | --- | --- | --- | --- |
+| **Render** | yes, on the service's public port | **paid plans only** | free web service that sleeps after ~15 min idle | **not for the real database** — a SQLite file on a free instance does not survive a restart, and an idle socket dies at spin-down |
+| **Fly.io** | yes (raw upgrades documented) | yes — volumes, ~$0.15/GB/month | none for new organizations (smallest machine ~$2.19/30 days) | straightforward, roughly **$2.34/month** floor |
+| **Northflank** | yes | yes | Sandbox tier with an included monthly resource allowance | best hosted free candidate — keep usage inside the allowance |
+| **Railway** | yes | yes | 30-day $5 credit, then paid | works, not free long-term |
+| **Koyeb** | yes | **not on free** | free instance sleeps after 1 h | fails the SQLite requirement |
+| **Coolify** (self-hosted) | yes | yes | software free, server is yours | only if you already run a server |
+
+Sources: [Render free plan](https://render.com/docs/free),
+[Render disks](https://render.com/docs/disks),
+[Render WebSockets](https://render.com/docs/websocket),
+[Fly pricing](https://docs.fly.io/about/pricing),
+[Fly WebSockets](https://fly.io/blog/websockets-and-fly/),
+[Northflank pricing](https://northflank.com/pricing),
+[Koyeb volumes](https://www.koyeb.com/docs/reference/volumes),
+[Railway pricing](https://railway.com/pricing).
+
+Then, in order:
+
+1. Create the service, set the environment variables from §2, mount a disk at
+   the database path, and enter `/api/proxy-status` as the health check.
+2. Confirm `https://your-backend.example/api/accounts/me` answers JSON.
+3. In Netlify: *Site settings → Environment →* add
+   `CRESCENT_BACKEND_URL=https://your-backend.example`.
+4. Redeploy the site (a build without step 3 still fails on purpose).

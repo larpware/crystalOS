@@ -65,7 +65,13 @@ import { createRoutedTCPSocket } from "../vpn/tunnel.mjs";
 import { createAssets, TRANSPORTS, VENDORED_DIR } from "./assets.mjs";
 import { corsHeadersFor, parsePublicOrigins } from "../origins.mjs";
 
-const PORT = Number(process.env.CRESCENT_PORT ?? 8787);
+const PORT = Number(
+  // A hosting platform's own PORT (Render, Railway, Koyeb, Northflank all
+  // inject one, and some assign it at runtime) is honoured when CRESCENT_PORT
+  // is not set; the local default is last. Setting CRESCENT_PORT always wins,
+  // which is how `CRESCENT_PORT=8788 npm run scramjet` keeps working.
+  process.env.CRESCENT_PORT ?? process.env.PORT ?? 8787,
+);
 const HOST = process.env.CRESCENT_HOST ?? "127.0.0.1";
 const ALLOW_PRIVATE = process.env.CRESCENT_ALLOW_PRIVATE_IPS === "1";
 

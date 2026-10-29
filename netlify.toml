@@ -8,6 +8,11 @@
 #
 # Redirect rules in _redirects are processed before the rules below, so the
 # single-page fallback can never answer an /api/* request with index.html.
+#
+# The build fails here unless CRESCENT_BACKEND_URL or CRESCENT_API_ORIGIN is
+# set — except on a non-production context (deploy-preview, branch-deploy,
+# dev), which builds without backend wiring so the artifact can be inspected.
+# Production is never allowed through silently. See docs/DEPLOYMENT.md.
 
 [build]
   command = "npm run build"

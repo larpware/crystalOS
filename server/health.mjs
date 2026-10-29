@@ -16,7 +16,11 @@ export function backendOrigin(env = process.env) {
   const explicit = env.CRESCENT_BACKEND_URL;
   if (explicit) return explicit.replace(/\/+$/, "");
   const host = env.CRESCENT_HOST ?? "127.0.0.1";
-  const port = env.CRESCENT_PORT ?? "8787";
+  // Same precedence as the backend's own listener (server/scramjet/index.js):
+  // CRESCENT_PORT, then a platform-assigned PORT, then the local default. This
+  // probe must address exactly what the server binds, or the dev runner would
+  // spawn a second copy against a port the first one already owns.
+  const port = env.CRESCENT_PORT ?? env.PORT ?? "8787";
   return `http://${host}:${port}`;
 }
 

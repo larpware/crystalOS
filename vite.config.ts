@@ -14,7 +14,9 @@ import { fileURLToPath } from "node:url";
    shell waiting forever. */
 const backend = (
   process.env.CRESCENT_BACKEND_URL ??
-  `http://${process.env.CRESCENT_HOST ?? "127.0.0.1"}:${process.env.CRESCENT_PORT ?? 8787}`
+  // Same precedence as the backend listener and the health probe: an explicit
+  // CRESCENT_PORT, else a platform PORT, else the local default.
+  `http://${process.env.CRESCENT_HOST ?? "127.0.0.1"}:${process.env.CRESCENT_PORT ?? process.env.PORT ?? 8787}`
 ).replace(/\/+$/, "");
 
 /**

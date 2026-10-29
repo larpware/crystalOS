@@ -9,6 +9,7 @@
     "dev:vite": "vite",
     "dev:all": "node server/dev.mjs",
     "build": "tsc --noEmit && vite build && node scripts/deploy-config.mjs",
+    "deploy:check": "node scripts/deploy-config.mjs --production-check",
     "typecheck": "tsc --noEmit",
     "test": "node --test \"server/**/*.test.mjs\" \"src/**/*.test.mjs\" \"scripts/**/*.test.mjs\"",
     "test:accounts": "node --test server/accounts/api.test.mjs",
@@ -22,17 +23,18 @@
     "vpn": "node server/vpn/cli.mjs"
   },
   "dependencies": {
+    "@mercuryworkshop/libcurl-transport": "^2.0.5",
+    "@mercuryworkshop/proxy-bootstrap": "^0.0.5",
+    "@mercuryworkshop/scramjet": "^2.0.67-alpha.2",
+    "@mercuryworkshop/scramjet-controller": "^0.0.14",
+    "@mercuryworkshop/scramjet-utils": "^0.0.3",
+    "@mercuryworkshop/wisp-js": "0.4.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "zustand": "^5.0.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
-    "@mercuryworkshop/libcurl-transport": "^2.0.5",
-    "@mercuryworkshop/proxy-bootstrap": "^0.0.5",
-    "@mercuryworkshop/scramjet": "^2.0.67-alpha.2",
-    "@mercuryworkshop/scramjet-controller": "^0.0.14",
-    "@mercuryworkshop/scramjet-utils": "^0.0.3",
     "@types/node": "^22.10.5",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
