@@ -1,0 +1,14 @@
+# Vendored reference code.
+#
+# integrations/scramjet is a read-only clone of the official Mercury Workshop
+# Scramjet repository. Nothing in the shell imports it at build or runtime —
+# the proxy runs on the published @mercuryworkshop/* packages — it is kept so
+# upstream defaults and patches can be read against the exact version the
+# integration was built with.
+#
+# It is recorded as a Git submodule: the index holds a gitlink for
+# integrations/scramjet, so this entry is what makes a fresh checkout (like
+# Netlify's clone) able to materialise the same commit.
+[submodule "integrations/scramjet"]
+	path = integrations/scramjet
+	url = https://github.com/MercuryWorkshop/scramjet.git
