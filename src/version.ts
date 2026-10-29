@@ -8,13 +8,20 @@ import type { ReleaseNote, SystemVersion } from "@/types";
    ========================================================================== */
 
 export const SYSTEM_VERSION: SystemVersion = {
-  version: "1.6.0",
-  build: "2026.10.26-crystal.1",
-  releaseDate: "2026-10-26",
+  version: "1.6.1",
+  build: "2026.10.29-crystal.1",
+  releaseDate: "2026-10-29",
   codename: "CrystalOS",
 };
 
 export const releaseNotes: ReleaseNote[] = [
+  {
+    version: "1.6.1",
+    date: "2026-10-29",
+    added: [
+      "A small pill appears under the top edge for a few seconds whenever a window enters full screen, naming the way back to a normal window: Shift + Alt. The pair of modifiers pressed together is now itself a way out (Escape and the rebound-able Shift + Z still work), and the hint is an on-screen display rather than a notification — it queues nothing, counts nothing, and is not silenced by Do Not Disturb.",
+    ],
+  },
   {
     version: "1.6.0",
     date: "2026-10-26",

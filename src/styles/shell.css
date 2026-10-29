@@ -2748,3 +2748,66 @@
   opacity: 0;
   pointer-events: none;
 }
+
+/* ---- full-screen exit hint ---------------------------------------------- */
+
+/* A pill under the top edge naming the way out of full screen. It is an OSD,
+   not a notification: no queue, no history, no unread count — and it must be
+   readable over any application, including a video in full screen. */
+.cr-full-hint {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9500;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(92vw, 460px);
+  padding: 9px 16px;
+  border-radius: var(--radius-medium);
+  background: color-mix(in srgb, var(--surface-2) 88%, transparent);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-popover);
+  color: var(--text-primary);
+  font-size: 12px;
+  letter-spacing: 0.01em;
+  animation: cr-full-hint-in 260ms cubic-bezier(0.2, 0.9, 0.25, 1) both;
+  pointer-events: none;
+}
+
+:root[data-motion="reduced"] .cr-full-hint {
+  animation: none;
+}
+
+.cr-full-hint__keys {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 7px;
+  border-radius: var(--radius-small);
+  background: color-mix(in srgb, var(--accent-primary) 16%, var(--surface-2));
+  border: 1px solid var(--border-subtle);
+  white-space: nowrap;
+}
+
+.cr-full-hint__keys i {
+  font-style: normal;
+  opacity: 0.55;
+  margin: 0 1px;
+}
+
+.cr-full-hint__text {
+  line-height: 1.35;
+}
+
+@keyframes cr-full-hint-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}

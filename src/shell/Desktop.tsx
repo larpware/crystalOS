@@ -19,6 +19,7 @@ import { WidgetLayer } from "./WidgetLayer";
 import { DesktopIcons } from "./DesktopIcons";
 import { HzReadout } from "./HzReadout";
 import { Standby } from "./Standby";
+import { FullScreenHint } from "./FullScreenHint";
 import { OFFLINE_BANNER_HEIGHT, OfflineBanner } from "./OfflineBanner";
 import { panelReservedTop, useShellStore } from "@/state/shell";
 import { useSystemStore } from "@/state/system";
@@ -331,6 +332,7 @@ export function Desktop() {
       <CommandPalette />
       <WorkspaceOverview />
       <ToastStack />
+      <FullScreenHint />
       <Standby />
 
       {contextMenu && (

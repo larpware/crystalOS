@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useShellStore } from "@/state/shell";
+import { useWindowStore } from "@/state/windows";
 import { comboFromEventMatches } from "@/services/keys";
 import { dispatchShortcut } from "@/services/shortcuts";
 
@@ -34,7 +35,19 @@ export function useGlobalShortcuts(active: boolean): void {
     if (!active) return;
 
     let metaDownAlone = false;
+    /* Shift + Alt is a chord of two modifiers, so it cannot be a registry
+       binding (bindings always need a non-modifier key). It is held in the
+       hook instead, like the Super key above: track which modifiers are
+       physically down, and when the second of the pair lands with no other
+       key in between, the focused window leaves full screen. */
+    let downModifiers = new Set<string>();
+    let chordUntouched = true;
     const plat = platform();
+
+    const exitFullScreen = () => {
+      const window = useWindowStore.getState().windows.find((candidate) => candidate.focused);
+      if (window?.full === true) useWindowStore.getState().toggleFullScreen(window.id);
+    };
 
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
@@ -50,6 +63,26 @@ export function useGlobalShortcuts(active: boolean): void {
       }
       if (event.key !== "Meta") metaDownAlone = false;
 
+      if (event.key === "Shift" || event.key === "Alt") {
+        const other =
+          event.key === "Shift" && (downModifiers.has("Alt") || event.altKey)
+            ? "Alt"
+            : event.key === "Alt" && (downModifiers.has("Shift") || event.shiftKey)
+              ? "Shift"
+              : null;
+        if (other && chordUntouched && !event.repeat) {
+          chordUntouched = false;
+          if (!typing) exitFullScreen();
+        }
+        downModifiers.add(event.key);
+        return;
+      }
+      /* Any ordinary key between the two modifiers means a different
+         combination (Alt+Shift is also the browser's layout switch) — the
+         chord only counts when its two keys are the only thing pressed. */
+      downModifiers.clear();
+      chordUntouched = false;
+
       const id = dispatchShortcut({
         platform: plat,
         typing,
@@ -62,6 +95,11 @@ export function useGlobalShortcuts(active: boolean): void {
     };
 
     const onKeyUp = (event: KeyboardEvent) => {
+      downModifiers.delete(event.key);
+      /* With every modifier released, the keyboard is at rest — the next pair
+         of Shift and Alt is a fresh chord attempt, whatever was pressed
+         before it. */
+      if (downModifiers.size === 0) chordUntouched = true;
       if (event.key !== "Meta" || !metaDownAlone) return;
       metaDownAlone = false;
       const shell = useShellStore.getState();
@@ -70,11 +108,19 @@ export function useGlobalShortcuts(active: boolean): void {
       shell.setLauncherOpen(!shell.launcherOpen);
     };
 
+    /* Losing the window with modifiers half-held would leave a stale chord. */
+    const onBlur = () => {
+      downModifiers.clear();
+      chordUntouched = true;
+      metaDownAlone = false;
+    };
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", onBlur);
     return () => {
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", onBlur);
     };
   }, [active]);
 }
