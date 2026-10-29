@@ -321,3 +321,42 @@ Then, in order:
 3. In Netlify: *Site settings → Environment →* add
    `CRESCENT_BACKEND_URL=https://your-backend.example`.
 4. Redeploy the site (a build without step 3 still fails on purpose).
+
+### Northflank, from this repository's Dockerfile
+
+The [Dockerfile](../Dockerfile) is a two-stage build: stage one compiles the
+shell into `dist/`, stage two ships the backend plus production dependencies
+only. Because the backend serves `dist/` itself, **one service is a complete
+deployment** — no static host and no build-time variable are required.
+
+1. *Create new → combined service*, repository and branch selected.
+   Build options → **Dockerfile**, path `/` (the repository root).
+2. Networking → **Add port**: `8787`, protocol HTTP, accessibility Public.
+   It is the port the Dockerfile `EXPOSE`s, so Northflank detects it.
+3. Advanced → **health check**: HTTP, path `/api/proxy-status`, port `8787`.
+4. Advanced → **persistent volume** mounted at `/data`. The image already
+   points every durable file there (`CRESCENT_ACCOUNTS_DB=/data/accounts.db`,
+   the Proton session and endpoint files). Without the volume the service
+   boots and works — and loses every account on the next deploy.
+5. Create. The first build takes a few minutes; CI/CD rebuilds on every push
+   to the tracked branch.
+
+No environment variables are needed to boot. Worth setting:
+
+| Variable | Value | Why |
+| --- | --- | --- |
+| `CRESCENT_SECURE_COOKIES` | `1` | Northflank terminates TLS in front of the container |
+| `CRESCENT_ADMINS` | your usernames | moderation rights (the first account is always an admin) |
+
+If the shell stays on **Netlify** and Northflank only runs the backend, add
+`CRESCENT_PUBLIC_ORIGINS=https://your-site.netlify.app` (and
+`CRESCENT_PUBLIC_WISP_URL=wss://your-backend-domain/wisp/`, since Netlify
+cannot proxy the WebSocket upgrade), then set
+`CRESCENT_BACKEND_URL=https://your-backend-domain` in Netlify as in §5. If the
+container serves the shell — the default here — none of that applies: the
+deployment is same-origin all the way down.
+
+The image never carries data: `server/accounts/data`, `server/vpn/data`,
+`node_modules` and `dist` are excluded by `.dockerignore`, and the database is
+created under `/data` at first boot. Run a local build of the same image with
+`docker build -t crystalos .` and `docker run -p 8787:8787 -v crystalos-data:/data crystalos`.

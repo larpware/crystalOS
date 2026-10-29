@@ -1,0 +1,42 @@
+# Build context for Dockerfile (CrystalOS backend image).
+#
+# The build stage compiles the shell, so src/, scripts/, public/ and the
+# Vite/tsconfig files MUST stay in the context — excluding them was what made
+# the previous Dockerfile fail at `COPY src` / at `npm run build`.
+
+# Installed and rebuilt inside the image; shipping the host's copies only
+# risks copying the wrong platform's binaries.
+node_modules
+dist
+
+# VCS and host metadata.
+.git
+.gitignore
+.gitmodules
+.agents
+.kilo
+.freebuff
+
+# Runtime data. The account database and the VPN session files live on a
+# volume at /data (see the Dockerfile), and the image must never carry a copy
+# of a real database or a dev server's log.
+server/accounts/data
+server/vpn/data
+*.db
+*.db-wal
+*.db-shm
+*.log
+vite-dev.log
+
+# Material the image does not read at build or run time. integrations/ is
+# half-excluded: the build imports integrations/sndgames-remastered (the Games
+# catalogue), while integrations/scramjet is a read-only submodule clone of the
+# whole upstream repo that nothing imports — and a host that does not init
+# submodules has no copy of it to exclude in the first place.
+docs
+integrations/scramjet
+popup-blocker-master
+reverse-engineer-anything
+tmp-review
+netlify.toml
+RILL-WALKTHROUGH.md
