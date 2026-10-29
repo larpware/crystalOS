@@ -16,7 +16,7 @@ import { useAppsStore } from "@/state/apps";
 import { useAuthStore } from "@/state/auth";
 import { useBrowserStore } from "@/state/browser";
 import { SYSTEM_VERSION } from "@/version";
-import type { AppCategory } from "@/types";
+import type { AppCapability, AppCategory } from "@/types";
 import { APP_CATEGORY_LABEL } from "@/types";
 import { formatRelative } from "@/utils/format";
 
@@ -38,6 +38,16 @@ function hostOf(url: string): string {
     return url;
   }
 }
+
+/** What a declared capability means in plain words, shown on every card. */
+const CAPABILITY_LABEL: Record<AppCapability, string> = {
+  filesystem: "Virtual files",
+  network: "Network",
+  notifications: "Notifications",
+  storage: "Local storage",
+  microphone: "Microphone",
+  camera: "Camera",
+};
 
 export function Store() {
   const installed = useAppsStore((state) => state.installed);
@@ -203,6 +213,17 @@ export function Store() {
             removing it hides it. The system applications that are part of the OS are listed in
             Settings → Applications.
           </p>
+          <div className="cr-store__actions">
+            <Button icon="users" onClick={() => openApp("social")}>
+              Discussions
+            </Button>
+            <Button icon="question" onClick={() => openApp("social", { args: { compose: "questions" } })}>
+              Ask for help
+            </Button>
+            <Button icon="palette" onClick={() => openApp("workshop")}>
+              Crystal Workshop
+            </Button>
+          </div>
         </div>
         <div className="cr-store__hero-stats">
           <div>
@@ -477,6 +498,7 @@ export function Store() {
               const entry = installed.find((item) => item.appId === meta.id);
               const isRemoved = removed.includes(meta.id);
               const launches = launchCounts[meta.id] ?? 0;
+              const ready = isImplemented(meta.id);
               return (
                 <article key={meta.id} className="cr-store__card" data-removed={isRemoved}>
                   <header>
@@ -486,6 +508,7 @@ export function Store() {
                       <div className="cr-store__meta">
                         <Badge>{APP_CATEGORY_LABEL[meta.category]}</Badge>
                         <span className="cr-row__desc">v{meta.version}</span>
+                        {!ready && <Badge tone="warning">Not in this build</Badge>}
                       </div>
                     </div>
                   </header>
@@ -501,6 +524,15 @@ export function Store() {
                     ))}
                   </ul>
 
+                  {meta.capabilities && meta.capabilities.length > 0 && (
+                    <div className="cr-store__caps">
+                      <span className="cr-row__desc">Declares:</span>
+                      {meta.capabilities.map((capability) => (
+                        <Badge key={capability}>{CAPABILITY_LABEL[capability]}</Badge>
+                      ))}
+                    </div>
+                  )}
+
                   <footer>
                     <span className="cr-row__desc">
                       {isRemoved
@@ -512,7 +544,13 @@ export function Store() {
                           : "Bundled"}
                     </span>
                     <div className="cr-store__actions">
-                      <Button size="sm" icon="external" onClick={() => openApp(meta.id)}>
+                      <Button
+                        size="sm"
+                        icon="external"
+                        disabled={!ready}
+                        title={ready ? undefined : "This catalogue entry has no bundle in this build."}
+                        onClick={() => openApp(meta.id)}
+                      >
                         Open
                       </Button>
                       {isRemoved ? (

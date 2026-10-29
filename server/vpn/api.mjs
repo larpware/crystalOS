@@ -21,6 +21,7 @@ import { createEndpointStore, EndpointError, normaliseEndpoint, PROVIDER } from 
 import { listCountries, normaliseCountry } from "./countries.mjs";
 import { createProxyPool } from "./proxies.mjs";
 import { basicAuthHeader, openConnectTunnel, requestThroughTunnel, verifyTlsThroughProxy } from "./tunnel.mjs";
+import { forwardedHost, parsePublicOrigins } from "../origins.mjs";
 
 const API_PREFIX = "/api/vpn";
 /** Sessions are tiny; anything bigger is not a request this API accepts. */
@@ -40,12 +41,20 @@ function fail(res, status, code, message) {
   send(res, status, { error: { code, message } });
 }
 
-/** Blocks cross-site writes, the same rule the accounts API applies. */
-function sameOrigin(req) {
+/**
+ * Blocks cross-site writes, the same rule the accounts API applies: the
+ * origin must match `Host`, or be one of the configured public origins
+ * (`CRESCENT_PUBLIC_ORIGINS`) when a proxy or a separate shell host sits in
+ * front of this server.
+ */
+function sameOrigin(req, allowedHosts = new Set()) {
   const origin = req.headers.origin;
   if (!origin) return true;
+  const host = forwardedHost(req);
   try {
-    return new URL(origin).host === req.headers.host;
+    const parsed = new URL(origin);
+    if (parsed.host.toLowerCase() === host) return true;
+    return allowedHosts.has(parsed.host.toLowerCase());
   } catch {
     return false;
   }
@@ -167,6 +176,11 @@ function readCanary(body) {
 }
 
 export function createVpnApi(options = {}) {
+  /* Public origins allowed to write through a proxy or from a separate shell
+     host — the accounts API's rule, applied identically (see origins.mjs). */
+  const PUBLIC_ORIGIN_HOSTS = options.publicOrigins
+    ? new Set(options.publicOrigins.map((value) => value.toLowerCase()))
+    : parsePublicOrigins();
   const sessionStore = options.sessionStore ?? createSessionStore();
   const endpointStore = options.endpointStore ?? createEndpointStore();
   const proton = options.proton ?? createProtonClient();
@@ -226,7 +240,7 @@ export function createVpnApi(options = {}) {
     const segments = path.slice(API_PREFIX.length).split("/").filter(Boolean);
     const method = req.method ?? "GET";
 
-    if (method !== "GET" && method !== "HEAD" && !sameOrigin(req)) {
+    if (method !== "GET" && method !== "HEAD" && !sameOrigin(req, PUBLIC_ORIGIN_HOSTS)) {
       fail(res, 403, "CROSS_ORIGIN", "Cross-origin requests are not allowed.");
       return true;
     }

@@ -157,6 +157,13 @@
   color: var(--text-muted);
 }
 
+/* Copy and regenerate sit at the far end of the turn's own header. */
+.cr-ai__turn-actions {
+  display: inline-flex;
+  gap: 2px;
+  margin-left: auto;
+}
+
 .cr-ai__turn--user .cr-ai__user-text {
   margin: 0;
   padding: 10px var(--space-4);

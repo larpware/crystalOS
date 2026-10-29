@@ -183,7 +183,20 @@
 .cr-store__actions {
   display: flex;
   gap: var(--space-2);
+  flex-wrap: wrap;
   margin-left: auto;
+}
+
+.cr-store__hero-text .cr-store__actions {
+  margin-top: 12px;
+}
+
+/* What the application says it needs, spelled out in words. */
+.cr-store__caps {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
 }
 
 /* ==========================================================================

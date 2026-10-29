@@ -1,4 +1,5 @@
 import type { ScramjetController, ScramjetFrame, ScramjetPlugin } from "./types";
+import { backendOrigin } from "@/services/api";
 import { currentOffline, offlineExplanation, offlineHeadline } from "@/services/offline";
 import { createShieldPlugin } from "@/services/shield/plugin";
 import { resetBlocked } from "@/services/shield/state";
@@ -125,11 +126,32 @@ interface BackendStatus {
 async function probeBackend(): Promise<BackendStatus> {
   const response = await fetch("/api/proxy-status", { cache: "no-store" });
   if (!response.ok) throw new Error(`Backend status ${response.status}`);
+  // A static host answers unknown paths with the app shell; anything that is
+  // not the backend's JSON is the same as no backend at all.
+  if (!(response.headers.get("content-type") ?? "").includes("application/json")) {
+    throw new Error("No CrystalOS backend on this origin.");
+  }
   return (await response.json()) as BackendStatus;
 }
 
-/** Why the proxy cannot start, said in the terms the user is actually in. */
-function backendUnavailableHelp(): string {
+/**
+ * Why the proxy cannot start, said in the terms the user is actually in.
+ *
+ * `splitDeployment` is true when the shell was told (runtime config or build
+ * variable) that its backend lives on another host: the accounts API works
+ * from there, but the Browser's transport cannot — it needs the service worker
+ * and the Wisp WebSocket to share this page's origin — so saying "start the
+ * backend" would be misleading.
+ */
+function backendUnavailableHelp(splitDeployment: boolean): string {
+  if (splitDeployment) {
+    return (
+      "This deployment calls its CrystalOS backend on another host. Sign-in, accounts and saved " +
+      "data work from there, but the Browser's proxy transport has to share this page's host — it " +
+      "needs the service worker and its WebSocket on the same origin. Deploy the backend behind " +
+      "this site (a host that can reverse-proxy it, see docs/DEPLOYMENT.md) to use proxied pages."
+    );
+  }
   const report = currentOffline();
   if (!report.offline) return BACKEND_HELP;
   return `${offlineHeadline(report)}. ${offlineExplanation(report)} Proxied pages need the Scramjet backend, which needs the network.`;
@@ -138,12 +160,15 @@ function backendUnavailableHelp(): string {
 async function createController(): Promise<ScramjetController> {
   publish({ status: "loading", error: null, attempts: state.attempts + 1, backendReachable: null });
 
+  // Resolved before the probe so a failure can be explained in the right terms.
+  const splitDeployment = (await backendOrigin()) !== "";
+
   let backend: BackendStatus;
   try {
     backend = await probeBackend();
     publish({ assets: backend.assets ?? null });
   } catch {
-    const help = backendUnavailableHelp();
+    const help = backendUnavailableHelp(splitDeployment);
     // Whatever the previous probe said about the files is no longer true.
     publish({ status: "error", error: help, backendReachable: false, assets: null });
     throw new Error(help);
@@ -152,8 +177,9 @@ async function createController(): Promise<ScramjetController> {
   try {
     await loadScriptOnce("/bootstrap-init.js");
   } catch (error) {
-    const message =
-      error instanceof Error
+    const message = splitDeployment
+      ? backendUnavailableHelp(true)
+      : error instanceof Error
         ? `${error.message} ${BACKEND_HELP}`
         : BACKEND_HELP;
     publish({ status: "error", error: message, backendReachable: true });

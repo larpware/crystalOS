@@ -15,6 +15,7 @@ import {
   type MenuItem,
 } from "@/components/ui";
 import { Icon } from "@/icons/Icon";
+import { notify } from "@/services/os";
 import { useOffline } from "@/hooks/useOffline";
 import { offlineExplanation } from "@/services/offline";
 import {
@@ -156,6 +157,92 @@ export function CrystalAi({ args }: AppProps) {
     state.setBusy(null);
   }, [store]);
 
+  /**
+   * The request itself, shared by Send and Regenerate.
+   *
+   * The answer turn must already exist and be the one being streamed into;
+   * `historyTurns` are the turns to send as context — for a regenerate that
+   * deliberately excludes the answer being replaced, so the model never sees
+   * its own previous attempt as history.
+   */
+  const runAnswer = useCallback(
+    async (conversationId: string, answerId: string, historyTurns: AiTurn[]) => {
+      const state = store.getState();
+      const model = state.settings.model;
+
+      const history = historyTurns
+        .filter((t) => !t.error && (t.content.trim() !== "" || t.role === "user"))
+        .slice(-40)
+        .map((t) => ({ role: t.role, content: t.content }) as PuterChatMessage);
+
+      const messages: PuterChatMessage[] = state.settings.systemPrompt.trim()
+        ? [{ role: "system", content: state.settings.systemPrompt.trim() }, ...history]
+        : history;
+
+      const controller = new AbortController();
+      abortRef.current = controller;
+
+      const patch = (content: string, error?: string) =>
+        store.getState().patchTurn(conversationId, answerId, { content, ...(error ? { error } : {}) });
+
+      try {
+        const response = await window.puter!.ai!.chat(messages, {
+          model,
+          // normalize guarantees OpenAI-style `message.content` as a string,
+          // so a vendor's native block-array shape never reaches the renderer.
+          normalize: true,
+          stream: state.settings.stream,
+          signal: controller.signal,
+        });
+
+        if (state.settings.stream && Symbol.asyncIterator in Object(response)) {
+          let accumulated = "";
+          for await (const part of response as AsyncIterable<PuterStreamPart>) {
+            if (controller.signal.aborted) break;
+            if (part?.type === "error") {
+              patch(accumulated, describePuterError(part.message ?? "The model reported an error."));
+              return;
+            }
+            if (typeof part?.text === "string") {
+              accumulated += part.text;
+              patch(accumulated);
+            }
+          }
+          if (!controller.signal.aborted && accumulated.trim() === "") {
+            patch("", "The model returned an empty answer. Try again or pick another model.");
+          }
+        } else {
+          const responseMessage = (response as { message?: { content?: unknown } }).message;
+          const content =
+            typeof responseMessage?.content === "string"
+              ? responseMessage.content
+              : JSON.stringify(responseMessage?.content ?? "", null, 2);
+          patch(content || "The model returned an empty answer.");
+        }
+      } catch (error) {
+        if (controller.signal.aborted) {
+          const current =
+            store.getState().conversations.find((c) => c.id === conversationId)?.turns.find(
+              (t) => t.id === answerId,
+            ) ?? null;
+          if (current && current.content.trim() === "") {
+            patch("(stopped before any answer arrived)");
+          }
+        } else {
+          const current =
+            store.getState().conversations.find((c) => c.id === conversationId)?.turns.find(
+              (t) => t.id === answerId,
+            ) ?? null;
+          patch(current?.content ?? "", describePuterError(error));
+        }
+      } finally {
+        abortRef.current = null;
+        store.getState().setBusy(null);
+      }
+    },
+    [store],
+  );
+
   const send = useCallback(async () => {
     const text = draft.trim();
     if (!text || busy) return;
@@ -181,87 +268,58 @@ export function CrystalAi({ args }: AppProps) {
     const userTurn: AiTurn = { id: turnId(), role: "user", content: text, createdAt: Date.now() };
     state.appendTurn(conversationId, userTurn);
 
-    const model = state.settings.model;
     const answerId = turnId();
     state.appendTurn(conversationId, {
       id: answerId,
       role: "assistant",
       content: "",
-      model,
+      model: state.settings.model,
       createdAt: Date.now(),
     });
     state.setBusy(conversationId);
 
-    const history = (store.getState().conversations.find((c) => c.id === conversationId)?.turns ?? [])
-      .filter((t) => !t.error && (t.content.trim() !== "" || t.role === "user"))
-      .slice(-40)
-      .map((t) => ({ role: t.role, content: t.content }) as PuterChatMessage);
+    const turns = store.getState().conversations.find((c) => c.id === conversationId)?.turns ?? [];
+    await runAnswer(conversationId, answerId, turns);
+  }, [busy, draft, ensureRuntime, offline, store, runAnswer]);
 
-    const messages: PuterChatMessage[] = state.settings.systemPrompt.trim()
-      ? [{ role: "system", content: state.settings.systemPrompt.trim() }, ...history]
-      : history;
+  /*
+   * Regenerate the last answer: the turn is cleared in place rather than
+   * deleted, so the history the user sees stays continuous, and the request
+   * goes out with that turn excluded from its own context.
+   */
+  const regenerate = useCallback(async () => {
+    const state = store.getState();
+    const conversation = state.conversations.find((c) => c.id === state.activeId);
+    if (!conversation || busy) return;
+    const turns = conversation.turns;
+    const last = turns[turns.length - 1];
+    if (!last || last.role !== "assistant") return;
+    if (turns.slice(0, -1).every((turn) => turn.role !== "user")) return;
+    if (offline.offline || !(await ensureRuntime())) return;
 
-    const controller = new AbortController();
-    abortRef.current = controller;
+    state.patchTurn(conversation.id, last.id, {
+      content: "",
+      error: undefined,
+      model: state.settings.model,
+      createdAt: Date.now(),
+    });
+    state.setBusy(conversation.id);
+    await runAnswer(conversation.id, last.id, turns.slice(0, -1));
+  }, [busy, ensureRuntime, offline, runAnswer, store]);
 
-    const patch = (content: string, error?: string) =>
-      store.getState().patchTurn(conversationId, answerId, { content, ...(error ? { error } : {}) });
-
-    try {
-      const response = await window.puter!.ai!.chat(messages, {
-        model,
-        // normalize guarantees OpenAI-style `message.content` as a string,
-        // so a vendor's native block-array shape never reaches the renderer.
-        normalize: true,
-        stream: state.settings.stream,
-        signal: controller.signal,
-      });
-
-      if (state.settings.stream && Symbol.asyncIterator in Object(response)) {
-        let accumulated = "";
-        for await (const part of response as AsyncIterable<PuterStreamPart>) {
-          if (controller.signal.aborted) break;
-          if (part?.type === "error") {
-            patch(accumulated, describePuterError(part.message ?? "The model reported an error."));
-            return;
-          }
-          if (typeof part?.text === "string") {
-            accumulated += part.text;
-            patch(accumulated);
-          }
-        }
-        if (!controller.signal.aborted && accumulated.trim() === "") {
-          patch("", "The model returned an empty answer. Try again or pick another model.");
-        }
-      } else {
-        const responseMessage = (response as { message?: { content?: unknown } }).message;
-        const content =
-          typeof responseMessage?.content === "string"
-            ? responseMessage.content
-            : JSON.stringify(responseMessage?.content ?? "", null, 2);
-        patch(content || "The model returned an empty answer.");
-      }
-    } catch (error) {
-      if (controller.signal.aborted) {
-        const current =
-          store.getState().conversations.find((c) => c.id === conversationId)?.turns.find(
-            (t) => t.id === answerId,
-          ) ?? null;
-        if (current && current.content.trim() === "") {
-          patch("(stopped before any answer arrived)");
-        }
-      } else {
-        const current =
-          store.getState().conversations.find((c) => c.id === conversationId)?.turns.find(
-            (t) => t.id === answerId,
-          ) ?? null;
-        patch(current?.content ?? "", describePuterError(error));
-      }
-    } finally {
-      abortRef.current = null;
-      store.getState().setBusy(null);
-    }
-  }, [busy, draft, ensureRuntime, offline, store]);
+  /** Copies an answer the way the composer's users expect: clipboard first,
+      and an honest word when the browser refuses it. */
+  const copyTurn = (text: string) => {
+    void navigator.clipboard
+      .writeText(text)
+      .then(() => notify({ title: "Crystal AI", body: "Response copied to the clipboard." }))
+      .catch(() =>
+        notify({
+          title: "Crystal AI",
+          body: "The clipboard is blocked here — select the text and copy it instead.",
+        }),
+      );
+  };
 
   const modelOptions = useMemo(() => {
     const base = SUGGESTED_MODELS.map((m) => ({ value: m.id, label: m.label }));
@@ -395,6 +453,26 @@ export function CrystalAi({ args }: AppProps) {
                 <Icon name={turn.role === "user" ? "user" : "sparkle"} size={13} />
                 <span>{turn.role === "user" ? "You" : (turn.model ?? "Assistant")}</span>
                 {turn.error && <Badge tone="danger" icon="warning">Error</Badge>}
+                {turn.role === "assistant" && !busy && (turn.content.trim() !== "" || turn.error) && (
+                  <span className="cr-ai__turn-actions">
+                    {turn.content.trim() !== "" && (
+                      <IconButton
+                        label="Copy response"
+                        icon="copy"
+                        size={13}
+                        onClick={() => copyTurn(turn.content)}
+                      />
+                    )}
+                    {turn.id === active?.turns[active.turns.length - 1]?.id && (
+                      <IconButton
+                        label={turn.error ? "Try again" : "Regenerate"}
+                        icon="refresh"
+                        size={13}
+                        onClick={() => void regenerate()}
+                      />
+                    )}
+                  </span>
+                )}
               </header>
               {turn.role === "user" ? (
                 <p className="cr-ai__user-text">{turn.content}</p>

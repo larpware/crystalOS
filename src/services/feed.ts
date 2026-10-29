@@ -26,6 +26,8 @@ export interface SocialPost {
   id: string;
   body: string;
   image: string | null;
+  /** One of POST_TOPICS; rows older than topics read as "general". */
+  topic: string;
   createdAt: number;
   editedAt: number | null;
   author: SocialUserBrief & { private: boolean };
@@ -79,14 +81,42 @@ export interface SocialNotification {
   actor: { id: string; username: string; displayName: string; avatar: string | null } | null;
 }
 
-export function fetchFeed(before: number | null = null, limit = 20): Promise<ApiResult<{ feed: PostPage }>> {
+/**
+ * The feed's topic vocabulary — the server's list, mirrored here so the
+ * composer and the filter row offer exactly what the API accepts.
+ */
+export const POST_TOPICS = ["general", "gaming", "development", "customization", "questions"] as const;
+
+export type PostTopic = (typeof POST_TOPICS)[number];
+
+export const TOPIC_LABELS: Record<PostTopic, string> = {
+  general: "General",
+  gaming: "Gaming",
+  development: "Development",
+  customization: "Customization",
+  questions: "Questions",
+};
+
+export interface FeedOptions {
+  /** "following" narrows to the people you follow; "discover" is everything. */
+  scope?: "following" | "discover";
+  topic?: PostTopic | "all";
+}
+
+export function fetchFeed(
+  before: number | null = null,
+  limit = 20,
+  options: FeedOptions = {},
+): Promise<ApiResult<{ feed: PostPage }>> {
   const query = new URLSearchParams({ limit: String(limit) });
   if (before) query.set("before", String(before));
+  if (options.scope) query.set("scope", options.scope);
+  if (options.topic && options.topic !== "all") query.set("topic", options.topic);
   return apiRequest(`/feed?${query}`);
 }
 
-export function createPost(body: string, image: string | null) {
-  return apiRequest<{ post: SocialPost }>("/posts", { method: "POST", body: { body, image } });
+export function createPost(body: string, image: string | null, topic: PostTopic = "general") {
+  return apiRequest<{ post: SocialPost }>("/posts", { method: "POST", body: { body, image, topic } });
 }
 
 export function editPost(postId: string, body: string) {

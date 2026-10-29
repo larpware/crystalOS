@@ -27,8 +27,18 @@
  *   CRESCENT_ACCOUNTS_DB        SQLite file for accounts (default
  *                               server/accounts/data/accounts.db)
  *   CRESCENT_SESSION_DAYS       session lifetime in days (default 30)
- *   CRESCENT_TRUST_PROXY        `1` trusts X-Forwarded-For for rate limiting
- *                               when running behind a reverse proxy
+ *   CRESCENT_TRUST_PROXY        `1`/`0` force trusting (or not) X-Forwarded-For
+ *                               for rate limiting; unset means auto — trusted
+ *                               only from loopback/private proxy peers
+ *   CRESCENT_PUBLIC_ORIGINS     comma-separated origins (or bare hosts) allowed
+ *                               to call this backend from a different host —
+ *                               enables CORS, cross-site session cookies and
+ *                               proxied writes, e.g.
+ *                               https://crystalos.netlify.app
+ *   CRESCENT_PUBLIC_WISP_URL    public ws(s):// endpoint for the Wisp transport
+ *                               when the shell lives on another origin (the
+ *                               browser dials it directly)
+ *   CRESCENT_SECURE_COOKIES    `1` forces the Secure attribute on cookies
  *
  * Scramjet itself is untouched: the client half of the bootstrap (registering
  * the service worker, loading the scripts above, wiring the transport) is still
@@ -53,6 +63,7 @@ import { createAccountsApi } from "../accounts/api.mjs";
 import { createVpnApi } from "../vpn/api.mjs";
 import { createRoutedTCPSocket } from "../vpn/tunnel.mjs";
 import { createAssets, TRANSPORTS, VENDORED_DIR } from "./assets.mjs";
+import { corsHeadersFor, parsePublicOrigins } from "../origins.mjs";
 
 const PORT = Number(process.env.CRESCENT_PORT ?? 8787);
 const HOST = process.env.CRESCENT_HOST ?? "127.0.0.1";
@@ -175,8 +186,33 @@ vpn.controller.subscribe(() => {
   }
 });
 
+/* Public origins (CRESCENT_PUBLIC_ORIGINS) allowed to call this backend from
+   another host. CORS is applied here, once, in front of every surface —
+   accounts, VPN, proxy status and the proxy assets — so no individual route
+   has to know about it, and an unlisted origin receives no CORS headers at all
+   (the browser then refuses its response, exactly as if the layer were absent). */
+const PUBLIC_ORIGINS = parsePublicOrigins();
+
 const server = createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", `http://${req.headers.host ?? `${HOST}:${PORT}`}`);
+
+  const cors = corsHeadersFor(req, PUBLIC_ORIGINS);
+  if (cors) {
+    for (const [name, value] of Object.entries(cors)) res.setHeader(name, value);
+    // Preflights are answered before any route sees them: only a configured
+    // origin ever gets this far, and only for the methods and headers the
+    // shell actually uses (JSON bodies, session cookies via credentials).
+    if (req.method === "OPTIONS") {
+      res.writeHead(204, {
+        "access-control-allow-methods": "GET, HEAD, POST, PATCH, PUT, DELETE, OPTIONS",
+        "access-control-allow-headers": "content-type",
+        "access-control-max-age": "600",
+        "cache-control": "no-store",
+      });
+      res.end();
+      return;
+    }
+  }
 
   if (await accounts.handle(req, res, url)) return;
 

@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Crystal Social
+   Crystal Community
    Written against src/styles/tokens.css only: surfaces, borders, text and
    type sizes come from the shared vocabulary so this window reads as part of
    the same OS as the shell, browser and calculator.
@@ -319,6 +319,112 @@
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-medium);
   background: var(--surface-1);
+}
+
+/* ---- feed filters ---- */
+
+.cr-social__filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.cr-social__topics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cr-social__composer-row .cr-select {
+  max-width: 160px;
+}
+
+/* ---- communities directory ---- */
+
+.cr-social__communities {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.cr-social__communities-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.cr-social__communities-head h3 {
+  margin: 0 0 3px;
+  font-size: var(--fs-md);
+  font-weight: 600;
+}
+
+.cr-social__communities-head p {
+  margin: 0;
+  max-width: 56ch;
+}
+
+.cr-social__community-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cr-social__community {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 11px var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-medium);
+  background: var(--surface-1);
+}
+
+.cr-social__community-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: var(--radius-small);
+  background: var(--surface-3);
+  color: var(--text-secondary);
+  overflow: hidden;
+}
+
+.cr-social__community-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cr-social__community-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.cr-social__community-body strong {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cr-social__community-meta {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 @media (max-width: 640px) {

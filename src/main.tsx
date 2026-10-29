@@ -18,6 +18,8 @@ import "./styles/shell.css";
 import "./styles/system.css";
 import "./styles/widgets.css";
 import "./styles/apps/terminal.css";
+import "./styles/apps/dev.css";
+import "./styles/apps/workshop.css";
 import "./styles/apps/calculator.css";
 import "./styles/apps/notes.css";
 import "./styles/apps/trash.css";

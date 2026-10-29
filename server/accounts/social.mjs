@@ -113,6 +113,15 @@ const MAX_FEED_PAGE = 40;
 export function createSocialStore(db, transaction) {
   db.exec(SOCIAL_SCHEMA);
 
+  /* The topic column arrived after the first release. CREATE TABLE IF NOT
+     EXISTS cannot add a column to a table that already exists, so this is the
+     same one-step migration the users table uses — rows written before it keep
+     a NULL topic and read back as "general" (see shapedPost / feedPage). */
+  const postColumns = db.prepare("PRAGMA table_info(posts)").all();
+  if (!postColumns.some((column) => column.name === "topic")) {
+    db.exec("ALTER TABLE posts ADD COLUMN topic TEXT");
+  }
+
   function isBlockedEither(a, b) {
     if (a === b) return false;
     return Boolean(
@@ -181,6 +190,8 @@ export function createSocialStore(db, transaction) {
       id: row.id,
       body: row.body,
       image: row.image ?? null,
+      // Rows written before topics existed carry no value and read as general.
+      topic: row.topic ?? "general",
       createdAt: row.created_at,
       editedAt: row.edited_at ?? null,
       author: {
@@ -199,18 +210,44 @@ export function createSocialStore(db, transaction) {
     };
   }
 
-  /** `before` is a cursor: return the page of posts strictly older than it. */
-  function feedPage(viewerId, { before = null, limit = 20 } = {}) {
+  /**
+   * `before` is a cursor: return the page of posts strictly older than it.
+   *
+   * `scope` narrows the feed to the people the viewer follows (plus their own
+   * posts); `topic` narrows it to one topic. Both are optional, so the default
+   * remains the plain reverse-chronological feed every existing client expects.
+   * Visibility is still enforced per row by canViewPosts below the query — a
+   * private account's posts never leak through a scope change.
+   */
+  function feedPage(viewerId, { before = null, limit = 20, scope = null, topic = null } = {}) {
     const size = Math.max(1, Math.min(MAX_FEED_PAGE, Number(limit) || 20));
+    const where = ["deleted_at IS NULL"];
+    const params = [];
+    if (scope === "following") {
+      where.push(
+        `(author_id = ? OR author_id IN (
+            SELECT followee_id FROM follows
+             WHERE follower_id = ? AND status = 'accepted'))`,
+      );
+      params.push(viewerId, viewerId);
+    }
+    if (topic) {
+      // COALESCE so rows written before topics existed still match "general".
+      where.push("COALESCE(topic, 'general') = ?");
+      params.push(topic);
+    }
+    if (before) {
+      where.push("created_at < ?");
+      params.push(Number(before));
+    }
     const rows = db
       .prepare(
         `SELECT * FROM posts
-          WHERE deleted_at IS NULL
-            ${before ? "AND created_at < ?" : ""}
+          WHERE ${where.join("\n            AND ")}
           ORDER BY created_at DESC, rowid DESC
           LIMIT ?`,
       )
-      .all(...(before ? [Number(before), size + 1] : [size + 1]));
+      .all(...params, size + 1);
     const page = rows.slice(0, size).filter((row) => canViewPosts(viewerId, row.author_id));
     return {
       posts: page.map((row) => shapedPost(row, viewerId)),
@@ -267,11 +304,11 @@ export function createSocialStore(db, transaction) {
     feedPage,
     postsByAuthor,
 
-    createPost(authorId, { body, image }) {
+    createPost(authorId, { body, image, topic }) {
       const id = createId("pst");
       db.prepare(
-        "INSERT INTO posts (id, author_id, body, image, created_at) VALUES (?, ?, ?, ?, ?)",
-      ).run(id, authorId, body, image ?? null, Date.now());
+        "INSERT INTO posts (id, author_id, body, image, topic, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+      ).run(id, authorId, body, image ?? null, topic || "general", Date.now());
       return shapedPost(db.prepare("SELECT * FROM posts WHERE id = ?").get(id), authorId);
     },
 

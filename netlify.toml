@@ -1,0 +1,32 @@
+# CrystalOS on Netlify
+#
+# Netlify publishes the static shell (dist/). The account system, the Scramjet
+# proxy assets and the Wisp transport live on the CrystalOS backend
+# (server/scramjet/index.js), which must be deployed separately — see
+# docs/DEPLOYMENT.md. The build step writes dist/_redirects, which proxies
+# /api/* and the proxy asset paths to CRESCENT_BACKEND_URL.
+#
+# Redirect rules in _redirects are processed before the rules below, so the
+# single-page fallback can never answer an /api/* request with index.html.
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# Single-page-app fallback: every path the shell owns (direct navigation to
+# /settings, a refresh on a nested route, unknown routes) is answered with the
+# app document. Static files still win over this rule (shadowing), and the
+# generated /api/* proxies above win by being processed first.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"

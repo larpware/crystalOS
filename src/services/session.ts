@@ -244,10 +244,31 @@ export function restoreSession(): RestoreReport {
 
   const skipped: { appId: string; reason: string }[] = [];
   const accepted: WindowSnapshot[] = [];
+  /* A singleton application is one window by catalogue rule. The rule is
+     enforced when a window is opened, but a session written before it existed
+     (or by a build that did not enforce it) can hold two of them — restoring
+     both hands the desk two Stores that both believe they are the only one.
+     The first copy is restored; the extra copies are reported, like every
+     other window that cannot come back. */
+  const singletonsSeen = new Set<string>();
   for (const window of snapshot.windows) {
     const verdict = restoreAllowed(window.appId, settings.excludedApps);
-    if (verdict.ok) accepted.push(window);
-    else skipped.push({ appId: window.appId, reason: verdict.reason ?? "Unavailable." });
+    if (!verdict.ok) {
+      skipped.push({ appId: window.appId, reason: verdict.reason ?? "Unavailable." });
+      continue;
+    }
+    const meta = metaFor(window.appId);
+    if (meta?.singleton) {
+      if (singletonsSeen.has(window.appId)) {
+        skipped.push({
+          appId: window.appId,
+          reason: "This application keeps a single window, and one was already restored.",
+        });
+        continue;
+      }
+      singletonsSeen.add(window.appId);
+    }
+    accepted.push(window);
   }
   if (accepted.length === 0) {
     return { restored: 0, skipped, problem, enabled: true };

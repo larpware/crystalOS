@@ -932,7 +932,207 @@
   gap: var(--space-2);
 }
 
+/* ---- Library home ------------------------------------------------- */
+
+.cr-library__home {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-4);
+}
+
+.cr-library__hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+  gap: 11px;
+}
+
+.cr-library__feature {
+  display: flex;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-medium);
+  background: var(--surface-1);
+  min-width: 0;
+}
+
+.cr-library__feature-art {
+  width: 168px;
+  flex: none;
+  aspect-ratio: 1 / 1;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-medium);
+  overflow: hidden;
+}
+
+.cr-library__feature-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.cr-library__feature-body h2 {
+  margin: 0;
+  font-size: var(--fs-xl);
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+.cr-library__feature-body p {
+  margin: 0;
+}
+
+.cr-library__feature-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: var(--space-2);
+}
+
+.cr-library__hero-side {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  min-width: 0;
+}
+
+.cr-library__hero-tile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
+  padding: 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-small);
+  background: var(--surface-1);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: default;
+}
+
+.cr-library__hero-tile:hover {
+  background: var(--surface-hover);
+  border-color: var(--border-default);
+}
+
+.cr-library__hero-tile > .cr-game-cover {
+  width: 46px;
+  height: 46px;
+  flex: none;
+}
+
+.cr-library__hero-tile-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-sm);
+  color: var(--text-primary);
+}
+
+.cr-library__hero-tile-text > span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cr-library__hero-tile > svg {
+  flex: none;
+  color: var(--text-muted);
+}
+
+.cr-library__shelf-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.cr-library__shelf-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.cr-library__shelf-head h3 {
+  margin: 0;
+  font-size: var(--fs-md);
+  font-weight: 600;
+}
+
+/* One row that scrolls sideways: the home is a starting point, not the
+   whole catalogue, so a shelf shows a handful and stops. */
+.cr-library__shelf {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 164px;
+  gap: 11px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.cr-library__shelf-empty {
+  margin: 0;
+  padding: 14px;
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-small);
+  background: var(--surface-1);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
+.cr-library__collections {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(158px, 1fr));
+  gap: 11px;
+}
+
+.cr-library__collection-card {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 13px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-small);
+  background: var(--surface-1);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--fs-sm);
+  text-align: left;
+  cursor: default;
+}
+
+.cr-library__collection-card:hover {
+  background: var(--surface-hover);
+  border-color: var(--border-default);
+}
+
+.cr-library__home-cta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-top: 2px;
+}
+
 @media (max-width: 900px) {
+  .cr-library__hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cr-library__feature-art {
+    width: 120px;
+  }
+
   .cr-library {
     grid-template-columns: 1fr;
   }

@@ -94,13 +94,21 @@ export const ASSETS = [
  * bundle reads them by name. `transport` is the one value that comes from this
  * server, so the client and the server can no longer disagree about it.
  */
-export function clientConfig({ transport = "libcurl" } = {}) {
+export function clientConfig({ transport = "libcurl", wispUrl } = {}) {
   return {
     transport,
     // The shell's own worker (public/sw.js): imports the controller below and
     // adds the offline cache on top of the same routing.
     swPath: "/sw.js",
     wispPath: "/wisp/",
+    // Absolute wss:// endpoint for the transport, set only when the shell and
+    // the backend are on different origins (CRESCENT_PUBLIC_WISP_URL). The
+    // official bootstrap always builds `wss://<location.host><wispPath>`, which
+    // is right for one-origin deployments and wrong behind a CDN that cannot
+    // proxy WebSocket upgrades; when this is present, bootstrap-init.js
+    // rewrites that one same-origin path to the backend before the transport
+    // is constructed. Absent means "same origin", i.e. no rewriting at all.
+    ...(wispUrl ? { wispUrl } : {}),
     bootstrapInitPath: "/bootstrap-init.js",
     scramjetBundlePath: "/scram/scramjet.js",
     scramjetWasmPath: "/scram/scramjet.wasm",
@@ -111,6 +119,70 @@ export function clientConfig({ transport = "libcurl" } = {}) {
     libcurlClientPath: "/clients/libcurl-client.js",
     epoxyClientPath: "/clients/epoxy-client.js",
   };
+}
+
+/**
+ * Validates the public wisp endpoint. Returns a `wss://…/` URL, or undefined
+ * when nothing was configured or the value is unusable — the client then keeps
+ * its default same-origin behaviour, which is correct whenever the shell and
+ * the backend really do share an origin.
+ */
+export function normaliseWispUrl(value) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return undefined;
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "wss:" && url.protocol !== "ws:") {
+      process.stderr.write(
+        `[crescent] CRESCENT_PUBLIC_WISP_URL must be a ws:// or wss:// URL, got "${raw}"; ignoring it.\n`,
+      );
+      return undefined;
+    }
+    if (!url.pathname.endsWith("/")) url.pathname += "/";
+    return url.toString();
+  } catch {
+    process.stderr.write(
+      `[crescent] CRESCENT_PUBLIC_WISP_URL is not a URL ("${raw}"); ignoring it.\n`,
+    );
+    return undefined;
+  }
+}
+
+/*
+ * The prelude injected into /bootstrap-init.js when the transport has to dial a
+ * different origin.
+ *
+ * The official client bundle derives its endpoint as
+ * `wss://<location.host><wispPath>`, so behind a CDN that cannot proxy
+ * WebSocket upgrades (Netlify cannot — see docs/DEPLOYMENT.md) the transport
+ * would aim at the CDN and fail. Rather than patch the upstream bundle, this
+ * wraps `window.WebSocket` for the lifetime of the page with a constructor that
+ * rewrites exactly one thing: a same-origin URL under the wisp path becomes the
+ * configured endpoint. Every other socket — and every socket on any other
+ * origin — is passed through untouched.
+ */
+function wispRewritePrelude(config) {
+  return [
+    `\tconst __wisp = ${JSON.stringify(config.wispUrl)};`,
+    "\tif (typeof window !== \"undefined\" && window.WebSocket && new URL(__wisp).origin !== location.origin) {",
+    "\t\tconst __native = window.WebSocket;",
+    `\t\tconst __target = new URL(__wisp);`,
+    `\t\tconst __path = ${JSON.stringify(config.wispPath)};`,
+    "\t\tconst __patched = function (url, protocols) {",
+    "\t\t\tlet next = String(url);",
+    "\t\t\ttry {",
+    "\t\t\t\tconst parsed = new URL(next, location.href);",
+    "\t\t\t\tif (parsed.origin === location.origin && parsed.pathname.startsWith(__path)) {",
+    "\t\t\t\t\tnext = __target.origin + parsed.pathname + parsed.search;",
+    "\t\t\t\t}",
+    "\t\t\t} catch { /* not a URL: leave it alone */ }",
+    "\t\t\treturn protocols === undefined ? new __native(next) : new __native(next, protocols);",
+    "\t\t};",
+    "\t\t__patched.prototype = __native.prototype;",
+    "\t\tfor (const __key of [\"CONNECTING\", \"OPEN\", \"CLOSING\", \"CLOSED\"]) __patched[__key] = __native[__key];",
+    "\t\twindow.WebSocket = __patched;",
+    "\t}",
+  ].join("\n");
 }
 
 /** The transports this server can actually serve. */
@@ -225,8 +297,9 @@ export function createAssets({
   downloadsDir,
   transport = "libcurl",
   clientBundlePath,
+  wispUrl = process.env.CRESCENT_PUBLIC_WISP_URL,
 } = {}) {
-  const config = clientConfig({ transport });
+  const config = clientConfig({ transport, wispUrl: normaliseWispUrl(wispUrl) });
   const active = ASSETS.filter((asset) => !asset.transport || asset.transport === transport);
   const cache = new Map();
   let clientBundlePromise = null;
@@ -325,6 +398,7 @@ export function createAssets({
     return [
       "async function initBootstrap() {",
       `\tconst { init } = await import("data:text/javascript;base64,${Buffer.from(bundle).toString("base64")}");`,
+      ...(config.wispUrl ? [wispRewritePrelude(config)] : []),
       `\treturn init(${JSON.stringify(config)});`,
       "}",
       "",

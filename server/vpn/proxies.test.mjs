@@ -115,7 +115,12 @@ describe("finding a working proxy", () => {
       a: "1.1.1.1:1000\n2.2.2.2:2000\n# comment\n",
       b: "2.2.2.2:2000\n3.3.3.3:3000\n", // 2.2.2.2 is a duplicate
     };
-    const { probe, attempted } = timedTunnel({ "1.1.1.1": 40, "3.3.3.3": 10 });
+    // The gap between the two working proxies is deliberately wide. The pool
+    // ranks survivors by *measured* duration, so two timers 30 ms apart can be
+    // reported in the wrong order when a busy test run jitters the scheduler —
+    // which would hand the win to the slower proxy for reasons that have
+    // nothing to do with the code under test.
+    const { probe, attempted } = timedTunnel({ "1.1.1.1": 400, "3.3.3.3": 40 });
 
     const pool = createProxyPool({
       sources,

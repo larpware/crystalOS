@@ -19,6 +19,77 @@ import { currentOffline, offlineExplanation } from "@/services/offline";
 
 export const ACCOUNTS_BASE = "/api/accounts";
 
+/* ==========================================================================
+   Backend origin resolution
+
+   By default every request is same-origin: `/api/*` is answered by whatever
+   host serves the shell — the Node backend in production, or the Vite proxy in
+   development. Same-origin keeps session cookies on `SameSite=Lax`, needs no
+   CORS, and is the path all the proxy-friendly static hosts use.
+
+   Sometimes the shell and the account database live on different hosts (a
+   static CDN in front, a long-lived Node process holding the SQLite file
+   elsewhere). Rather than hardcoding a deployment URL into the build, the
+   origin is resolved at runtime from `public/config.json`, which any host can
+   publish or override without a rebuild:
+
+       { "apiOrigin": "https://crystalos-api.example.com" }
+
+   An empty or missing `apiOrigin` means "same origin", so the default is
+   unchanged. A build-time `VITE_API_ORIGIN` wins over the file when present.
+   The result is memoized, so the config is fetched at most once per load.
+   ========================================================================== */
+
+/** Normalises a configured value to a bare http(s) origin, or "" for none. */
+function normaliseOrigin(raw: unknown): string {
+  const value = String(raw ?? "").trim().replace(/\/+$/, "");
+  if (!value) return "";
+  try {
+    const base = typeof window === "undefined" ? "http://localhost/" : window.location.href;
+    const url = new URL(value, base);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return "";
+    return url.origin;
+  } catch {
+    return "";
+  }
+}
+
+let backendOriginPromise: Promise<string> | null = null;
+
+async function loadBackendOrigin(): Promise<string> {
+  // A build-time override is authoritative and needs no extra request.
+  const fromEnv = normaliseOrigin(import.meta.env?.VITE_API_ORIGIN);
+  if (fromEnv) return fromEnv;
+
+  if (typeof window === "undefined") return "";
+  try {
+    const response = await fetch("/config.json", { cache: "no-store" });
+    if (!response.ok) return "";
+    // A single-page host answers unknown paths with index.html; only a real
+    // JSON body is treated as configuration.
+    if (!(response.headers.get("content-type") ?? "").includes("application/json")) return "";
+    const data = (await response.json()) as { apiOrigin?: unknown } | null;
+    const origin = normaliseOrigin(data?.apiOrigin);
+    // An origin identical to the page's own is the same as configuring none.
+    if (!origin || origin === window.location.origin) return "";
+    return origin;
+  } catch {
+    // No config (dev server, static host without one) — stay same-origin.
+    return "";
+  }
+}
+
+/**
+ * The absolute origin of the CrystalOS backend, or "" when it is same-origin.
+ * Memoized so `config.json` is read at most once per page load.
+ */
+export function backendOrigin(): Promise<string> {
+  if (!backendOriginPromise) {
+    backendOriginPromise = loadBackendOrigin().catch(() => "");
+  }
+  return backendOriginPromise;
+}
+
 export interface ApiErrorShape {
   /** Machine-readable code from the server, e.g. `FRIEND_CODE_NOT_FOUND`. */
   code: string;
@@ -76,9 +147,13 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   signal?.addEventListener("abort", abort, { once: true });
 
   try {
-    const response = await fetch(`${base}${path}`, {
+    // `base` is a path (e.g. `/api/accounts`); when the backend is on another
+    // origin the resolved origin is prefixed. `include` sends the session
+    // cookie on both same-origin and cross-origin requests.
+    const origin = await backendOrigin();
+    const response = await fetch(`${origin}${base}${path}`, {
       method,
-      credentials: "same-origin",
+      credentials: "include",
       headers: body === undefined ? undefined : { "content-type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
       signal: controller.signal,

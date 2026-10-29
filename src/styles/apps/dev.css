@@ -1,0 +1,524 @@
+/* ==========================================================================
+   Crystal Dev
+   Written against src/styles/tokens.css only, so the workspace reads as part
+   of the same OS as the shell, terminal and settings.
+   ========================================================================== */
+
+.cr-dev {
+  display: grid;
+  grid-template-columns: 188px minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+  background: var(--surface-0);
+  color: var(--text-primary);
+  font-size: var(--fs-base);
+}
+
+/* ---- rail ---- */
+
+.cr-dev__rail {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px var(--space-3);
+  border-right: 1px solid var(--border-subtle);
+  background: var(--surface-1);
+}
+
+.cr-dev__brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 12px;
+  font-size: var(--fs-sm);
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  color: var(--text-primary);
+}
+
+.cr-dev__rail-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: var(--space-3) 10px;
+  border: 0;
+  border-radius: var(--radius-small);
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cr-dev__rail-item:hover {
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+
+.cr-dev__rail-item[data-active="true"] {
+  background: var(--surface-3);
+  color: var(--text-primary);
+  font-weight: 600;
+  box-shadow: inset 2px 0 0 var(--accent-primary);
+}
+
+.cr-dev__rail-note {
+  margin: auto 2px 0;
+  padding: 9px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-small);
+  background: var(--surface-2);
+  font-size: var(--fs-xs);
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+/* ---- shared pane ---- */
+
+.cr-dev__area {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.cr-dev__area > .cr-term {
+  flex: 1;
+  min-height: 0;
+}
+
+.cr-dev__pane {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+}
+
+.cr-dev__pane-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.cr-dev__pane-head h2 {
+  margin: 0 0 3px;
+  font-size: var(--fs-lg);
+  font-weight: 650;
+}
+
+.cr-dev__pane-head p {
+  margin: 0;
+  max-width: 62ch;
+}
+
+.cr-dev__pane-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ---- community ---- */
+
+.cr-dev-community__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.cr-dev-community__post {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 11px 13px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-medium);
+  background: var(--surface-1);
+}
+
+.cr-dev-community__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: var(--fs-sm);
+}
+
+.cr-dev-community__meta strong {
+  font-weight: 600;
+}
+
+.cr-dev-community__body {
+  margin: 0;
+  font-size: var(--fs-sm);
+  line-height: 1.55;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.cr-dev-community__stats {
+  display: flex;
+  gap: 14px;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
+.cr-dev-community__stats span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ---- projects ---- */
+
+.cr-dev-projects__body {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: var(--space-4);
+  flex: 1;
+  min-height: 320px;
+}
+
+.cr-dev-projects__list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-right: 4px;
+  overflow-y: auto;
+}
+
+.cr-dev-projects__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 9px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-small);
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--fs-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.cr-dev-projects__item:hover {
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+
+.cr-dev-projects__item[data-active="true"] {
+  background: var(--surface-3);
+  border-color: var(--border-default);
+  color: var(--text-primary);
+}
+
+.cr-dev-projects__item-name {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cr-dev-projects__tree,
+.cr-dev-projects__editor {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+  min-height: 0;
+  padding: 11px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-medium);
+  background: var(--surface-1);
+  overflow-y: auto;
+}
+
+.cr-dev-projects__tree-head,
+.cr-dev-projects__editor-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-bottom: 7px;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: var(--fs-sm);
+}
+
+.cr-dev-projects__editor-spacer {
+  flex: 1;
+}
+
+.cr-dev-projects__file {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--fs-sm);
+  text-align: left;
+  cursor: default;
+}
+
+.cr-dev-projects__file:hover {
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+
+.cr-dev-projects__file[data-active="true"] {
+  background: var(--surface-3);
+  color: var(--text-primary);
+}
+
+.cr-dev-projects__file span:first-of-type {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cr-dev-projects__editor-area {
+  flex: 1;
+  min-height: 220px;
+  resize: none;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  line-height: 1.55;
+}
+
+/* ---- tools ---- */
+
+.cr-dev-tools__body {
+  display: grid;
+  grid-template-columns: 232px minmax(0, 1fr);
+  gap: var(--space-4);
+  flex: 1;
+  min-height: 0;
+}
+
+.cr-dev-tools__list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  overflow-y: auto;
+}
+
+.cr-dev-tools__item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 9px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-small);
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cr-dev-tools__item:hover {
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+
+.cr-dev-tools__item[data-active="true"] {
+  background: var(--surface-3);
+  border-color: var(--border-default);
+  color: var(--text-primary);
+}
+
+.cr-dev-tools__item-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  font-size: var(--fs-sm);
+}
+
+.cr-dev-tool__panels {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-medium);
+  background: var(--surface-1);
+}
+
+.cr-dev-tool__title {
+  margin: 0;
+  font-size: var(--fs-md);
+  font-weight: 650;
+}
+
+.cr-dev-tool__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.cr-dev-tool__panel h3 {
+  margin: 0;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.cr-dev-tool__row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.cr-dev-tool__row .cr-input {
+  flex: 1;
+  min-width: 140px;
+}
+
+.cr-dev-tool__flags {
+  max-width: 90px;
+}
+
+.cr-dev-tool__out {
+  margin: 0;
+  padding: 10px 11px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-small);
+  background: var(--surface-sunken);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 340px;
+  overflow: auto;
+}
+
+.cr-dev-tool__out--hash {
+  letter-spacing: 0.03em;
+}
+
+.cr-dev-tool__error {
+  margin: 0;
+  padding: 9px 11px;
+  border: 1px solid color-mix(in srgb, var(--danger, #e5484d) 40%, transparent);
+  border-radius: var(--radius-small);
+  background: color-mix(in srgb, var(--danger, #e5484d) 10%, transparent);
+  color: var(--text-secondary);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+}
+
+.cr-dev-tool__facts {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 0;
+}
+
+.cr-dev-tool__facts > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: var(--fs-sm);
+}
+
+.cr-dev-tool__facts dt {
+  color: var(--text-muted);
+}
+
+.cr-dev-tool__facts dd {
+  margin: 0;
+  min-width: 0;
+  text-align: right;
+  word-break: break-all;
+}
+
+.cr-dev-tool__matches {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.cr-dev-tool__matches li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 5px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xs);
+  background: var(--surface-2);
+  font-size: var(--fs-sm);
+}
+
+.cr-dev-tool__swatch-input {
+  width: 42px;
+  height: 32px;
+  padding: 2px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-small);
+  background: var(--surface-2);
+  cursor: pointer;
+}
+
+.cr-dev-tool__swatch {
+  width: 52px;
+  height: 32px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-small);
+}
+
+/* ---- small windows ---- */
+
+@media (max-width: 860px) {
+  .cr-dev {
+    grid-template-columns: 54px minmax(0, 1fr);
+  }
+
+  .cr-dev__brand span,
+  .cr-dev__rail-item span,
+  .cr-dev__rail-note {
+    display: none;
+  }
+
+  .cr-dev__rail-item {
+    justify-content: center;
+  }
+
+  .cr-dev-projects__body,
+  .cr-dev-tools__body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cr-dev-projects__list,
+  .cr-dev-tools__list {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+}

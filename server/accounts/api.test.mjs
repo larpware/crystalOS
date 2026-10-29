@@ -197,6 +197,57 @@ describe("Crystal Social", () => {
       "non-image data URLs are refused",
     );
     assert.equal((await erin.get("/api/accounts/posts/pst_missing")).status, 404);
+    // Topics come from a closed vocabulary, and a value outside it is a 400 —
+    // publishing content is not the same as inventing a filter label.
+    assert.equal((await erin.post("/api/accounts/posts", { body: "x", topic: "nonsense" })).status, 400);
+  });
+
+  it("the feed narrows by scope and topic, and refuses values outside the vocabulary", async () => {
+    const hana = makeClient(base);
+    const ivan = makeClient(base);
+    const jude = makeClient(base);
+    assert.equal((await register(hana, "hana")).status, 201);
+    assert.equal((await register(ivan, "ivan")).status, 201);
+    assert.equal((await register(jude, "jude")).status, 201);
+
+    // Hana follows Ivan; Jude is a stranger to both of them.
+    assert.equal((await hana.post("/api/accounts/users/ivan/follow")).body.following, true);
+
+    const own = await hana.post("/api/accounts/posts", {
+      body: "hana ships a theme",
+      topic: "customization",
+    });
+    assert.equal(own.status, 201);
+    assert.equal(own.body.post.topic, "customization");
+    await ivan.post("/api/accounts/posts", { body: "ivan fixes a bug", topic: "development" });
+    await jude.post("/api/accounts/posts", { body: "jude plays", topic: "gaming" });
+    // A post with no topic lands in general: the default, not an error.
+    const plain = await jude.post("/api/accounts/posts", { body: "jude says hi" });
+    assert.equal(plain.body.post.topic, "general");
+
+    // Topic filter: only that topic comes back.
+    const development = await hana.get("/api/accounts/feed?topic=development");
+    assert.equal(development.status, 200);
+    assert.deepEqual(
+      development.body.feed.posts.map((post) => post.body),
+      ["ivan fixes a bug"],
+    );
+
+    // Scope filter: who Hana follows, plus Hana herself — and nobody else.
+    const following = await hana.get("/api/accounts/feed?scope=following");
+    const followingBodies = following.body.feed.posts.map((post) => post.body);
+    assert.ok(followingBodies.includes("hana ships a theme"), "your own posts stay in your feed");
+    assert.ok(followingBodies.includes("ivan fixes a bug"), "a followed account is in the feed");
+    assert.ok(!followingBodies.includes("jude plays"), "a stranger is not");
+    assert.ok(!followingBodies.includes("jude says hi"));
+
+    // Discover is the whole timeline.
+    const discover = await hana.get("/api/accounts/feed?scope=discover");
+    assert.ok(discover.body.feed.posts.some((post) => post.body === "jude plays"));
+
+    // Out-of-vocabulary values are refused at both ends of the wire.
+    assert.equal((await hana.get("/api/accounts/feed?topic=nonsense")).status, 400);
+    assert.equal((await hana.get("/api/accounts/feed?scope=strangers")).status, 400);
   });
 
   it("a private account's posts stay hidden until a follow is accepted", async () => {

@@ -35,7 +35,7 @@ function channelIcon(channel: Channel) {
   return "hash" as const;
 }
 
-export function Messages() {
+export function Messages({ args }: { args?: Record<string, unknown> }) {
   const chat = useChatStore();
   const account = useAuthStore((state) => state.account);
   const attach = useChatStore((state) => state.attach);
@@ -53,7 +53,16 @@ export function Messages() {
   const [groupName, setGroupName] = useState("");
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
   const [showMembers, setShowMembers] = useState(true);
-  const [mode, setMode] = useState<"direct" | "communities">("direct");
+  /* A launch argument can name the area to open: Community's "Open in Chat"
+     hands the user the communities list rather than the last DM they were in.
+     Kept as an effect as well as an initial value, because a singleton window
+     that is already open receives the new arguments without remounting. */
+  const [mode, setMode] = useState<"direct" | "communities">(
+    args?.view === "communities" ? "communities" : "direct",
+  );
+  useEffect(() => {
+    if (args?.view === "communities") setMode("communities");
+  }, [args?.view]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const typingRef = useRef(0);

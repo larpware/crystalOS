@@ -6,6 +6,8 @@ import {
   IconButton,
   Menu,
   Modal,
+  Chip,
+  Segmented,
   Spinner,
   Textarea,
   UserTag,
@@ -14,6 +16,7 @@ import {
 import { Icon } from "@/icons/Icon";
 import { notify } from "@/services/os";
 import { useAuthStore } from "@/state/auth";
+import { useWindowStore } from "@/state/windows";
 import {
   addComment,
   createPost,
@@ -25,6 +28,8 @@ import {
   fetchFeed,
   fetchFollowRequests,
   fetchNotifications,
+  POST_TOPICS,
+  TOPIC_LABELS,
   fetchProfile,
   fetchUserPosts,
   markNotificationsRead,
@@ -36,19 +41,29 @@ import {
   setLiked,
   type SocialComment,
   type SocialNotification,
+  type PostTopic,
   type SocialPost,
   type SocialProfile,
 } from "@/services/feed";
+import { listCommunities, type Community } from "@/services/communities";
+import { openApp } from "@/services/os";
 import { formatRelative } from "@/utils/format";
 import type { AppProps } from "@/types";
 
 /* ==========================================================================
-   Crystal Social
+   Crystal Community
 
    One feed, several shapes: text posts, image posts, short and long alike —
    whatever a person wrote. Every count on screen came from the server, which
    counted rows it actually holds; nothing here estimates, and nothing here
    fabricates engagement.
+
+   The feed has two scopes (Following and Discover) and a closed set of
+   topics — both decided by the server, which is also where visibility is
+   enforced: a private account's posts simply do not arrive for anyone but
+   accepted followers, and a blocked account's posts arrive for nobody on
+   either side of the block. This app renders that verdict; it does not
+   second-guess it.
 
    The server decides who may see what. A private account's posts simply do
    not arrive for anyone but accepted followers, and a blocked account's posts
@@ -56,7 +71,7 @@ import type { AppProps } from "@/types";
    verdict; it does not second-guess it.
    ========================================================================== */
 
-type View = "home" | "notifications" | "bookmarks" | "profile";
+type View = "home" | "communities" | "notifications" | "bookmarks" | "profile";
 
 const IMAGE_MAX_BYTES = 2 * 1024 * 1024;
 
@@ -74,12 +89,12 @@ function Avatar({ user, size = 32 }: { user: { avatar: string | null; displayNam
 function readImage(file: File): Promise<string | null> {
   return new Promise((resolve) => {
     if (!/^image\//.test(file.type)) {
-      notify({ title: "Crystal Social", body: "That file is not an image." });
+      notify({                        title: "Crystal Community", body: "That file is not an image." });
       resolve(null);
       return;
     }
     if (file.size > IMAGE_MAX_BYTES) {
-      notify({ title: "Crystal Social", body: "Post images are limited to 2 MB. Try a smaller picture." });
+      notify({                        title: "Crystal Community", body: "Post images are limited to 2 MB. Try a smaller picture." });
       resolve(null);
       return;
     }
@@ -90,11 +105,18 @@ function readImage(file: File): Promise<string | null> {
   });
 }
 
-export function Social({ args }: AppProps) {
+export function Social({ windowId, args }: AppProps) {
   const account = useAuthStore((state) => state.account);
   const signedIn = Boolean(account) && !account?.guest;
 
   const [view, setView] = useState<View>("home");
+
+  /* The catalogue renamed this application to Crystal Community; a window
+     restored from an older session still carries the previous title, so the
+     name is corrected once on mount. */
+  useEffect(() => {
+    useWindowStore.getState().setTitle(windowId, "Crystal Community");
+  }, [windowId]);
   const [posts, setPosts] = useState<SocialPost[]>([]);
   const [nextBefore, setNextBefore] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
@@ -118,22 +140,33 @@ export function Social({ args }: AppProps) {
   const [profileTarget, setProfileTarget] = useState<string | null>(
     typeof args?.username === "string" ? args.username : null,
   );
+  /* Feed filters. Scope and topic belong to the server's own vocabulary, so
+     changing either re-requests the page rather than filtering what already
+     arrived — a client-side filter would render a "Following" feed full of
+     people the server was never asked to exclude. */
+  const [scope, setScope] = useState<"following" | "discover">("discover");
+  const [topic, setTopic] = useState<PostTopic | "all">("all");
+  /* The composer's own topic, independent of the filter above. */
+  const [postTopic, setPostTopic] = useState<PostTopic>("general");
 
   const profileUsername =
     view === "profile" ? (profileTarget ?? (account?.username ?? "")) : "";
 
-  const loadFeed = useCallback(async (before: number | null = null) => {
-    setLoading(true);
-    setError(null);
-    const result = await fetchFeed(before);
-    if (result.ok) {
-      setPosts((current) => (before ? [...current, ...result.data.feed.posts] : result.data.feed.posts));
-      setNextBefore(result.data.feed.nextBefore);
-    } else {
-      setError(result.error.message);
-    }
-    setLoading(false);
-  }, []);
+  const loadFeed = useCallback(
+    async (before: number | null = null) => {
+      setLoading(true);
+      setError(null);
+      const result = await fetchFeed(before, 20, { scope, topic });
+      if (result.ok) {
+        setPosts((current) => (before ? [...current, ...result.data.feed.posts] : result.data.feed.posts));
+        setNextBefore(result.data.feed.nextBefore);
+      } else {
+        setError(result.error.message);
+      }
+      setLoading(false);
+    },
+    [scope, topic],
+  );
 
   const loadNotifications = useCallback(async () => {
     const result = await fetchNotifications();
@@ -195,6 +228,19 @@ export function Social({ args }: AppProps) {
     });
   }, [signedIn, profile?.relationship.self, profile?.private]);
 
+  /* A launch argument can hand over the composer with a topic already chosen:
+     Crystal Dev's "Ask a question" sends `compose: "questions"`, the game
+     library's "Discuss" sends `compose: "gaming"`. A value outside the
+     vocabulary is ignored rather than crashing the composer. */
+  useEffect(() => {
+    const requested = typeof args?.compose === "string" ? args.compose : null;
+    if (!requested) return;
+    if ((POST_TOPICS as readonly string[]).includes(requested)) {
+      setView("home");
+      setPostTopic(requested as PostTopic);
+    }
+  }, [args?.compose]);
+
   /* A launch argument can name a profile to open (from Chat or the terminal). */
   useEffect(() => {
     const username = typeof args?.username === "string" ? args.username : null;
@@ -208,17 +254,20 @@ export function Social({ args }: AppProps) {
     const body = draft.trim();
     if (!body || posting) return;
     setPosting(true);
-    const result = await createPost(body, image);
+    const result = await createPost(body, image, postTopic);
     setPosting(false);
     if (result.ok) {
       setDraft("");
       setImage(null);
-      setPosts((current) => [result.data.post, ...current]);
+      setPostTopic("general");
+      /* The post is refetched rather than spliced in: with a scope or topic
+         filter active, the server decides whether it belongs in this page. */
       if (view !== "home") setView("home");
+      else void loadFeed();
     } else {
-      notify({ title: "Crystal Social", body: result.error.message });
+      notify({ title: "Crystal Community", body: result.error.message });
     }
-  }, [draft, image, posting, view]);
+  }, [draft, image, postTopic, posting, view, loadFeed]);
 
   const toggleLike = useCallback(async (post: SocialPost) => {
     const next = !post.liked;
@@ -230,7 +279,7 @@ export function Social({ args }: AppProps) {
       setPosts((current) =>
         current.map((p) => (p.id === post.id ? { ...p, liked: post.liked, likes: post.likes } : p)),
       );
-      notify({ title: "Crystal Social", body: result.error.message });
+      notify({ title: "Crystal Community", body: result.error.message });
     }
   }, []);
 
@@ -238,7 +287,7 @@ export function Social({ args }: AppProps) {
     const next = !post.bookmarked;
     setPosts((current) => current.map((p) => (p.id === post.id ? { ...p, bookmarked: next } : p)));
     const result = await setBookmarked(post.id, next);
-    if (!result.ok) notify({ title: "Crystal Social", body: result.error.message });
+    if (!result.ok) notify({                        title: "Crystal Community", body: result.error.message });
   }, []);
 
   const toggleComments = useCallback(
@@ -252,7 +301,7 @@ export function Social({ args }: AppProps) {
         setCommentsFor((current) => ({ ...current, [post.id]: result.data.comments }));
         setOpenComments(post.id);
       } else {
-        notify({ title: "Crystal Social", body: result.error.message });
+        notify({ title: "Crystal Community", body: result.error.message });
       }
     },
     [openComments],
@@ -273,7 +322,7 @@ export function Social({ args }: AppProps) {
           current.map((p) => (p.id === post.id ? { ...p, comments: p.comments + 1 } : p)),
         );
       } else {
-        notify({ title: "Crystal Social", body: result.error.message });
+        notify({ title: "Crystal Community", body: result.error.message });
       }
     },
     [commentDraft],
@@ -306,7 +355,7 @@ export function Social({ args }: AppProps) {
                 run: () => {
                   void deletePost(menu.post.id).then((result) => {
                     if (result.ok) setPosts((current) => current.filter((p) => p.id !== menu.post.id));
-                    else notify({ title: "Crystal Social", body: result.error.message });
+                    else notify({ title: "Crystal Community", body: result.error.message });
                   });
                 },
               },
@@ -322,7 +371,7 @@ export function Social({ args }: AppProps) {
                   if (!reason) return;
                   void reportPost(menu.post.id, reason).then((result) => {
                     notify({
-                      title: "Crystal Social",
+                      title: "Crystal Community",
                       body: result.ok
                         ? "Reported. A moderator will look at it."
                         : result.error.message,
@@ -340,11 +389,11 @@ export function Social({ args }: AppProps) {
                     if (result.ok) {
                       setPosts((current) => current.filter((p) => p.author.id !== menu.post.author.id));
                       notify({
-                        title: "Crystal Social",
+                        title: "Crystal Community",
                         body: `@${menu.post.author.username} is blocked. Their posts are hidden both ways.`,
                       });
                     } else {
-                      notify({ title: "Crystal Social", body: result.error.message });
+                      notify({ title: "Crystal Community", body: result.error.message });
                     }
                   });
                 },
@@ -357,6 +406,7 @@ export function Social({ args }: AppProps) {
     () =>
       [
         { id: "home" as const, label: "Home", icon: "grid" as const },
+        { id: "communities" as const, label: "Communities", icon: "users" as const },
         { id: "notifications" as const, label: "Notifications", icon: "bell" as const },
         { id: "bookmarks" as const, label: "Bookmarks", icon: "pin" as const },
         { id: "profile" as const, label: "Profile", icon: "user" as const },
@@ -369,7 +419,7 @@ export function Social({ args }: AppProps) {
       <div className="cr-social">
         <EmptyState
           icon="users"
-          title="Crystal Social needs an account"
+          title="Crystal Community needs an account"
           hint="Posts, follows and notifications belong to an account. Sign in from the desktop's account area (Settings → Account), then come back."
         />
       </div>
@@ -378,7 +428,7 @@ export function Social({ args }: AppProps) {
 
   return (
     <div className="cr-social">
-      <nav className="cr-social__nav" aria-label="Crystal Social">
+      <nav className="cr-social__nav" aria-label="Crystal Community">
         {tabs.map((tab) => (
           <button
             key={tab.id}
@@ -402,6 +452,30 @@ export function Social({ args }: AppProps) {
       </nav>
 
       <main className="cr-social__main">
+        {view === "home" && (
+          <div className="cr-social__filters">
+            <Segmented
+              label="Feed scope"
+              value={scope}
+              onChange={setScope}
+              options={[
+                { value: "following", label: "Following" },
+                { value: "discover", label: "Discover" },
+              ]}
+            />
+            <div className="cr-social__topics" role="group" aria-label="Topic filter">
+              <Chip active={topic === "all"} onClick={() => setTopic("all")}>
+                All topics
+              </Chip>
+              {POST_TOPICS.map((entry) => (
+                <Chip key={entry} active={topic === entry} onClick={() => setTopic(entry)}>
+                  {TOPIC_LABELS[entry]}
+                </Chip>
+              ))}
+            </div>
+          </div>
+        )}
+
         {view === "home" && (
           <div className="cr-social__composer">
             <Textarea
@@ -432,6 +506,18 @@ export function Social({ args }: AppProps) {
               <Button variant="ghost" icon="image" onClick={() => fileRef.current?.click()}>
                 {image ? "Change image" : "Add image"}
               </Button>
+              <select
+                className="cr-select"
+                aria-label="Topic"
+                value={postTopic}
+                onChange={(event) => setPostTopic(event.target.value as PostTopic)}
+              >
+                {POST_TOPICS.map((entry) => (
+                  <option key={entry} value={entry}>
+                    {TOPIC_LABELS[entry]}
+                  </option>
+                ))}
+              </select>
               <span className="cr-social__composer-count">{4000 - draft.length}</span>
               <Button variant="primary" icon="send" disabled={!draft.trim() || posting} onClick={() => void submitPost()}>
                 {posting ? "Posting…" : "Post"}
@@ -481,6 +567,15 @@ export function Social({ args }: AppProps) {
               </div>
             </div>
             <div className="cr-social__profile-actions">
+              {profile.relationship.self && (
+                <Button
+                  variant="secondary"
+                  icon="pencil"
+                  onClick={() => openApp("settings", { args: { page: "accounts" } })}
+                >
+                  Edit profile
+                </Button>
+              )}
               {!profile.relationship.self && (
                 <Button
                   variant={profile.relationship.following ? "secondary" : "primary"}
@@ -501,7 +596,7 @@ export function Social({ args }: AppProps) {
                           },
                         });
                       } else {
-                        notify({ title: "Crystal Social", body: result.error.message });
+                        notify({ title: "Crystal Community", body: result.error.message });
                       }
                     });
                   }}
@@ -519,7 +614,7 @@ export function Social({ args }: AppProps) {
                   icon="messages"
                   onClick={() => {
                     notify({
-                      title: "Crystal Social",
+                      title: "Crystal Community",
                       body: "Opening a conversation happens in Crystal Chat, from this person's friends list.",
                     });
                   }}
@@ -574,14 +669,57 @@ export function Social({ args }: AppProps) {
           </section>
         )}
 
-        {view === "notifications" && notifications.length === 0 && !error && (
+        {view === "home" &&
+          posts.length === 0 &&
+          !loading &&
+          !error &&
+          (topic !== "all" || scope === "following" ? (
+            <EmptyState
+              icon="grid"
+              title={
+                topic !== "all"
+                  ? `No ${TOPIC_LABELS[topic].toLowerCase()} posts yet`
+                  : "Your following feed is empty"
+              }
+              hint={
+                topic !== "all"
+                  ? "Nothing matches that topic under the current scope. Widen the filter, or write the first one."
+                  : "Follow people to fill this feed — or switch to Discover to see everything."
+              }
+              action={
+                <div className="cr-button-row">
+                  {scope === "following" && (
+                    <Button variant="primary" icon="users" onClick={() => setScope("discover")}>
+                      Switch to Discover
+                    </Button>
+                  )}
+                  {topic !== "all" && (
+                    <Button icon="close" onClick={() => setTopic("all")}>
+                      Clear topic filter
+                    </Button>
+                  )}
+                </div>
+              }
+            />
+          ) : (
+            <EmptyState
+              icon="users"
+              title="The feed is empty"
+              hint="Be the first: write a post above, or switch to a topic that has one."
+            />
+          ))}
+
+        {view === "communities" && <CommunitiesPanel />}
+
+        {view === "notifications" &&
+          notifications.length === 0 && !error && (
           <EmptyState icon="bell" title="Nothing yet" hint="Likes, comments and follows will show up here." />
         )}
         {view === "bookmarks" && posts.length === 0 && !error && !loading && (
           <EmptyState icon="pin" title="No bookmarks" hint="Posts you save land here." />
         )}
 
-        {view !== "notifications" &&
+        {(view === "home" || view === "bookmarks" || view === "profile") &&
           posts.map((post) => (
             <article key={post.id} className="cr-social__post">
               <button
@@ -600,6 +738,9 @@ export function Social({ args }: AppProps) {
                 <span className="cr-social__handle">@{post.author.username}</span>
                 <span className="cr-social__time">{formatRelative(post.createdAt)}</span>
                 {post.editedAt && <span className="cr-social__time">(edited)</span>}
+                {post.topic !== "general" && (
+                  <Badge tone="accent">{TOPIC_LABELS[post.topic as PostTopic] ?? post.topic}</Badge>
+                )}
               </button>
               <p className="cr-social__body">{post.body}</p>
               {post.image && <img className="cr-social__image" src={post.image} alt="" />}
@@ -705,7 +846,7 @@ export function Social({ args }: AppProps) {
           ))}
 
         {loading && <Spinner label="Loading" />}
-        {!loading && nextBefore !== null && view !== "notifications" && (
+        {!loading && nextBefore !== null && view !== "notifications" && view !== "communities" && (
           <Button variant="ghost" onClick={() => {
             if (view === "home") void loadFeed(nextBefore);
             else if (view === "bookmarks") void loadBookmarks();
@@ -743,7 +884,7 @@ export function Social({ args }: AppProps) {
                   );
                   setEditing(null);
                 } else {
-                  notify({ title: "Crystal Social", body: result.error.message });
+                  notify({ title: "Crystal Community", body: result.error.message });
                 }
               });
             }}
@@ -755,6 +896,100 @@ export function Social({ args }: AppProps) {
           </Button>
         </div>
       </Modal>
+    </div>
+  );
+}
+
+/* ==========================================================================
+   Communities
+
+   The persistent, backend-backed communities — shared membership, channels,
+   roles and permissions enforced on the server — are managed in Crystal
+   Chat. This panel is their directory inside Community: what exists, how many
+   people are in it, whether you are one of them, and a door straight into the
+   conversation. Growing a second copy of the same rooms here would split the
+   membership and half-ship the moderation tools.
+   ========================================================================== */
+
+function CommunitiesPanel() {
+  const [communities, setCommunities] = useState<Community[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void listCommunities().then((result) => {
+      if (cancelled) return;
+      if (result.ok) setCommunities(result.data.servers);
+      else setError(result.error.message);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const openChat = () => openApp("messages", { args: { view: "communities" } });
+
+  if (error) {
+    return (
+      <div className="cr-social__error">
+        <Icon name="warning" size={14} />
+        <span>{error}</span>
+        <Button size="sm" icon="refresh" onClick={() => window.location.reload()}>
+          Reload
+        </Button>
+      </div>
+    );
+  }
+  if (!communities) return <Spinner label="Loading communities" />;
+
+  return (
+    <div className="cr-social__communities">
+      <header className="cr-social__communities-head">
+        <div>
+          <h3>Communities</h3>
+          <p className="cr-row__desc">
+            Shared spaces with channels, roles and permissions — membership lives on the account
+            server, so everyone sees the same one.
+          </p>
+        </div>
+        <Button icon="messages" onClick={openChat}>
+          Open in Chat
+        </Button>
+      </header>
+
+      {communities.length === 0 ? (
+        <EmptyState
+          icon="users"
+          title="No communities yet"
+          hint="Communities are created in Crystal Chat, where their channels, roles and moderation live."
+          action={
+            <Button variant="primary" icon="messages" onClick={openChat}>
+              Open Crystal Chat
+            </Button>
+          }
+        />
+      ) : (
+        <ul className="cr-social__community-list">
+          {communities.map((community) => (
+            <li key={community.id} className="cr-social__community">
+              <span className="cr-social__community-icon">
+                {community.icon ? <img src={community.icon} alt="" /> : <Icon name="users" size={16} />}
+              </span>
+              <span className="cr-social__community-body">
+                <strong>{community.name}</strong>
+                {community.description && <span className="cr-row__desc">{community.description}</span>}
+              </span>
+              <span className="cr-social__community-meta">
+                {community.memberCount} member{community.memberCount === 1 ? "" : "s"}
+              </span>
+              {community.isMember && <Badge tone="accent">Joined</Badge>}
+              <Button size="sm" icon="messages" onClick={openChat}>
+                Open
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

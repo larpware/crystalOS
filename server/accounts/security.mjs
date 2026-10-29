@@ -129,6 +129,27 @@ export function validatePostBody(value) {
   return { value: body };
 }
 
+/* ---- Post topics ------------------------------------------------------
+
+   The feed is filterable by a small, closed set of topics. Closed on purpose:
+   an open topic string would be arbitrary text in every card and in every
+   filter row, so the server decides the vocabulary and the client renders the
+   same list. Anything unknown falls back to "general" rather than being
+   refused — a post is content, and refusing a publish over a label would be
+   the wrong failure.
+   ------------------------------------------------------------------------ */
+
+export const POST_TOPICS = ["general", "gaming", "development", "customization", "questions"];
+
+export function validateTopic(value) {
+  if (value === null || value === undefined || value === "") return { value: "general" };
+  const raw = String(value).trim().toLowerCase();
+  if (!POST_TOPICS.includes(raw)) {
+    return { error: `Topics are: ${POST_TOPICS.join(", ")}.` };
+  }
+  return { value: raw };
+}
+
 export function validateCommentBody(value) {
   const body = cleanText(stringField(value) ?? "").trim();
   if (!body) return { error: "Comments cannot be empty." };

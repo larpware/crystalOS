@@ -44,6 +44,7 @@ import {
   validateReportReason,
   validateReview,
   validateSubmission,
+  validateTopic,
   validateUsername,
   verifyPassword,
 } from "./security.mjs";
@@ -54,6 +55,7 @@ import {
   normalizeFriendCode,
 } from "./codes.mjs";
 import { conversationIdFor, openAccountsStore, publicUser } from "./db.mjs";
+import { forwardedHost, parsePublicOrigins, isCrossSiteRequest } from "../origins.mjs";
 import { tagsOf, validateTags } from "./tags.mjs";
 import { createId } from "./ids.mjs";
 import { rarityGuide } from "./rarity.mjs";
@@ -142,20 +144,61 @@ function isSecureRequest(req) {
   return proto === "https" || Boolean(req.socket.encrypted);
 }
 
+/**
+ * True when the direct peer is loopback or a private address — a reverse
+ * proxy on this machine (Vite, nginx) or on the same private network (a
+ * platform's load balancer). An outside client cannot impersonate such a
+ * peer, so `X-Forwarded-For` from one is safe to believe; a client connecting
+ * from the public internet never satisfies this, so its spoofed header is
+ * ignored.
+ */
+function isTrustedProxyPeer(req) {
+  const peer = String(req.socket.remoteAddress ?? "").replace(/^::ffff:/, "");
+  if (peer === "127.0.0.1" || peer === "::1" || peer === "localhost") return true;
+  if (peer.startsWith("10.") || peer.startsWith("192.168.")) return true;
+  return /^172\.(1[6-9]|2\d|3[01])\./.test(peer);
+}
+
+/**
+ * The address rate limits are keyed by.
+ *
+ * `trustProxy` is three-state:
+ *   `true`    always take the first `X-Forwarded-For` entry — the operator has
+ *             declared a reverse proxy in front;
+ *   `false`   never trust it — a public client could spoof the header to dodge
+ *             its limits;
+ *   undefined auto (the default): trust it only when the direct peer is
+ *             loopback/private. This is what keeps limits correct both behind
+ *             Netlify/nginx and directly exposed, without configuration — and
+ *             prevents one shared proxy IP from throttling every visitor.
+ */
 function clientAddress(req, trustProxy) {
-  if (trustProxy) {
+  const trusted = trustProxy === true || (trustProxy === undefined && isTrustedProxyPeer(req));
+  if (trusted) {
     const forwarded = String(req.headers["x-forwarded-for"] ?? "").split(",")[0].trim();
     if (forwarded) return forwarded;
   }
   return req.socket.remoteAddress ?? "unknown";
 }
 
-/** Blocks cross-site form posts from riding an existing session cookie. */
-function sameOrigin(req) {
+/**
+ * Blocks cross-site form posts from riding an existing session cookie.
+ *
+ * `allowedHosts` comes from `CRESCENT_PUBLIC_ORIGINS` (see server/origins.mjs)
+ * and names the public origins that reach this server through a reverse proxy
+ * or call it directly from another host; everything else still has to match
+ * the `Host` header exactly.
+ */
+function sameOrigin(req, allowedHosts = new Set()) {
   const origin = req.headers.origin;
   if (!origin) return true;
+  // `forwardedHost` is what the browser addressed, which survives a proxy
+  // rewriting `Host` (see server/origins.mjs for why that header is trusted).
+  const host = forwardedHost(req);
   try {
-    return new URL(origin).host === req.headers.host;
+    const parsed = new URL(origin);
+    if (parsed.host.toLowerCase() === host) return true;
+    return allowedHosts.has(parsed.host.toLowerCase());
   } catch {
     return false;
   }
@@ -166,7 +209,15 @@ function sameOrigin(req) {
 export function createAccountsApi(options = {}) {
   const store = options.store ?? openAccountsStore();
   const sessionDays = Number(options.sessionDays ?? process.env.CRESCENT_SESSION_DAYS ?? DEFAULT_SESSION_DAYS);
-  const trustProxy = options.trustProxy ?? process.env.CRESCENT_TRUST_PROXY === "1";
+  /* Three-state: true (trust XFF), false (never), undefined (auto). */
+  const trustProxy =
+    options.trustProxy ??
+    ({
+      "1": true,
+      true: true,
+      "0": false,
+      false: false,
+    }[String(process.env.CRESCENT_TRUST_PROXY ?? "").trim().toLowerCase()] ?? undefined);
   const limits = {
     register: createRateLimiter(options.limits?.register ?? DEFAULT_LIMITS.register),
     login: createRateLimiter(options.limits?.login ?? DEFAULT_LIMITS.login),
@@ -178,6 +229,19 @@ export function createAccountsApi(options = {}) {
   };
 
   const ADMIN_USERNAMES = envAdmins();
+  /* Public origins allowed to talk to this API cross-origin (see sameOrigin). */
+  const PUBLIC_ORIGIN_HOSTS = options.publicOrigins
+    ? new Set(options.publicOrigins.map((value) => value.toLowerCase()))
+    : parsePublicOrigins();
+  /*
+   * Behind a TLS-terminating proxy the request this server sees is plain HTTP,
+   * so `isSecureRequest` answers from `x-forwarded-proto`. `secureCookies`
+   * forces the `Secure` attribute anyway — a deployment that publishes on
+   * https should never have its session cookie sent over plain http, whatever
+   * the proxy chooses to forward.
+   */
+  const forceSecureCookies =
+    options.secureCookies ?? process.env.CRESCENT_SECURE_COOKIES === "1";
 
   /** Moderation authority: the role column, or the environment's list. */
   function isAdmin(user) {
@@ -186,15 +250,40 @@ export function createAccountsApi(options = {}) {
 
   let sweeps = 0;
 
-  function setCookie(res, token, secure) {
+  /**
+   * Cookie attributes derived from the request's own origin context.
+   *
+   * When the browser is calling from an allow-listed *different* host (the
+   * shell on a CDN, this API behind a rewrite that changed Host, or a static
+   * shell talking to the backend directly) the exchange is cross-site as far
+   * as the cookie jar is concerned: `SameSite=Lax` would drop the session
+   * cookie on the way back, so the cookie is issued `None` — which browsers
+   * only accept over https, so `Secure` accompanies it. Same-origin requests
+   * keep the original `Lax` behaviour unchanged.
+   */
+  function cookieFlags(req) {
+    const crossSite = isCrossSiteRequest(req, PUBLIC_ORIGIN_HOSTS);
+    return {
+      secure: crossSite || forceSecureCookies || isSecureRequest(req),
+      sameSite: crossSite ? "None" : "Lax",
+    };
+  }
+
+  function setCookie(req, res, token) {
     res.setHeader(
       "set-cookie",
-      serializeCookie(SESSION_COOKIE, token, { maxAge: sessionDays * 24 * 3600, secure }),
+      serializeCookie(SESSION_COOKIE, token, {
+        maxAge: sessionDays * 24 * 3600,
+        ...cookieFlags(req),
+      }),
     );
   }
 
-  function clearCookie(res, secure) {
-    res.setHeader("set-cookie", serializeCookie(SESSION_COOKIE, "", { clear: true, secure }));
+  function clearCookie(req, res) {
+    res.setHeader(
+      "set-cookie",
+      serializeCookie(SESSION_COOKIE, "", { clear: true, ...cookieFlags(req) }),
+    );
   }
 
   /** Resolves the session (if any) and returns the fresh user row. */
@@ -231,7 +320,7 @@ export function createAccountsApi(options = {}) {
       createdAt: now,
       expiresAt: now + sessionDays * 24 * 3600 * 1000,
     });
-    setCookie(res, token, isSecureRequest(req));
+    setCookie(req, res, token);
     store.pruneSessions(now);
   }
 
@@ -438,7 +527,7 @@ export function createAccountsApi(options = {}) {
     if (!ok) return fail(res, 403, "WRONG_PASSWORD", "Enter your password to delete the account.");
     store.deleteSessionsForUser(user.id);
     store.deleteUser(user.id);
-    clearCookie(res, isSecureRequest(req));
+    clearCookie(req, res);
     send(res, 200, { ok: true });
   }
 
@@ -699,8 +788,14 @@ export function createAccountsApi(options = {}) {
     if (postBody.error) return fail(res, 400, "INVALID_POST", postBody.error);
     const image = validatePostImage(body.image);
     if (image.error) return fail(res, 400, "INVALID_IMAGE", image.error);
+    const topic = validateTopic(body.topic);
+    if (topic.error) return fail(res, 400, "INVALID_TOPIC", topic.error);
     const post = store.transaction(() =>
-      store.social.createPost(user.id, { body: postBody.value, image: image.value }),
+      store.social.createPost(user.id, {
+        body: postBody.value,
+        image: image.value,
+        topic: topic.value,
+      }),
     );
     send(res, 201, { post });
   }
@@ -746,7 +841,7 @@ export function createAccountsApi(options = {}) {
     const segments = path.slice(API_PREFIX.length).split("/").filter(Boolean);
     const method = req.method ?? "GET";
 
-    if (method !== "GET" && method !== "HEAD" && !sameOrigin(req)) {
+    if (method !== "GET" && method !== "HEAD" && !sameOrigin(req, PUBLIC_ORIGIN_HOSTS)) {
       fail(res, 403, "CROSS_ORIGIN", "Cross-origin requests are not allowed.");
       return true;
     }
@@ -786,7 +881,7 @@ export function createAccountsApi(options = {}) {
       if (method === "POST" && segments.length === 1 && segments[0] === "logout") {
         const token = parseCookies(req.headers.cookie)[SESSION_COOKIE];
         if (token) store.deleteSession(hashToken(token));
-        clearCookie(res, isSecureRequest(req));
+        clearCookie(req, res);
         send(res, 200, { ok: true });
         return true;
       }
@@ -874,16 +969,29 @@ export function createAccountsApi(options = {}) {
 
       /* ---- Crystal Social ---- */
 
-      // GET /api/accounts/feed?before=&limit=
+      // GET /api/accounts/feed?before=&limit=&scope=&topic=
       if (method === "GET" && segments.length === 1 && segments[0] === "feed") {
         const user = requireUser(req, res, limits.login);
         if (!user) return true;
         const beforeRaw = Number(url.searchParams.get("before") ?? 0);
         const limitRaw = Number(url.searchParams.get("limit") ?? 20);
+        // Absent means "no narrowing"; a value that is present but not in the
+        // vocabulary is a client bug, and answering with the whole feed would
+        // hide it — that gets the standard 400 instead.
+        const scopeRaw = url.searchParams.get("scope");
+        if (scopeRaw && scopeRaw !== "following" && scopeRaw !== "discover") {
+          return fail(res, 400, "INVALID_SCOPE", "Scope must be following or discover.") || true;
+        }
+        const topicParam = validateTopic(url.searchParams.get("topic"));
+        if (topicParam.error) return fail(res, 400, "INVALID_TOPIC", topicParam.error) || true;
+        const scope = scopeRaw === "following" ? "following" : null;
+        const topic = topicParam.value === "general" ? null : topicParam.value;
         send(res, 200, {
           feed: store.social.feedPage(user.id, {
             before: Number.isFinite(beforeRaw) && beforeRaw > 0 ? beforeRaw : null,
             limit: Number.isFinite(limitRaw) ? limitRaw : 20,
+            scope,
+            topic,
           }),
         });
         return true;

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Badge, Button, EmptyState, Segmented, Switch, TextInput } from "@/components/ui";
 import { Icon } from "@/icons/Icon";
 import { useGamesStore } from "@/state/games";
+import { openApp } from "@/services/os";
 import { useWindowStore } from "@/state/windows";
 import type { AppProps } from "@/types";
 import { formatRelative } from "@/utils/format";
@@ -33,6 +34,11 @@ export function GameLibrary({ windowId, args }: AppProps) {
   const launchGameId = typeof args?.playGameId === "string" ? args.playGameId : null;
   const isPlayerWindow = Boolean(launchGameId);
 
+  /* Home is the landing view: the featured picks, what you were playing, your
+     favourites and the collections. Anything that filters, searches or sorts
+     drops into the browse view, which is the full catalogue with its detail
+     panel — so the home stays a starting point, not a second copy of it. */
+  const [view, setView] = useState<"home" | "browse">("home");
   const [collection, setCollection] = useState<string>("all");
   const [sort, setSort] = useState<Sort>("recent");
   const [filter, setFilter] = useState<Filter>("all");
@@ -140,6 +146,34 @@ export function GameLibrary({ windowId, args }: AppProps) {
   const totalSeconds = [...playtime.values()].reduce((total, value) => total + value, 0);
   const focused = gameById.get(focusedId) ?? list[0] ?? games[0];
 
+  /* ---- home shelves -------------------------------------------------- */
+  const playable = (ids: string[]) =>
+    ids
+      .map((id) => gameById.get(id))
+      .filter((game): game is CrystalOSGame => Boolean(game) && !hidden.includes((game as CrystalOSGame).id))
+      .slice(0, 8);
+
+  const continueShelf = playable(recents);
+  const favouriteShelf = playable(favourites);
+  const hero = featuredGames[0] ?? games[0];
+  const heroSide = featuredGames.slice(1, 4);
+
+  /** First session on record for a game — the shelf's "last played" stamp. */
+  const lastPlayedAt = (game: CrystalOSGame) =>
+    sessions.find((entry) => entry.gameId === game.id)?.at ?? null;
+
+  /** Details lives in the browse view's panel, so asking for them navigates. */
+  const openDetails = (game: CrystalOSGame) => {
+    setFocusedId(game.id);
+    setView("browse");
+  };
+
+  /** Typing, filtering or sorting is the user asking for the full library. */
+  const goBrowse = (patch?: { collection?: string }) => {
+    if (patch?.collection !== undefined) setCollection(patch.collection);
+    setView("browse");
+  };
+
   return (
     <div className="cr-library">
       {playing ? (
@@ -159,8 +193,16 @@ export function GameLibrary({ windowId, args }: AppProps) {
             <button
               type="button"
               className="cr-library__rail-item"
-              aria-current={collection === "all"}
-              onClick={() => setCollection("all")}
+              aria-current={view === "home"}
+              onClick={() => setView("home")}
+            >
+              Home
+            </button>
+            <button
+              type="button"
+              className="cr-library__rail-item"
+              aria-current={view === "browse" && collection === "all"}
+              onClick={() => goBrowse({ collection: "all" })}
             >
               All games <span>{games.length - hidden.length}</span>
             </button>
@@ -169,8 +211,8 @@ export function GameLibrary({ windowId, args }: AppProps) {
                 key={name}
                 type="button"
                 className="cr-library__rail-item"
-                aria-current={collection === name}
-                onClick={() => setCollection(name)}
+                aria-current={view === "browse" && collection === name}
+                onClick={() => goBrowse({ collection: name })}
               >
                 {name}
                 <span>{games.filter((game) => game.collection === name).length}</span>
@@ -216,6 +258,105 @@ export function GameLibrary({ windowId, args }: AppProps) {
           </aside>
 
           <div className="cr-library__main">
+            {view === "home" && (
+              <div className="cr-library__home">
+                <section className="cr-library__hero" aria-label="Featured game">
+                  <article className="cr-library__feature">
+                    <div className="cr-library__feature-art">
+                      <GameCover game={hero} radius={8} />
+                    </div>
+                    <div className="cr-library__feature-body">
+                      <Badge tone="accent">Featured</Badge>
+                      <h2>{titleOf(hero)}</h2>
+                      <p className="cr-row__desc">
+                        {hero.collection} · hosted on {hero.host}
+                        {lastPlayedAt(hero)
+                          ? ` · last played ${formatRelative(lastPlayedAt(hero) as number)}`
+                          : ""}
+                      </p>
+                      <div className="cr-library__feature-actions">
+                        <Button variant="primary" icon="play" onClick={() => startGame(hero)}>
+                          Play
+                        </Button>
+                        <Button variant="ghost" icon="info" onClick={() => openDetails(hero)}>
+                          Details
+                        </Button>
+                      </div>
+                    </div>
+                  </article>
+                  <div className="cr-library__hero-side">
+                    {heroSide.map((game) => (
+                      <button
+                        key={game.id}
+                        type="button"
+                        className="cr-library__hero-tile"
+                        onClick={() => startGame(game)}
+                      >
+                        <GameCover game={game} radius={5} />
+                        <span className="cr-library__hero-tile-text">
+                          <span>{titleOf(game)}</span>
+                          <span className="cr-row__desc">{game.host}</span>
+                        </span>
+                        <Icon name="play" size={14} />
+                      </button>
+                    ))}
+                  </div>
+                </section>
+
+                <HomeShelf
+                  title="Continue playing"
+                  hint="Sessions the player actually measured."
+                  empty="Nothing played yet. Start anything from Featured and it lands here."
+                  games={continueShelf}
+                  onPlay={startGame}
+                  onOpen={openDetails}
+                />
+
+                <HomeShelf
+                  title="Your favourites"
+                  hint={favouriteShelf.length ? `${favourites.length} starred` : undefined}
+                  empty="Star a game anywhere in the library and it keeps its place here."
+                  games={favouriteShelf}
+                  onPlay={startGame}
+                  onOpen={openDetails}
+                />
+
+                <section className="cr-library__shelf-section">
+                  <header className="cr-library__shelf-head">
+                    <h3>Collections</h3>
+                    <span className="cr-row__desc">Browse the catalogue by kind</span>
+                  </header>
+                  <div className="cr-library__collections">
+                    {collections.map((name) => (
+                      <button
+                        key={name}
+                        type="button"
+                        className="cr-library__collection-card"
+                        onClick={() => goBrowse({ collection: name })}
+                      >
+                        <span>{name}</span>
+                        <span className="cr-row__desc">
+                          {games.filter((game) => game.collection === name && !hidden.includes(game.id)).length}{" "}
+                          games
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+
+                <div className="cr-library__home-cta">
+                  <Button variant="secondary" icon="library" onClick={() => goBrowse({ collection: "all" })}>
+                    Browse all {games.length - hidden.length} games
+                  </Button>
+                  <span className="cr-row__desc">
+                    Search, sort by name or play time, and filter by favourites.
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {view === "browse" && (
+              <>
             <header className="cr-library__bar">
               <div className="cr-library__search">
                 <TextInput
@@ -223,13 +364,19 @@ export function GameLibrary({ windowId, args }: AppProps) {
                   value={query}
                   aria-label="Search library"
                   placeholder="Search the library"
-                  onChange={(event) => setQuery(event.target.value)}
+                  onChange={(event) => {
+                    setQuery(event.target.value);
+                    if (event.target.value) setView("browse");
+                  }}
                 />
               </div>
               <Segmented
                 label="Filter"
                 value={filter}
-                onChange={setFilter}
+                onChange={(value) => {
+                  setFilter(value);
+                  setView("browse");
+                }}
                 options={[
                   { value: "all", label: "All" },
                   { value: "favourites", label: "Favourites" },
@@ -382,6 +529,15 @@ export function GameLibrary({ windowId, args }: AppProps) {
                       >
                         Publisher page
                       </Button>
+                      <Button
+                        variant="ghost"
+                        icon="users"
+                        onClick={() =>
+                          openApp("social", { args: { compose: "gaming" } })
+                        }
+                      >
+                        Discuss
+                      </Button>
                     </div>
                     <p className="cr-row__desc">
                       Catalogue entry — bundled with CrystalOS. Launching it opens the publisher's
@@ -390,11 +546,63 @@ export function GameLibrary({ windowId, args }: AppProps) {
                   </>
                 )}
               </aside>
-            </div>
+              </div>
+              </>
+            )}
           </div>
         </>
       )}
     </div>
+  );
+}
+
+/* ==========================================================================
+   A shelf on the home view
+
+   Same card the grid uses, laid out in a row that scrolls sideways, with a
+   written empty state instead of an empty box — an empty shelf that says
+   nothing looks broken rather than new.
+   ========================================================================== */
+
+function HomeShelf({
+  title,
+  hint,
+  empty,
+  games: items,
+  launched = false,
+  onPlay,
+  onOpen,
+}: {
+  title: string;
+  hint?: string;
+  empty: string;
+  games: CrystalOSGame[];
+  launched?: boolean;
+  onPlay: (game: CrystalOSGame) => void;
+  onOpen: (game: CrystalOSGame) => void;
+}) {
+  return (
+    <section className="cr-library__shelf-section">
+      <header className="cr-library__shelf-head">
+        <h3>{title}</h3>
+        {hint && <span className="cr-row__desc">{hint}</span>}
+      </header>
+      {items.length === 0 ? (
+        <p className="cr-library__shelf-empty">{empty}</p>
+      ) : (
+        <div className="cr-library__shelf">
+          {items.map((game) => (
+            <GameCard
+              key={game.id}
+              game={game}
+              launched={launched}
+              onPlay={() => onPlay(game)}
+              onOpen={() => onOpen(game)}
+            />
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 

@@ -4,7 +4,8 @@ import { appCatalog, metaFor, type AppMeta } from "./catalog";
 import { Drive } from "./drive/Drive";
 import { Spotify } from "./spotify/Spotify";
 import { Audiomack } from "./audiomack/Audiomack";
-import { Terminal } from "./terminal/Terminal";
+import { Dev } from "./dev/Dev";
+import { Workshop } from "./workshop/Workshop";
 import { Notes } from "./notes/Notes";
 import { Calculator } from "./calculator/Calculator";
 import { Trash } from "./trash/Trash";
@@ -49,7 +50,11 @@ const components: Record<string, ComponentType<AppProps>> = {
   drive: Drive,
   spotify: Spotify,
   audiomack: Audiomack,
-  terminal: Terminal,
+  /* Crystal Dev is the shell; the terminal itself is one of its panes, so the
+     `terminal` id keeps resolving — saved windows, dock pins and the shell's
+     own `open terminal` command all still work. */
+  terminal: Dev,
+  workshop: Workshop,
   notes: Notes,
   calculator: Calculator,
   trash: Trash,
