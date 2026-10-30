@@ -79,12 +79,16 @@ function allowedCorsOrigin(request: Request, env: Env): string | null {
 function applyCors(response: Response, request: Request, env: Env): Response {
   const allowed = allowedCorsOrigin(request, env);
   if (!allowed) return response;
-  response.headers.set("access-control-allow-origin", allowed);
-  response.headers.set("access-control-allow-credentials", "true");
-  if (!(response.headers.get("vary") ?? "").toLowerCase().includes("origin")) {
-    response.headers.append("vary", "origin");
+  // Responses returned by an upstream fetch can have immutable headers in
+  // Workers. Clone before adding CORS headers so an API/proxy request never
+  // turns into a Cloudflare 1101 just because the caller included Origin.
+  const withCors = new Response(response.body, response);
+  withCors.headers.set("access-control-allow-origin", allowed);
+  withCors.headers.set("access-control-allow-credentials", "true");
+  if (!(withCors.headers.get("vary") ?? "").toLowerCase().includes("origin")) {
+    withCors.headers.append("vary", "origin");
   }
-  return response;
+  return withCors;
 }
 
 function preflight(request: Request, env: Env): Response {
@@ -402,6 +406,7 @@ const worker = {
       response = await apiRoute(request, env, url);
       // API answers are never cached: they carry sessions and per-user data.
       if (!response.headers.has("cache-control")) {
+        response = new Response(response.body, response);
         response.headers.set("cache-control", "no-store");
       }
     } else if (isScramjetPath(url.pathname)) {

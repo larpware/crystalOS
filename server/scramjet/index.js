@@ -72,7 +72,10 @@ const PORT = Number(
   // which is how `CRESCENT_PORT=8788 npm run scramjet` keeps working.
   process.env.CRESCENT_PORT ?? process.env.PORT ?? 8787,
 );
-const HOST = process.env.CRESCENT_HOST ?? "127.0.0.1";
+// Hosted platforms expose the service through the assigned PORT and require
+// the process to listen on every interface. Keep localhost for local runs,
+// but make Render/other PaaS deployments work without a manual host variable.
+const HOST = process.env.CRESCENT_HOST ?? (process.env.PORT ? "0.0.0.0" : "127.0.0.1");
 const ALLOW_PRIVATE = process.env.CRESCENT_ALLOW_PRIVATE_IPS === "1";
 
 const requestedTransport = process.env.CRESCENT_TRANSPORT ?? "libcurl";
