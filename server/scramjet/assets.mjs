@@ -396,7 +396,10 @@ export function createAssets({
 
     const bundle = await clientBundlePromise;
     return [
-      "async function initBootstrap() {",
+      // Assign explicitly to the global object. The bootstrap is injected as a
+      // classic external script, but an explicit export remains reliable when
+      // it has crossed the Cloudflare Worker -> Node proxy boundary.
+      "globalThis.initBootstrap = async function initBootstrap() {",
       `\tconst { init } = await import("data:text/javascript;base64,${Buffer.from(bundle).toString("base64")}");`,
       ...(config.wispUrl ? [wispRewritePrelude(config)] : []),
       `\treturn init(${JSON.stringify(config)});`,
