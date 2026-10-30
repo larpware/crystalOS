@@ -320,6 +320,29 @@ const SCRAMJET_PATHS = [
   "/wisp/",
 ];
 
+const EPOXY_COMPAT_POSTLUDE = `
+;(function () {
+  if (typeof window === "undefined" || !window.EpoxyTransport || typeof window.EpoxyTransport.EpoxyClient === "function") return;
+  const exported = window.EpoxyTransport;
+  const Transport = typeof exported === "function" ? exported : exported.default;
+  if (typeof Transport !== "function") throw new Error("The Epoxy browser transport export is unavailable.");
+  window.EpoxyTransport = {
+    EpoxyClient: class {
+      constructor(options) {
+        this.__transport = new Transport({ wisp: options.wisp });
+        this.__ready = this.__transport.init();
+      }
+      request(...args) { return this.__ready.then(() => this.__transport.request(...args)); }
+      connect(...args) {
+        let send, close;
+        const ready = this.__ready.then(() => [send, close] = this.__transport.connect(...args));
+        return [data => ready.then(() => send(data)), (code, reason) => ready.then(() => close(code, reason))];
+      }
+    }
+  };
+})();
+`;
+
 function isScramjetPath(pathname: string): boolean {
   return SCRAMJET_PATHS.some((prefix) => pathname === prefix || pathname.startsWith(prefix));
 }
@@ -343,7 +366,19 @@ async function scramjetRoute(request: Request, env: Env, url: URL): Promise<Resp
   try {
     // Passing the original Request preserves WebSocket upgrade requests for
     // /wisp/ while keeping the Node service hidden behind this Worker origin.
-    return await fetch(new Request(target, request));
+    const response = await fetch(new Request(target, request));
+    if (url.pathname !== "/clients/epoxy-client.js" || !response.ok || request.method === "HEAD") {
+      return response;
+    }
+    const source = await response.text();
+    const headers = new Headers(response.headers);
+    headers.set("content-length", String(source.length + EPOXY_COMPAT_POSTLUDE.length));
+    headers.set("cache-control", "no-store");
+    return new Response(source + EPOXY_COMPAT_POSTLUDE, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
   } catch {
     return fail(503, "SCRAMJET_UNREACHABLE", "The Scramjet Node service is not reachable.");
   }
