@@ -210,6 +210,34 @@ function epoxyCompatPrelude() {
   ];
 }
 
+// The bootstrap loads epoxy-client.js after this initializer runs, so the
+// initializer cannot adapt the UMD export in time. Append the same adapter to
+// the asset itself, after the package has created window.EpoxyTransport.
+function epoxyCompatPostlude() {
+  return `
+;(function () {
+  if (typeof window === "undefined" || !window.EpoxyTransport || typeof window.EpoxyTransport.EpoxyClient === "function") return;
+  const exported = window.EpoxyTransport;
+  const Transport = typeof exported === "function" ? exported : exported.default;
+  if (typeof Transport !== "function") throw new Error("The Epoxy browser transport export is unavailable.");
+  window.EpoxyTransport = {
+    EpoxyClient: class {
+      constructor(options) {
+        this.__transport = new Transport({ wisp: options.wisp });
+        this.__ready = this.__transport.init();
+      }
+      request(...args) { return this.__ready.then(() => this.__transport.request(...args)); }
+      connect(...args) {
+        let send, close;
+        const ready = this.__ready.then(() => [send, close] = this.__transport.connect(...args));
+        return [data => ready.then(() => send(data)), (code, reason) => ready.then(() => close(code, reason))];
+      }
+    }
+  };
+})();
+`;
+}
+
 /** The transports this server can actually serve. */
 export const TRANSPORTS = ["libcurl", "epoxy"];
 
@@ -468,7 +496,13 @@ export function createAssets({
     if (req.method !== "GET" && req.method !== "HEAD") return false;
 
     const info = await stat(asset.file);
-    const etag = `"${info.size.toString(16)}-${Math.trunc(info.mtimeMs).toString(16)}"`;
+    const isEpoxyClient = asset.package === "epoxy-transport";
+    const body = req.method === "HEAD"
+      ? null
+      : await readFile(asset.file).then((source) =>
+          isEpoxyClient ? Buffer.concat([source, Buffer.from(epoxyCompatPostlude())]) : source,
+        );
+    const etag = `"${info.size.toString(16)}-${Math.trunc(info.mtimeMs).toString(16)}${isEpoxyClient ? "-compat" : ""}"`;
     if (req.headers["if-none-match"] === etag) {
       res.writeHead(304, { etag, "cache-control": "no-cache" });
       res.end();
@@ -477,14 +511,14 @@ export function createAssets({
 
     res.writeHead(200, {
       "content-type": asset.type,
-      "content-length": info.size,
+      "content-length": body?.length ?? info.size,
       etag,
       "last-modified": info.mtime.toUTCString(),
       // Revalidate: a swapped file in the vendored folder is picked up on the
       // next page load, and an unchanged one costs a 304 instead of 2 MB.
       "cache-control": "no-cache",
     });
-    res.end(req.method === "HEAD" ? undefined : await readFile(asset.file));
+    res.end(body ?? undefined);
     return true;
   }
 
