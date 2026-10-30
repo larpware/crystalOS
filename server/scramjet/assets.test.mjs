@@ -20,6 +20,7 @@ import { once } from "node:events";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { runInNewContext } from "node:vm";
 import {
   ASSETS,
   VENDORED_DIR,
@@ -56,7 +57,7 @@ const PACKAGE_FILES = {
  * A complete, self-contained asset world: `vendored` (folder-name → files) as
  * the vendored override, plus either an installed tree or a bootstrap cache.
  */
-async function fixture({ vendored = {}, installed = true, cache = false, clientBundle = "official-client" } = {}) {
+async function fixture({ vendored = {}, installed = true, cache = false, clientBundle = "official-client", packageOverrides = {} } = {}) {
   const root = await mkdtemp(join(tmpdir(), "crescent-assets-"));
 
   for (const [dirName, files] of Object.entries(vendored)) {
@@ -67,6 +68,7 @@ async function fixture({ vendored = {}, installed = true, cache = false, clientB
     for (const [name, files] of Object.entries(PACKAGE_FILES)) {
       await writeTree(root, ["node_modules", "@mercuryworkshop", name], {
         ...files,
+        ...(packageOverrides[name] ?? {}),
         "package.json": JSON.stringify({ name: `@mercuryworkshop/${name}`, version: `9.9.${name.length}` }),
       });
     }
@@ -307,6 +309,56 @@ describe("clientConfig", () => {
       assert.ok(script.includes("__crystalDuckDuckGoRelay"), "DuckDuckGo relay wraps the hybrid client");
       assert.match(script, /exported\.default/, "wrapper supports Epoxy's actual UMD default export");
       assert.equal(exchange.captured.headers["cache-control"], "no-cache");
+    } finally {
+      await world.cleanup();
+    }
+  });
+
+  it("falls back on malformed response headers without replaying writes", async () => {
+    const world = await fixture({
+      packageOverrides: {
+        "libcurl-transport": {
+          "dist/index.js": `window.LibcurlTransport = { LibcurlClient: class { async init() { calls.push("libcurl:init"); } async request() { calls.push("libcurl:request"); return { status: 200, statusText: "OK", headers: [], body: "fallback" }; } async connect() {} } };`,
+        },
+        "epoxy-transport": {
+          "dist/index.js": `window.EpoxyTransport = { default: class { async init() { calls.push("epoxy:init"); } async request() { calls.push("epoxy:request"); throw new Error("http::Error(InvalidHeaderValue)"); } async connect() {} } };`,
+        },
+      },
+    });
+    try {
+      const assets = createAssets({ ...world.options, transport: "epoxy" });
+      const exchange = fakeExchange();
+      await assets.serve(exchange.req, exchange.res, "/clients/epoxy-client.js");
+      const calls = [];
+      const window = {};
+      const context = {
+        calls,
+        window,
+        location: { origin: "https://crystalos.test" },
+        URL,
+        Headers,
+        Response,
+        fetch: async () => {
+          calls.push("duckduckgo:relay");
+          return new Response("relay", { status: 200 });
+        },
+      };
+      runInNewContext(String(exchange.captured.body), context);
+      const Client = window.EpoxyTransport.EpoxyClient;
+      const client = new Client({ wisp: "wss://crystalos.test/wisp/" });
+      await client.init();
+      const safeResult = await client.request(new URL("https://example.com"), "GET", null, [], undefined);
+      assert.equal(safeResult.body, "fallback");
+      assert.deepEqual(calls.slice(0, 4), ["epoxy:init", "epoxy:request", "libcurl:init", "libcurl:request"]);
+
+      await assert.rejects(
+        client.request(new URL("https://example.com/form"), "POST", "payload", [], undefined),
+        /InvalidHeaderValue/,
+      );
+      assert.equal(calls.filter((call) => call === "libcurl:request").length, 1);
+
+      await client.request(new URL("https://duckduckgo.com/"), "GET", null, [], undefined);
+      assert.equal(calls.at(-1), "duckduckgo:relay");
     } finally {
       await world.cleanup();
     }
