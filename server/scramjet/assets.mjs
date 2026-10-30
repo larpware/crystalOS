@@ -46,6 +46,81 @@ export const PACKAGE_SCOPE = "@mercuryworkshop";
 const JS = "application/javascript; charset=utf-8";
 const WASM = "application/wasm";
 
+const HYBRID_TRANSPORT_POSTLUDE = `
+;(function () {
+  if (typeof window === "undefined" || !window.EpoxyTransport || !window.LibcurlTransport) return;
+  const EpoxyClient = window.EpoxyTransport.EpoxyClient;
+  const LibcurlClient = window.LibcurlTransport.LibcurlClient;
+  if (typeof EpoxyClient !== "function" || typeof LibcurlClient !== "function") {
+    throw new Error("The CrystalOS hybrid transport could not find both clients.");
+  }
+  if (EpoxyClient.__crystalHybridTransport) return;
+  class CrystalHybridTransport {
+    constructor(options) {
+      this.options = options;
+      this.epoxy = new EpoxyClient(options);
+      this.libcurl = new LibcurlClient(options);
+      this.epoxyReady = false;
+      this.libcurlReady = false;
+      this.libcurlInit = null;
+      this.ready = false;
+    }
+
+    async init() {
+      try {
+        await this.epoxy.init();
+        this.epoxyReady = true;
+      } catch (epoxyError) {
+        try {
+          await this.ensureLibcurl();
+        } catch {
+          throw epoxyError;
+        }
+      }
+      this.ready = this.epoxyReady || this.libcurlReady;
+    }
+
+    async ensureLibcurl() {
+      if (this.libcurlReady) return;
+      this.libcurlInit ??= this.libcurl.init().then(() => {
+        this.libcurlReady = true;
+      });
+      await this.libcurlInit;
+    }
+
+    async meta() {
+      if (this.epoxyReady && typeof this.epoxy.meta === "function") return this.epoxy.meta();
+      if (this.libcurlReady && typeof this.libcurl.meta === "function") return this.libcurl.meta();
+    }
+
+    async request(remote, method, body, headers, signal) {
+      if (this.epoxyReady) {
+        try {
+          return await this.epoxy.request(remote, method, body, headers, signal);
+        } catch (epoxyError) {
+          if (signal?.aborted) throw epoxyError;
+          try {
+            await this.ensureLibcurl();
+            return await this.libcurl.request(remote, method, body, headers, signal);
+          } catch {
+            throw epoxyError;
+          }
+        }
+      }
+      await this.ensureLibcurl();
+      return this.libcurl.request(remote, method, body, headers, signal);
+    }
+
+    connect(url, protocols, requestHeaders, onopen, onmessage, onclose, onerror) {
+      if (this.epoxyReady) return this.epoxy.connect(url, protocols, requestHeaders, onopen, onmessage, onclose, onerror);
+      return this.libcurl.connect(url, protocols, requestHeaders, onopen, onmessage, onclose, onerror);
+    }
+  }
+  Object.defineProperty(CrystalHybridTransport, "__crystalHybridTransport", { value: true });
+  window.EpoxyTransport.EpoxyClient = CrystalHybridTransport;
+})();
+`;
+
 /**
  * Every file the browser asks for. `transport` limits an entry to one transport,
  * because only the selected one is ever loaded or reported as missing.
@@ -498,12 +573,23 @@ export function createAssets({
 
     const info = await stat(asset.file);
     const isEpoxyClient = asset.package === "epoxy-transport";
+    const hybridLibcurl = isEpoxyClient && transport === "epoxy"
+      ? await locate(ASSETS.find((entry) => entry.url === "/clients/libcurl-client.js"))
+      : null;
     const body = req.method === "HEAD"
       ? null
-      : await readFile(asset.file).then((source) =>
-          isEpoxyClient ? Buffer.concat([source, Buffer.from(epoxyCompatPostlude())]) : source,
-        );
-    const etag = `"${info.size.toString(16)}-${Math.trunc(info.mtimeMs).toString(16)}${isEpoxyClient ? "-compat" : ""}"`;
+      : await readFile(asset.file).then(async (source) => {
+          if (!isEpoxyClient) return source;
+          if (!hybridLibcurl) return Buffer.concat([source, Buffer.from(epoxyCompatPostlude())]);
+          const libcurlSource = await readFile(hybridLibcurl.file);
+          return Buffer.concat([
+            libcurlSource,
+            source,
+            Buffer.from(HYBRID_TRANSPORT_POSTLUDE),
+          ]);
+        });
+    const isHybrid = Boolean(hybridLibcurl);
+    const etag = `"${info.size.toString(16)}-${Math.trunc(info.mtimeMs).toString(16)}${isEpoxyClient ? (isHybrid ? "-hybrid" : "-compat") : ""}"`;
     if (req.headers["if-none-match"] === etag) {
       res.writeHead(304, { etag, "cache-control": "no-cache" });
       res.end();
