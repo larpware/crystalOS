@@ -63,6 +63,7 @@ import { server as wisp } from "@mercuryworkshop/wisp-js/server";
 import { createAccountsApi } from "../accounts/api.mjs";
 import { createVpnApi } from "../vpn/api.mjs";
 import { createRoutedTCPSocket } from "../vpn/tunnel.mjs";
+import { handleDuckDuckGoRelay } from "./duckduckgo-relay.mjs";
 import { createAssets, TRANSPORTS, VENDORED_DIR } from "./assets.mjs";
 import { corsHeadersFor, parsePublicOrigins } from "../origins.mjs";
 
@@ -238,6 +239,11 @@ const server = createServer(async (req, res) => {
       res.end();
       return;
     }
+  }
+
+  if (url.pathname === "/api/proxy/duckduckgo") {
+    await handleDuckDuckGoRelay(req, res, url);
+    return;
   }
 
   if (await accounts.handle(req, res, url)) return;

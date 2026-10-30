@@ -185,32 +185,58 @@ function wispRewritePrelude(config) {
   ].join("\n");
 }
 
-/* proxy-bootstrap expects EpoxyTransport.EpoxyClient. epoxy-transport 3.x
- * exports the same ProxyTransport class as its UMD default export. Alias that
- * constructor directly so Scramjet still receives its init() method. */
+/* Keep the native ProxyTransport init() contract and route DuckDuckGo through
+ * the same-origin Worker relay when its direct TLS handshake is closed. */
+const EPOXY_COMPAT_INSTALLER = `
+const exported = window.EpoxyTransport;
+const Transport = typeof exported === "function" ? exported : exported.default;
+if (typeof Transport !== "function") throw new Error("The Epoxy browser transport export is unavailable.");
+if (!exported.EpoxyClient?.__crystalDuckDuckGoRelay) {
+  class CrystalEpoxyTransport extends Transport {
+    async request(remote, method, body, headers, signal) {
+      const hostname = String(remote?.hostname ?? "").toLowerCase();
+      const duckDomain = hostname === "duckduckgo.com" || hostname.endsWith(".duckduckgo.com") || hostname === "duck.com" || hostname.endsWith(".duck.com");
+      if (!duckDomain || typeof location === "undefined" || !location.origin) return super.request(remote, method, body, headers, signal);
+      const relay = new URL("/api/proxy/duckduckgo", location.origin);
+      relay.searchParams.set("url", remote.href);
+      const relayHeaders = new Headers();
+      const cookies = [];
+      let userAgent = "";
+      for (const [name, value] of headers ?? []) {
+        const key = String(name).toLowerCase();
+        if (key === "cookie") cookies.push(String(value));
+        else if (key === "user-agent") userAgent = String(value);
+        else if (!["host", "content-length", "connection", "transfer-encoding", "accept-encoding", "x-crystal-upstream-cookie", "x-crystal-upstream-user-agent"].includes(key)) relayHeaders.append(name, value);
+      }
+      if (cookies.length) relayHeaders.set("x-crystal-upstream-cookie", cookies.join("; "));
+      if (userAgent) relayHeaders.set("x-crystal-upstream-user-agent", userAgent);
+      const relayMethod = String(method || "GET").toUpperCase();
+      const init = { method: relayMethod, headers: relayHeaders, redirect: "manual", signal };
+      if (relayMethod !== "GET" && relayMethod !== "HEAD" && body != null) { init.body = body; init.duplex = "half"; }
+      const response = await fetch(relay, init);
+      const responseHeaders = [];
+      response.headers.forEach((value, name) => { if (name.toLowerCase() !== "x-crystal-upstream-set-cookie") responseHeaders.push([name, value]); });
+      try { const cookies = JSON.parse(response.headers.get("x-crystal-upstream-set-cookie") || "[]"); if (Array.isArray(cookies)) for (const cookie of cookies) responseHeaders.push(["set-cookie", String(cookie)]); } catch {}
+      return { body: response.body, headers: responseHeaders, status: response.status, statusText: response.statusText };
+    }
+  }
+  Object.defineProperty(CrystalEpoxyTransport, "__crystalDuckDuckGoRelay", { value: true });
+  exported.EpoxyClient = CrystalEpoxyTransport;
+}
+`;
+
 function epoxyCompatPrelude() {
   return [
-    '\tif (typeof window !== "undefined" && window.EpoxyTransport && typeof window.EpoxyTransport.EpoxyClient !== "function") {',
-    '\t\tconst __EpoxyExport = window.EpoxyTransport;',
-    '\t\tconst __EpoxyTransport = typeof __EpoxyExport === "function" ? __EpoxyExport : __EpoxyExport.default;',
-    '\t\tif (typeof __EpoxyTransport !== "function") throw new Error("The Epoxy browser transport export is unavailable.");',
-    '\t\t__EpoxyExport.EpoxyClient = __EpoxyTransport;',
-    '\t}',
+    'if (typeof window !== "undefined" && window.EpoxyTransport) {',
+    EPOXY_COMPAT_INSTALLER,
+    '}',
   ];
 }
 
-// The bootstrap loads epoxy-client.js after this initializer runs. Alias the
-// package's default ProxyTransport constructor after its UMD export is created.
+// The bootstrap loads epoxy-client.js after this initializer runs. Install the
+// same shim after its UMD export so the class is ready before construction.
 function epoxyCompatPostlude() {
-  return `
-;(function () {
-  if (typeof window === "undefined" || !window.EpoxyTransport || typeof window.EpoxyTransport.EpoxyClient === "function") return;
-  const exported = window.EpoxyTransport;
-  const Transport = typeof exported === "function" ? exported : exported.default;
-  if (typeof Transport !== "function") throw new Error("The Epoxy browser transport export is unavailable.");
-  exported.EpoxyClient = Transport;
-})();
-`;
+  return `\n;(function () { if (typeof window !== "undefined" && window.EpoxyTransport) { ${EPOXY_COMPAT_INSTALLER} } })();\n`;
 }
 
 /** The transports this server can actually serve. */

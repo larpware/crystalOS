@@ -322,13 +322,118 @@ const SCRAMJET_PATHS = [
 
 const EPOXY_COMPAT_POSTLUDE = `
 ;(function () {
-  if (typeof window === "undefined" || !window.EpoxyTransport || typeof window.EpoxyTransport.EpoxyClient === "function") return;
+  if (typeof window === "undefined" || !window.EpoxyTransport) return;
   const exported = window.EpoxyTransport;
   const Transport = typeof exported === "function" ? exported : exported.default;
   if (typeof Transport !== "function") throw new Error("The Epoxy browser transport export is unavailable.");
-  exported.EpoxyClient = Transport;
+  if (exported.EpoxyClient?.__crystalDuckDuckGoRelay) return;
+  class CrystalEpoxyTransport extends Transport {
+    async request(remote, method, body, headers, signal) {
+      const hostname = String(remote?.hostname ?? "").toLowerCase();
+      const duckDomain = hostname === "duckduckgo.com" || hostname.endsWith(".duckduckgo.com") || hostname === "duck.com" || hostname.endsWith(".duck.com");
+      if (!duckDomain || typeof location === "undefined" || !location.origin) {
+        return super.request(remote, method, body, headers, signal);
+      }
+
+      const relay = new URL("/api/proxy/duckduckgo", location.origin);
+      relay.searchParams.set("url", remote.href);
+      const relayHeaders = new Headers();
+      const cookies = [];
+      let userAgent = "";
+      for (const [name, value] of headers ?? []) {
+        const key = String(name).toLowerCase();
+        if (key === "cookie") cookies.push(String(value));
+        else if (key === "user-agent") userAgent = String(value);
+        else if (!["host", "content-length", "connection", "transfer-encoding", "accept-encoding", "x-crystal-upstream-cookie", "x-crystal-upstream-user-agent"].includes(key)) relayHeaders.append(name, value);
+      }
+      if (cookies.length) relayHeaders.set("x-crystal-upstream-cookie", cookies.join("; "));
+      if (userAgent) relayHeaders.set("x-crystal-upstream-user-agent", userAgent);
+
+      const relayMethod = String(method || "GET").toUpperCase();
+      const init = { method: relayMethod, headers: relayHeaders, redirect: "manual", signal };
+      if (relayMethod !== "GET" && relayMethod !== "HEAD" && body != null) {
+        init.body = body;
+        init.duplex = "half";
+      }
+      const response = await fetch(relay, init);
+      const responseHeaders = [];
+      response.headers.forEach((value, name) => {
+        if (name.toLowerCase() !== "x-crystal-upstream-set-cookie") responseHeaders.push([name, value]);
+      });
+      try {
+        const setCookies = JSON.parse(response.headers.get("x-crystal-upstream-set-cookie") || "[]");
+        if (Array.isArray(setCookies)) for (const cookie of setCookies) responseHeaders.push(["set-cookie", String(cookie)]);
+      } catch {}
+      return { body: response.body, headers: responseHeaders, status: response.status, statusText: response.statusText };
+    }
+  }
+  Object.defineProperty(CrystalEpoxyTransport, "__crystalDuckDuckGoRelay", { value: true });
+  exported.EpoxyClient = CrystalEpoxyTransport;
 })();
 `;
+
+const DUCKDUCKGO_HOSTS = ["duckduckgo.com", "duck.com"];
+
+function isDuckDuckGoHost(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  return DUCKDUCKGO_HOSTS.some((domain) => host === domain || host.endsWith(`.${domain}`));
+}
+
+/** DuckDuckGo closes the TLS handshake from the Render Wisp egress. Fetch it
+ * through this Worker instead; the destination is strictly allowlisted so this
+ * route cannot become a general-purpose open proxy. */
+async function duckDuckGoRelay(request: Request, url: URL): Promise<Response> {
+  const method = request.method.toUpperCase();
+  if (!["GET", "HEAD", "POST"].includes(method)) {
+    return json({ ok: false, error: "METHOD_NOT_ALLOWED" }, { status: 405 });
+  }
+
+  let target: URL;
+  try {
+    const raw = url.searchParams.get("url") ?? "";
+    if (!raw || raw.length > 12_000) throw new Error("invalid URL length");
+    target = new URL(raw);
+  } catch {
+    return json({ ok: false, error: "INVALID_TARGET" }, { status: 400 });
+  }
+  if (target.protocol !== "https:" || !isDuckDuckGoHost(target.hostname) || target.username || target.password || (target.port && target.port !== "443")) {
+    return json({ ok: false, error: "TARGET_NOT_ALLOWED" }, { status: 403 });
+  }
+
+  const headers = new Headers(request.headers);
+  const upstreamCookie = headers.get("x-crystal-upstream-cookie");
+  const upstreamUserAgent = headers.get("x-crystal-upstream-user-agent");
+  for (const name of [...headers.keys()]) {
+    const key = name.toLowerCase();
+    if (key === "host" || key === "content-length" || key === "connection" || key === "transfer-encoding" || key === "accept-encoding" || key === "cookie" || key.startsWith("cf-") || key.startsWith("x-forwarded-") || key === "x-real-ip" || key.startsWith("x-crystal-upstream-")) {
+      headers.delete(name);
+    }
+  }
+  if (upstreamCookie) headers.set("cookie", upstreamCookie);
+  if (upstreamUserAgent) headers.set("user-agent", upstreamUserAgent);
+
+  try {
+    const init: RequestInit = { method, headers, redirect: "manual", signal: request.signal };
+    if (method !== "GET" && method !== "HEAD" && request.body) init.body = request.body;
+    const upstream = await fetch(target, init);
+    const responseHeaders = new Headers(upstream.headers);
+    const cloudflareHeaders = upstream.headers as Headers & { getAll?: (name: string) => string[] };
+    const setCookies = cloudflareHeaders.getAll?.("set-cookie") ?? [];
+    responseHeaders.delete("set-cookie");
+    responseHeaders.delete("content-encoding");
+    responseHeaders.delete("content-length");
+    responseHeaders.delete("transfer-encoding");
+    if (setCookies.length) responseHeaders.set("x-crystal-upstream-set-cookie", JSON.stringify(setCookies));
+    responseHeaders.set("cache-control", "no-store");
+    return new Response(method === "HEAD" ? null : upstream.body, {
+      status: upstream.status,
+      statusText: upstream.statusText,
+      headers: responseHeaders,
+    });
+  } catch {
+    return json({ ok: false, error: "DUCKDUCKGO_UPSTREAM_FAILED" }, { status: 502 });
+  }
+}
 
 function isScramjetPath(pathname: string): boolean {
   return SCRAMJET_PATHS.some((prefix) => pathname === prefix || pathname.startsWith(prefix));
@@ -376,6 +481,7 @@ async function apiRoute(request: Request, env: Env, url: URL): Promise<Response>
   if (request.method.toUpperCase() === "OPTIONS") return preflight(request, env);
 
   const pathname = url.pathname;
+  if (pathname === "/api/proxy/duckduckgo") return duckDuckGoRelay(request, url);
   if (pathname === "/api" || pathname === "/api/") {
     return json(
       { ok: true, service: "crystalos-api", api: API_NAMESPACES, health: "/api/health" },
