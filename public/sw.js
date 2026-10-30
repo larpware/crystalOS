@@ -20,7 +20,10 @@
 
 let scramjetReady = false;
 try {
-  importScripts("/controller/controller.sw.js");
+  // Version the import as well as this worker. Browsers can keep the active
+  // root worker while revalidating its imported controller, so an unversioned
+  // import can leave Scramjet waiting on an older controller forever.
+  importScripts("/controller/controller.sw.js?v=0.0.14-crystal-2");
   scramjetReady = typeof $scramjetController?.shouldRoute === "function";
 } catch (error) {
   console.warn("[crystal] Scramjet controller unavailable:", error);
@@ -37,7 +40,7 @@ self.addEventListener("fetch", (event) => {
   }
 });
 
-const VERSION = "crystal-v2";
+const VERSION = "crystal-v3";
 const SHELL_CACHE = `${VERSION}-shell`;
 const ASSET_CACHE = `${VERSION}-assets`;
 const IMAGE_CACHE = `${VERSION}-images`;
