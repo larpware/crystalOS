@@ -89,6 +89,16 @@ if (!TRANSPORTS.includes(requestedTransport)) {
 }
 const TRANSPORT = requestedTransport;
 
+/* Render supports WebSockets on the service's public URL, but a CDN Worker
+ * is not a reliable long-lived WebSocket tunnel for every client/runtime.
+ * When Render provides its public URL, advertise a direct Wisp endpoint to
+ * the browser automatically. An explicit value still wins for other hosts. */
+const PUBLIC_WISP_URL =
+  process.env.CRESCENT_PUBLIC_WISP_URL ??
+  (process.env.RENDER_EXTERNAL_URL
+    ? `${process.env.RENDER_EXTERNAL_URL.replace(/\/$/, "").replace(/^http:/, "ws:").replace(/^https:/, "wss:")}/wisp/`
+    : undefined);
+
 const here = fileURLToPath(new URL(".", import.meta.url));
 const projectRoot = resolve(here, "../..");
 const distDir = join(projectRoot, "dist");
@@ -101,7 +111,7 @@ if (ALLOW_PRIVATE) {
 /* The proxy assets — Scramjet, the controller, the utils and the transport
    client — plus the generated /bootstrap-init.js. The service worker is the
    shell's own public/sw.js, which imports the controller served here. */
-const assets = createAssets({ projectRoot, transport: TRANSPORT });
+const assets = createAssets({ projectRoot, transport: TRANSPORT, wispUrl: PUBLIC_WISP_URL });
 const WISP_PATH = assets.config.wispPath;
 
 const CONTENT_TYPES = {
