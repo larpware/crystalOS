@@ -23,7 +23,15 @@
     // answer /api/* with index.html, which is exactly how the backend broke
     // in production before. "/api" is listed as well as "/api/*" because a
     // bare glob does not match its own directory path.
-    "run_worker_first": ["/api", "/api/*"]
+    "run_worker_first": [
+      "/api",
+      "/api/*",
+      "/bootstrap-init.js",
+      "/scram/*",
+      "/controller/*",
+      "/clients/*",
+      "/wisp/*"
+    ]
   },
   "observability": {
     "enabled": true
