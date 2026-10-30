@@ -185,6 +185,29 @@ function wispRewritePrelude(config) {
   ].join("\n");
 }
 
+/* proxy-bootstrap 0.0.5 expects the older Epoxy global shape
+ * (`EpoxyTransport.EpoxyClient`). epoxy-transport 3.x exports the transport
+ * class directly and initializes its WASM client asynchronously. Adapt the
+ * current package without modifying the upstream bootstrap bundle. */
+function epoxyCompatPrelude() {
+  return [
+    '\tif (typeof window !== "undefined" && typeof window.EpoxyTransport === "function" && !window.EpoxyTransport.EpoxyClient) {',
+    '\t\tconst __EpoxyTransport = window.EpoxyTransport;',
+    '\t\twindow.EpoxyTransport = {',
+    '\t\t\tEpoxyClient: class {',
+    '\t\t\t\tconstructor(options) { this.__transport = new __EpoxyTransport({ wisp: options.wisp }); this.__ready = this.__transport.init(); }',
+    '\t\t\t\trequest(...args) { return this.__ready.then(() => this.__transport.request(...args)); }',
+    '\t\t\t\tconnect(...args) {',
+    '\t\t\t\t\tlet send, close;',
+    '\t\t\t\t\tconst ready = this.__ready.then(() => [send, close] = this.__transport.connect(...args));',
+    '\t\t\t\t\treturn [data => ready.then(() => send(data)), (code, reason) => ready.then(() => close(code, reason))];',
+    '\t\t\t\t}',
+    '\t\t\t},',
+    '\t\t};',
+    '\t}',
+  ];
+}
+
 /** The transports this server can actually serve. */
 export const TRANSPORTS = ["libcurl", "epoxy"];
 
@@ -401,6 +424,7 @@ export function createAssets({
       // it has crossed the Cloudflare Worker -> Node proxy boundary.
       "globalThis.initBootstrap = async function initBootstrap() {",
       `\tconst { init } = await import("data:text/javascript;base64,${Buffer.from(bundle).toString("base64")}");`,
+      ...(config.transport === "epoxy" ? epoxyCompatPrelude() : []),
       ...(config.wispUrl ? [wispRewritePrelude(config)] : []),
       `\treturn init(${JSON.stringify(config)});`,
       "}",
