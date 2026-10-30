@@ -40,6 +40,9 @@ import {
   openNode,
 } from "@/services/os";
 import { metaFor } from "@/apps/catalog";
+import { type IconName } from "@/icons/Icon";
+import { useAppsStore } from "@/state/apps";
+import { notify } from "@/services/os";
 import { useFullScreenChrome, useViewport } from "@/hooks/useUi";
 import { useOffline } from "@/hooks/useOffline";
 
