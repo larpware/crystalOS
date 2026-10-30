@@ -326,20 +326,7 @@ const EPOXY_COMPAT_POSTLUDE = `
   const exported = window.EpoxyTransport;
   const Transport = typeof exported === "function" ? exported : exported.default;
   if (typeof Transport !== "function") throw new Error("The Epoxy browser transport export is unavailable.");
-  window.EpoxyTransport = {
-    EpoxyClient: class {
-      constructor(options) {
-        this.__transport = new Transport({ wisp: options.wisp });
-        this.__ready = this.__transport.init();
-      }
-      request(...args) { return this.__ready.then(() => this.__transport.request(...args)); }
-      connect(...args) {
-        let send, close;
-        const ready = this.__ready.then(() => [send, close] = this.__transport.connect(...args));
-        return [data => ready.then(() => send(data)), (code, reason) => ready.then(() => close(code, reason))];
-      }
-    }
-  };
+  exported.EpoxyClient = Transport;
 })();
 `;
 
@@ -371,10 +358,11 @@ async function scramjetRoute(request: Request, env: Env, url: URL): Promise<Resp
       return response;
     }
     const source = await response.text();
+    const patched = source + EPOXY_COMPAT_POSTLUDE;
     const headers = new Headers(response.headers);
-    headers.set("content-length", String(source.length + EPOXY_COMPAT_POSTLUDE.length));
+    headers.set("content-length", String(new TextEncoder().encode(patched).length));
     headers.set("cache-control", "no-store");
-    return new Response(source + EPOXY_COMPAT_POSTLUDE, {
+    return new Response(patched, {
       status: response.status,
       statusText: response.statusText,
       headers,

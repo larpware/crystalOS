@@ -185,34 +185,22 @@ function wispRewritePrelude(config) {
   ].join("\n");
 }
 
-/* proxy-bootstrap 0.0.5 expects the older Epoxy global shape
- * (`EpoxyTransport.EpoxyClient`). epoxy-transport 3.x exports the transport
- * class directly and initializes its WASM client asynchronously. Adapt the
- * current package without modifying the upstream bootstrap bundle. */
+/* proxy-bootstrap expects EpoxyTransport.EpoxyClient. epoxy-transport 3.x
+ * exports the same ProxyTransport class as its UMD default export. Alias that
+ * constructor directly so Scramjet still receives its init() method. */
 function epoxyCompatPrelude() {
   return [
     '\tif (typeof window !== "undefined" && window.EpoxyTransport && typeof window.EpoxyTransport.EpoxyClient !== "function") {',
     '\t\tconst __EpoxyExport = window.EpoxyTransport;',
     '\t\tconst __EpoxyTransport = typeof __EpoxyExport === "function" ? __EpoxyExport : __EpoxyExport.default;',
     '\t\tif (typeof __EpoxyTransport !== "function") throw new Error("The Epoxy browser transport export is unavailable.");',
-    '\t\twindow.EpoxyTransport = {',
-    '\t\t\tEpoxyClient: class {',
-    '\t\t\t\tconstructor(options) { this.__transport = new __EpoxyTransport({ wisp: options.wisp }); this.__ready = this.__transport.init(); }',
-    '\t\t\t\trequest(...args) { return this.__ready.then(() => this.__transport.request(...args)); }',
-    '\t\t\t\tconnect(...args) {',
-    '\t\t\t\t\tlet send, close;',
-    '\t\t\t\t\tconst ready = this.__ready.then(() => [send, close] = this.__transport.connect(...args));',
-    '\t\t\t\t\treturn [data => ready.then(() => send(data)), (code, reason) => ready.then(() => close(code, reason))];',
-    '\t\t\t\t}',
-    '\t\t\t},',
-    '\t\t};',
+    '\t\t__EpoxyExport.EpoxyClient = __EpoxyTransport;',
     '\t}',
   ];
 }
 
-// The bootstrap loads epoxy-client.js after this initializer runs, so the
-// initializer cannot adapt the UMD export in time. Append the same adapter to
-// the asset itself, after the package has created window.EpoxyTransport.
+// The bootstrap loads epoxy-client.js after this initializer runs. Alias the
+// package's default ProxyTransport constructor after its UMD export is created.
 function epoxyCompatPostlude() {
   return `
 ;(function () {
@@ -220,20 +208,7 @@ function epoxyCompatPostlude() {
   const exported = window.EpoxyTransport;
   const Transport = typeof exported === "function" ? exported : exported.default;
   if (typeof Transport !== "function") throw new Error("The Epoxy browser transport export is unavailable.");
-  window.EpoxyTransport = {
-    EpoxyClient: class {
-      constructor(options) {
-        this.__transport = new Transport({ wisp: options.wisp });
-        this.__ready = this.__transport.init();
-      }
-      request(...args) { return this.__ready.then(() => this.__transport.request(...args)); }
-      connect(...args) {
-        let send, close;
-        const ready = this.__ready.then(() => [send, close] = this.__transport.connect(...args));
-        return [data => ready.then(() => send(data)), (code, reason) => ready.then(() => close(code, reason))];
-      }
-    }
-  };
+  exported.EpoxyClient = Transport;
 })();
 `;
 }
