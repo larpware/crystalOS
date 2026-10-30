@@ -451,7 +451,9 @@ export function createAssets({
   wispUrl = process.env.CRESCENT_PUBLIC_WISP_URL,
 } = {}) {
   const config = clientConfig({ transport, wispUrl: normaliseWispUrl(wispUrl) });
-  const active = ASSETS.filter((asset) => !asset.transport || asset.transport === transport);
+  // When transport is "epoxy", include both epoxy and libcurl clients because
+  // the hybrid transport bundles them together for fallback support.
+  const active = ASSETS.filter((asset) => !asset.transport || asset.transport === transport || (transport === "epoxy" && asset.transport === "libcurl"));
   const cache = new Map();
   let clientBundlePromise = null;
 

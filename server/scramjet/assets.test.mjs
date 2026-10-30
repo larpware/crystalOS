@@ -285,12 +285,11 @@ describe("clientConfig", () => {
       assert.deepEqual(libcurl.missing, []);
       assert.equal(libcurl.urls.includes("/clients/epoxy-client.js"), false);
 
-      // Epoxy is resolvable here too, so the only change is which client is
-      // reported — the same files switch over.
+      // Epoxy transport includes both clients for hybrid fallback support.
       const epoxy = await createAssets({ ...world.options, transport: "epoxy" }).report();
       assert.ok(epoxy.packages["epoxy-transport"]);
-      assert.equal(epoxy.packages["libcurl-transport"], undefined);
-      assert.equal(epoxy.urls.includes("/clients/libcurl-client.js"), false);
+      assert.ok(epoxy.packages["libcurl-transport"], "libcurl is included for hybrid fallback");
+      assert.ok(epoxy.urls.includes("/clients/libcurl-client.js"), "libcurl URL is served for hybrid fallback");
     } finally {
       await world.cleanup();
     }
