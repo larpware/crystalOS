@@ -28,6 +28,7 @@
     "vpn": "node server/vpn/cli.mjs"
   },
   "dependencies": {
+    "@mercuryworkshop/epoxy-transport": "^3.0.2",
     "@mercuryworkshop/libcurl-transport": "^2.0.5",
     "@mercuryworkshop/proxy-bootstrap": "^0.0.5",
     "@mercuryworkshop/scramjet": "^2.0.67-alpha.2",
