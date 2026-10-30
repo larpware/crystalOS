@@ -83,9 +83,12 @@ const ALLOW_PRIVATE = process.env.CRESCENT_ALLOW_PRIVATE_IPS === "1";
 // otherwise usable sites when one response header contains a value it cannot
 // represent (`http::Error(InvalidHeaderValue)`). DuckDuckGo's separate TLS
 // failure is handled by the same-origin edge relay, so it no longer requires
-// changing the transport for the entire browser. An explicit environment
-// value remains available for local diagnostics or a deployment that needs it.
-const requestedTransport = process.env.CRESCENT_TRANSPORT ?? "libcurl";
+// changing the transport for the entire browser. Hosted instances force this
+// choice even if an older Render environment variable still says `epoxy`;
+// local runs can still choose either transport explicitly.
+const requestedTransport = process.env.PORT
+  ? "libcurl"
+  : (process.env.CRESCENT_TRANSPORT ?? "libcurl");
 if (!TRANSPORTS.includes(requestedTransport)) {
   process.stderr.write(
     [
