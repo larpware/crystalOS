@@ -14,6 +14,8 @@ import {
 import { AccountForm } from "@/shell/AccountForm";
 import { RarityBadge, RarityGuideModal } from "@/components/rarity";
 import { changePassword, forgetLegacyLocalAccounts, listLegacyLocalAccounts } from "@/services/auth";
+import { uploadAvatar } from "@/services/supabaseStorage";
+import { hasSupabaseConfig } from "@/lib/supabase";
 import { mesh } from "@/services/messaging";
 import { useAuthStore } from "@/state/auth";
 import { useBrowserStore } from "@/state/browser";
@@ -54,6 +56,21 @@ export function AccountsPage() {
 
   const pickAvatar = async (file: File) => {
     if (!file.type.startsWith("image/")) return;
+
+    // A Supabase account stores the picture in the project's avatars bucket
+    // and keeps a URL — the data-URL route embeds the bytes in the account
+    // row instead. If the upload path is unavailable (no email session, the
+    // bucket not migrated yet, the server offline), the classic data URL
+    // still works, so the feature degrades instead of failing.
+    if (auth.account?.supabaseLinked && hasSupabaseConfig()) {
+      const uploaded = await uploadAvatar(file);
+      if (uploaded.ok) {
+        auth.setAvatar(uploaded.url);
+        return;
+      }
+      console.debug("[supabase] avatar upload fell back to data URL:", uploaded.error);
+    }
+
     const dataUrl = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(String(reader.result));

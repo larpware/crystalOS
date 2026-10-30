@@ -110,8 +110,43 @@ export function validateAvatar(value) {
   const raw = stringField(value);
   if (raw === null) return { error: "That avatar could not be read." };
   if (raw.length > AVATAR_MAX_BYTES) return { error: "That image is larger than 512 KB." };
+  // Two trusted shapes: a data URL (the original flow) or a public URL in the
+  // configured Supabase project's avatars bucket (uploaded through Storage).
+  // Anything else — any other https host, a path, a relative URL — is refused,
+  // so an avatar can never point at an arbitrary remote host.
+  if (raw.startsWith("https://")) {
+    const urlError = avatarStorageUrlError(raw);
+    if (urlError) return { error: urlError };
+    return { value: raw };
+  }
   if (!AVATAR_PATTERN.test(raw)) return { error: "Avatars must be a PNG, JPEG, WebP, GIF or AVIF image." };
   return { value: raw };
+}
+
+/**
+ * Checks an https avatar against the configured Supabase project's public
+ * storage path. Resolved per call (not at import time) so test setups that
+ * configure the project after loading the module still behave like runtime.
+ */
+function avatarStorageUrlError(raw) {
+  const configured = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? "";
+  if (!configured) {
+    return "This server is not linked to a Supabase project, so it cannot host avatar URLs.";
+  }
+  let origin;
+  try {
+    origin = new URL(configured).origin;
+  } catch {
+    return "This server is not linked to a Supabase project, so it cannot host avatar URLs.";
+  }
+  if (!raw.startsWith(`${origin}/storage/v1/object/public/avatars/`)) {
+    return "That avatar URL is not part of this project's storage.";
+  }
+  const path = raw.slice(`${origin}/storage/v1/object/public/avatars/`.length).split(/[?#]/)[0];
+  if (!/^[A-Za-z0-9/._-]+$/.test(path) || !/\.(?:png|jpe?g|webp|gif|avif)$/.test(path)) {
+    return "That avatar URL does not look like a supported image.";
+  }
+  return null;
 }
 
 export function validateMessageBody(value) {

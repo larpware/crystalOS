@@ -197,6 +197,9 @@ export function publicUser(row, now = Date.now()) {
     rarity: row.rarity ?? undefined,
     tags: tagsOf(row),
     private: Boolean(row.private_account),
+    /** True when the account's password belongs to Supabase Auth, so the
+        OS's own change-password route does not apply to it. */
+    supabaseLinked: row.supabase_id != null,
 
     role: row.role ?? "user",
     createdAt: row.created_at,
@@ -231,6 +234,12 @@ export function openAccountsStore(options = {}) {
   // Account tags (owner, staff, …) shown beside the name; empty for everyone
   // the owner has not been asked about yet.
   ensureColumn(db, "users", "tags", "TEXT NOT NULL DEFAULT '[]'");
+  // Supabase Auth link: the Supabase user id (a uuid) the account's
+  // credentials belong to. Null for legacy password-only accounts. A partial
+  // UNIQUE index keeps one link per id while letting every legacy NULL be
+  // its own row.
+  ensureColumn(db, "users", "supabase_id", "TEXT");
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS users_supabase_id ON users(supabase_id) WHERE supabase_id IS NOT NULL");
   backfillRarity(db);
   upgradeOwnerAccount(db);
 
@@ -271,7 +280,7 @@ export function openAccountsStore(options = {}) {
      * collision is retried with a brand new code; a username collision is
      * surfaced to the caller as `UsernameTakenError`.
      */
-    createUser({ username, displayName, passwordSalt, passwordHash, bio, avatar, createdAt }) {
+    createUser({ username, displayName, passwordSalt, passwordHash, supabaseId, bio, avatar, createdAt }) {
       const id = createId("usr");
       // Drawn once, outside the retry loop: a friend-code collision must not
       // hand the account a second chance at a better tier.
@@ -282,9 +291,9 @@ export function openAccountsStore(options = {}) {
           db.prepare(
             `INSERT INTO users
                (id, username, username_lower, display_name, friend_code,
-                password_salt, password_hash, bio, avatar, rarity, rarity_roll,
+                password_salt, password_hash, supabase_id, bio, avatar, rarity, rarity_roll,
                 created_at, last_seen_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           ).run(
             id,
             username,
@@ -293,6 +302,7 @@ export function openAccountsStore(options = {}) {
             friendCode,
             passwordSalt,
             passwordHash,
+            supabaseId ?? null,
             bio ?? null,
             avatar ?? null,
             rarity,
@@ -317,6 +327,9 @@ export function openAccountsStore(options = {}) {
     /** `canonicalCode` is the normalised form from `normalizeFriendCode`. */
     userByFriendCode: (canonicalCode) =>
       db.prepare("SELECT * FROM users WHERE friend_code = ?").get(canonicalCode) ?? null,
+    /** The account whose credentials Supabase verifies; null when unlinked. */
+    userBySupabaseId: (supabaseId) =>
+      db.prepare("SELECT * FROM users WHERE supabase_id = ?").get(supabaseId) ?? null,
     countUsers: () => Number(db.prepare("SELECT COUNT(*) AS n FROM users").get().n),
 
     /** How many accounts hold each rarity. Used by tests and diagnostics. */

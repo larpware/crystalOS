@@ -33,6 +33,12 @@ interface AuthState {
   lockArmed: boolean;
   busy: boolean;
   error: string | null;
+  /**
+   * Supabase sign-up created the account, but the project requires the
+   * email to be confirmed first — there is no session to show yet. The
+   * form turns this into a "check your inbox" panel and resets it.
+   */
+  confirmationPending: boolean;
   /** True once the boot-time session check has completed. */
   restored: boolean;
   /** Whether the account server answered the last request. */
@@ -45,6 +51,8 @@ interface AuthState {
     username: string;
     displayName: string;
     password: string;
+    /** When present, the credentials live with Supabase Auth. */
+    email?: string;
   }) => Promise<boolean>;
   signOut: () => Promise<void>;
   startGuestSession: () => void;
@@ -73,6 +81,7 @@ export const useAuthStore = create<AuthState>()(
       lockArmed: false,
       busy: false,
       error: null,
+      confirmationPending: false,
       restored: false,
       serverOnline: true,
 
@@ -121,9 +130,15 @@ export const useAuthStore = create<AuthState>()(
       },
 
       signUp: async (input) => {
-        set({ busy: true, error: null });
+        set({ busy: true, error: null, confirmationPending: false });
         const result = await registerAccount(input);
         if (!result.ok || !result.account) {
+          // Email confirmation pending is not an error: the account exists,
+          // there is just no session until the inbox link is used.
+          if (result.emailConfirmationPending) {
+            set({ busy: false, error: null, confirmationPending: true });
+            return false;
+          }
           set({
             busy: false,
             error: result.error ?? "Could not create the account.",
@@ -213,7 +228,7 @@ export const useAuthStore = create<AuthState>()(
         if (!current.guest) void get().updateProfile({ avatar });
       },
 
-      clearError: () => set({ error: null }),
+      clearError: () => set({ error: null, confirmationPending: false }),
     }),
     {
       name: "auth",

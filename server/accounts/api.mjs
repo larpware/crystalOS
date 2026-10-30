@@ -59,6 +59,7 @@ import { forwardedHost, parsePublicOrigins, isCrossSiteRequest } from "../origin
 import { tagsOf, validateTags } from "./tags.mjs";
 import { createId } from "./ids.mjs";
 import { rarityGuide } from "./rarity.mjs";
+import { verifySupabaseToken } from "./supabase.mjs";
 
 const DEFAULT_SESSION_DAYS = 30;
 const BODY_LIMIT = AVATAR_MAX_BYTES + 64 * 1024;
@@ -381,16 +382,128 @@ export function createAccountsApi(options = {}) {
     return true;
   }
 
+  /*
+   * Supabase Auth: the second way to be signed in. The browser signs in (or
+   * signs up) with Supabase itself, then presents the access token here; this
+   * module verifies the token against the project — an id named by the body
+   * is never trusted — and finds the OS account linked to that identity.
+   * The account's password lives with Supabase: rows linked this way carry an
+   * empty local salt, which scrypt verification always rejects.
+   */
+
+  /** Extracts the token from the Authorization header, when present. */
+  function bearerFromRequest(req) {
+    const header = String(req.headers.authorization ?? "");
+    const match = /^Bearer ([A-Za-z0-9_.-]+)$/.exec(header);
+    return match ? match[1] : null;
+  }
+
+  /**
+   * Turns a presented Supabase token into the linked OS account, writing the
+   * failure response itself. `forRegister` relaxes the email-confirmation
+   * check: the confirmation email lands right after sign-up.
+   */
+  async function linkedUserForToken(req, res, token, { forRegister = false } = {}) {
+    const verdict = await verifySupabaseToken(token);
+    if (!verdict.ok) {
+      switch (verdict.code) {
+        case "NOT_CONFIGURED":
+          fail(res, 503, "NOT_CONFIGURED", "Email sign-in is not configured on this server.");
+          return null;
+        case "RATE_LIMITED":
+          fail(res, 429, "RATE_LIMITED", "Too many attempts. Try again in a moment.");
+          return null;
+        case "UNAUTHORIZED":
+          fail(res, 401, "INVALID_CREDENTIALS", "The sign-in could not be verified. Try again.");
+          return null;
+        case "UNREACHABLE":
+        case "UNAVAILABLE":
+          fail(res, 503, "SERVER_UNREACHABLE", "The identity service did not answer. Try again.");
+          return null;
+        default:
+          fail(res, 400, "INVALID_TOKEN", "That sign-in token is not usable.");
+          return null;
+      }
+    }
+    if (verdict.emailConfirmed === false && !forRegister) {
+      fail(res, 403, "EMAIL_UNCONFIRMED", "Confirm your email first — the message is in your inbox.");
+      return null;
+    }
+    const user = store.userBySupabaseId(verdict.id);
+    if (!user && !forRegister) {
+      fail(res, 404, "NO_LINKED_ACCOUNT", "This email has no CrystalOS account yet.");
+      return null;
+    }
+    return { verdict, user };
+  }
+
   async function handleRegister(req, res, { body }) {
     if (limitOr429(limits.register, `register:${clientAddress(req, trustProxy)}`, res)) return;
     if (rejectFriendCodeField(body, res)) return;
 
     const username = validateUsername(body.username);
     if (username.error) return fail(res, 400, "INVALID_USERNAME", username.error);
-    const password = validatePassword(body.password);
-    if (password.error) return fail(res, 400, "INVALID_PASSWORD", password.error);
     const displayName = validateDisplayName(body.displayName, username.value);
     if (displayName.error) return fail(res, 400, "INVALID_DISPLAY_NAME", displayName.error);
+
+    /*
+     * Two ways an account is born.
+     *   Supabase — the body carries a fresh access token from the browser's
+     *   email sign-up; the password stays with Supabase and never reaches
+     *   this database, which stores only the link and the OS profile.
+     *   Legacy — username + password with scrypt here (the original path,
+     *   unchanged for accounts and tests that rely on it).
+     */
+    const supabaseToken = typeof body.supabaseToken === "string" ? body.supabaseToken : "";
+    if (supabaseToken) {
+      const link = await linkedUserForToken(req, res, supabaseToken, { forRegister: true });
+      if (!link) return;
+
+      // An identity that already has an OS account: signing up with the same
+      // email again is— and answers like — a plain sign-in.
+      if (link.user) {
+        startSession(req, res, link.user);
+        send(res, 200, { user: publicUser(link.user) });
+        return;
+      }
+
+      let user;
+      try {
+        user = store.transaction(() => {
+          // Supabase owns the password: the row carries an empty salt, which
+          // scrypt verification can never succeed on.
+          const created = store.createUser({
+            username: username.value,
+            displayName: displayName.value,
+            passwordSalt: "",
+            passwordHash: "",
+            supabaseId: link.verdict.id,
+            createdAt: Date.now(),
+          });
+          // The first account on a fresh database is the project owner and gets
+          // moderation authority. CRESCENT_ADMINS can name more, by username.
+          const isFirst =
+            Number(store.db.prepare("SELECT COUNT(*) AS n FROM users").get().n) === 1;
+          if (isFirst || ADMIN_USERNAMES.has(username.value.toLowerCase())) {
+            store.db.prepare("UPDATE users SET role = 'admin' WHERE id = ?").run(created.id);
+            created.role = "admin";
+          }
+          startSession(req, res, created);
+          return created;
+        });
+      } catch (error) {
+        if (error?.code === "USERNAME_TAKEN") {
+          return fail(res, 409, "USERNAME_TAKEN", "That username is already taken.");
+        }
+        throw error;
+      }
+
+      send(res, 201, { user: publicUser(user) });
+      return;
+    }
+
+    const password = validatePassword(body.password ?? "");
+    if (password.error) return fail(res, 400, "INVALID_PASSWORD", password.error);
 
     const { salt, hash } = await hashPassword(password.value);
 
@@ -430,6 +543,23 @@ export function createAccountsApi(options = {}) {
   async function handleLogin(req, res, { body }) {
     const address = clientAddress(req, trustProxy);
     if (limitOr429(limits.login, `login:${address}`, res)) return;
+
+    /*
+     * Supabase login: the browser has already signed in with Supabase Auth
+     * (email + password there) and presents the access token. The token is
+     * verified here, and the OS session attaches to the account the verified
+     * identity is linked to. Passwords are never compared on this path.
+     */
+    const supabaseToken =
+      bearerFromRequest(req) ??
+      (typeof body.supabaseToken === "string" ? body.supabaseToken : "");
+    if (supabaseToken) {
+      const link = await linkedUserForToken(req, res, supabaseToken);
+      if (!link) return;
+      startSession(req, res, link.user);
+      send(res, 200, { user: publicUser(link.user) });
+      return;
+    }
 
     const identifier = cleanText(String(body.identifier ?? body.username ?? "")).trim();
     const password = typeof body.password === "string" ? body.password : "";
@@ -506,6 +636,12 @@ export function createAccountsApi(options = {}) {
 
   async function handlePasswordChange(req, res, { body, user }) {
     if (rejectFriendCodeField(body, res)) return;
+    if (user.supabase_id) {
+      // Supabase owns this password; changing it here would desync the two.
+      // The client changes it through Supabase (supabase.auth.updateUser).
+      return fail(res, 409, "PASSWORD_OWNED_BY_SUPABASE",
+        "This account signs in with its email — change the password from the email sign-in screen.");
+    }
     const current = typeof body.currentPassword === "string" ? body.currentPassword : "";
     const next = validatePassword(body.newPassword);
     if (next.error) return fail(res, 400, "INVALID_PASSWORD", next.error);

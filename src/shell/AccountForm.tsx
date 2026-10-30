@@ -1,6 +1,13 @@
 import { useState, type FormEvent } from "react";
 import { Button, Field, PasswordInput, Segmented, TextInput } from "@/components/ui";
-import { validateDisplayName, validatePassword, validateUsername } from "@/services/auth";
+import {
+  looksLikeEmail,
+  requestPasswordReset,
+  validateDisplayName,
+  validatePassword,
+  validateUsername,
+} from "@/services/auth";
+import { hasSupabaseConfig } from "@/lib/supabase";
 import { useAuthStore } from "@/state/auth";
 
 /* ==========================================================================
@@ -33,15 +40,36 @@ export function AccountForm({
 
   const [mode, setMode] = useState<AccountFormMode>(initialMode);
   const [identifier, setIdentifier] = useState("");
+  const [email, setEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
+  const [resetSent, setResetSent] = useState(false);
+  const [resetBusy, setResetBusy] = useState(false);
+
+  // Email sign-up/sign-in and password recovery only appear when the project
+  // has its Supabase values; deployments without them show the classic form.
+  const emailEnabled = hasSupabaseConfig();
 
   const reset = () => {
     setPassword("");
     setConfirm("");
     setLocalError(null);
+    setResetSent(false);
+  };
+
+  const sendReset = async () => {
+    if (resetBusy || !looksLikeEmail(identifier)) {
+      if (!looksLikeEmail(identifier)) setLocalError("Enter your email above to reset the password.");
+      return;
+    }
+    setResetBusy(true);
+    setLocalError(null);
+    const result = await requestPasswordReset(identifier);
+    setResetBusy(false);
+    if (result.ok) setResetSent(true);
+    else setLocalError(result.error ?? "The reset email could not be sent.");
   };
 
   const submit = async (event: FormEvent) => {
@@ -50,7 +78,7 @@ export function AccountForm({
 
     if (mode === "signin") {
       if (!identifier.trim()) {
-        setLocalError("Enter your username.");
+        setLocalError(emailEnabled ? "Enter your username or email." : "Enter your username.");
         return;
       }
       setLocalError(null);
@@ -82,13 +110,21 @@ export function AccountForm({
     }
 
     setLocalError(null);
-    if (await signUp({ username: identifier.trim(), displayName: displayName.trim(), password })) {
+    if (
+      await signUp({
+        username: identifier.trim(),
+        displayName: displayName.trim(),
+        password,
+        email: emailEnabled && email.trim() ? email.trim() : undefined,
+      })
+    ) {
       reset();
       onDone?.();
     }
   };
 
   const error = localError ?? storeError;
+  const confirmationPending = useAuthStore((state) => state.confirmationPending);
 
   return (
     <form className="cr-account-form" onSubmit={(event) => void submit(event)}>
@@ -109,19 +145,40 @@ export function AccountForm({
       )}
 
       <Field
-        label="Username"
-        hint={mode === "register" ? "Letters, numbers, dot, dash or underscore. Must be unique." : undefined}
+        label={mode === "signin" && emailEnabled ? "Username or email" : "Username"}
+        hint={
+          mode === "register"
+            ? "Letters, numbers, dot, dash or underscore. Must be unique."
+            : undefined
+        }
         htmlFor="account-identifier"
       >
         <TextInput
           id="account-identifier"
           value={identifier}
           autoComplete="username"
-          placeholder="luna"
+          placeholder={mode === "signin" && emailEnabled ? "luna or luna@example.com" : "luna"}
           spellCheck={false}
           onChange={(event) => setIdentifier(event.target.value)}
         />
       </Field>
+
+      {mode === "register" && emailEnabled && (
+        <Field
+          label="Email"
+          hint="Optional — enables sign-in from anywhere, real password recovery and syncing."
+          htmlFor="account-email"
+        >
+          <TextInput
+            id="account-email"
+            type="email"
+            value={email}
+            autoComplete="email"
+            placeholder="luna@example.com"
+            onChange={(event) => setEmail(event.target.value)}
+          />
+        </Field>
+      )}
 
       {mode === "register" && (
         <Field label="Display name" hint="Shown on the lock screen and to friends." htmlFor="account-display-name">
@@ -136,7 +193,13 @@ export function AccountForm({
 
       <Field
         label="Password"
-        hint={mode === "register" ? "At least 8 characters. Stored only as a scrypt hash on the server." : undefined}
+        hint={
+          mode === "register"
+            ? email.trim()
+              ? "At least 8 characters. Kept by the email system — this server never sees it."
+              : "At least 8 characters. Stored only as a scrypt hash on the server."
+            : undefined
+        }
         htmlFor="account-password"
       >
         <PasswordInput
@@ -161,6 +224,25 @@ export function AccountForm({
       )}
 
       {error && <div className="cr-field__error">{error}</div>}
+      {confirmationPending && !error && (
+        <div className="cr-field__hint" role="status">
+          Account created — check your inbox and confirm your email, then sign in here with the
+          email and password.
+        </div>
+      )}
+      {resetSent && !error && (
+        <div className="cr-field__hint" role="status">
+          If that email has an account, a reset link is on its way. Follow the link, then sign in
+          with the new password.
+        </div>
+      )}
+
+      {mode === "signin" && emailEnabled && !resetSent && (
+        <Button variant="ghost" type="button" onClick={() => void sendReset()} disabled={busy || resetBusy}>
+          {resetBusy ? "Sending…" : "Forgot password?"}
+        </Button>
+      )}
+
       {!serverOnline && mode === "signin" && !error && (
         <p className="cr-row__desc">
           The account server is not reachable, so signing in is not possible right now. Guest mode

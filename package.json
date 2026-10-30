@@ -18,6 +18,7 @@
     "test:units": "node --test \"src/**/*.test.mjs\"",
     "preview": "vite preview",
     "lint": "eslint src --max-warnings 0",
+    "ai:gateway": "node server/ai-gateway/run.mjs",
     "scramjet": "node server/scramjet/index.js",
     "start": "node server/scramjet/index.js",
     "vpn": "node server/vpn/cli.mjs"
@@ -29,6 +30,8 @@
     "@mercuryworkshop/scramjet-controller": "^0.0.14",
     "@mercuryworkshop/scramjet-utils": "^0.0.3",
     "@mercuryworkshop/wisp-js": "0.4.1",
+    "@supabase/server": "^1.9.2",
+    "@supabase/supabase-js": "^2.118.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "zustand": "^5.0.3"

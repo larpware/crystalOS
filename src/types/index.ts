@@ -428,6 +428,11 @@ export interface AccountProfile {
    * registered account, anyone named in CRESCENT_ADMINS, or nobody.
    */
   role?: "admin" | "user";
+  /**
+   * True when sign-in runs through Supabase Auth (email + password there):
+   * the OS holds the link, the credentials live with Supabase.
+   */
+  supabaseLinked?: boolean;
   createdAt: number;
   guest?: boolean;
 }
