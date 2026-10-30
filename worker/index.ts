@@ -307,6 +307,44 @@ function contentTypeError(request: Request): Response | null {
   return fail(415, "UNSUPPORTED_MEDIA_TYPE", "Send this request as application/json.");
 }
 
+const SCRAMJET_PATHS = [
+  "/api/proxy-status",
+  "/bootstrap-init.js",
+  "/scram/",
+  "/controller/",
+  "/clients/",
+  "/wisp/",
+];
+
+function isScramjetPath(pathname: string): boolean {
+  return SCRAMJET_PATHS.some((prefix) => pathname === prefix || pathname.startsWith(prefix));
+}
+
+function scramjetOrigin(env: Env): string | null {
+  const raw = String(env.SCRAMJET_ORIGIN ?? "").trim().replace(/\/+$/, "");
+  try {
+    const origin = new URL(raw);
+    return origin.protocol === "https:" ? origin.origin : null;
+  } catch {
+    return null;
+  }
+}
+
+async function scramjetRoute(request: Request, env: Env, url: URL): Promise<Response> {
+  const origin = scramjetOrigin(env);
+  if (!origin) {
+    return fail(503, "SCRAMJET_NOT_CONFIGURED", "The Scramjet Node service is not configured yet.");
+  }
+  const target = `${origin}${url.pathname}${url.search}`;
+  try {
+    // Passing the original Request preserves WebSocket upgrade requests for
+    // /wisp/ while keeping the Node service hidden behind this Worker origin.
+    return await fetch(new Request(target, request));
+  } catch {
+    return fail(503, "SCRAMJET_UNREACHABLE", "The Scramjet Node service is not reachable.");
+  }
+}
+
 async function apiRoute(request: Request, env: Env, url: URL): Promise<Response> {
   if (request.method.toUpperCase() === "OPTIONS") return preflight(request, env);
 
@@ -319,6 +357,8 @@ async function apiRoute(request: Request, env: Env, url: URL): Promise<Response>
   }
 
   if (pathname === "/api/health") return healthRoute(env);
+
+  if (isScramjetPath(pathname)) return scramjetRoute(request, env, url);
 
   if (!SAFE_METHODS.has(request.method.toUpperCase())) {
     const wrongType = contentTypeError(request);
@@ -364,6 +404,8 @@ const worker = {
       if (!response.headers.has("cache-control")) {
         response.headers.set("cache-control", "no-store");
       }
+    } else if (isScramjetPath(url.pathname)) {
+      response = await scramjetRoute(request, env, url);
     } else if (env.ASSETS) {
       // Static shell + SPA fallback, exactly as configured in wrangler.jsonc.
       response = await env.ASSETS.fetch(request);

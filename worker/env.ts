@@ -29,4 +29,6 @@ export interface Env {
   SUPABASE_SERVICE_KEY?: string;
   /** Static assets pipeline; absent when the Worker runs without assets. */
   ASSETS?: AssetsBinding;
+  /** Public origin of the Node service that runs Scramjet/Wisp. */
+  SCRAMJET_ORIGIN?: string;
 }
