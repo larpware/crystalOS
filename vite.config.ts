@@ -1,4 +1,4 @@
-import { defineConfig, type Plugin } from "vite";
+import { defineConfig, loadEnv, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import { fileURLToPath } from "node:url";
 
@@ -83,7 +83,60 @@ function scramjetScopeGuard(): Plugin {
   };
 }
 
-export default defineConfig({
+/* ==========================================================================
+   Supabase wiring for the shell
+
+   `src/lib/supabase.ts` reads VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY
+   by name. The project's own environment spells them without the VITE_ prefix
+   (SUPABASE_URL / SUPABASE_PUBLISHABLE_KEY — the same names the Worker and the
+   Node backend use), and Vite only exposes VITE_* keys to the browser, so a
+   build out of this repo shipped a shell that reported "Supabase is not
+   configured" no matter what was set.
+
+   This block forwards the two *public* values by name, which is exactly what
+   a bundle is allowed to carry: the publishable key is designed to be readable
+   by any browser, and authority comes from RLS, not from hiding it.
+
+   `loadEnv` is called with an explicit prefix list, so SUPABASE_SECRET_KEY and
+   every other secret in the environment is never read, never defined, and
+   never reaches the bundle — plus a belt-and-braces refusal below if a secret
+   shaped value ever arrives anyway.
+   ========================================================================== */
+
+const PUBLIC_ENV_PREFIXES = [
+  "VITE_",
+  "SUPABASE_URL",
+  "SUPABASE_PUBLISHABLE_KEY",
+  "SUPABASE_ANON_KEY",
+];
+
+/** A secret-shaped value must never be inlined into a public bundle. */
+function publicOnly(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed || /^sb_secret_/i.test(trimmed)) return "";
+  return trimmed;
+}
+
+function supabaseDefine(mode: string): Record<string, string> {
+  const env = loadEnv(mode, ".", PUBLIC_ENV_PREFIXES);
+  const url = publicOnly(env.VITE_SUPABASE_URL || env.SUPABASE_URL || "");
+  const key = publicOnly(
+    env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+      env.SUPABASE_PUBLISHABLE_KEY ||
+      env.VITE_SUPABASE_ANON_KEY ||
+      env.SUPABASE_ANON_KEY ||
+      "",
+  );
+  const anon = publicOnly(env.VITE_SUPABASE_ANON_KEY || env.SUPABASE_ANON_KEY || "");
+  return {
+    "import.meta.env.VITE_SUPABASE_URL": JSON.stringify(url),
+    "import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY": JSON.stringify(key),
+    "import.meta.env.VITE_SUPABASE_ANON_KEY": JSON.stringify(anon),
+  };
+}
+
+export default defineConfig(({ mode }) => ({
+  define: supabaseDefine(mode),
   plugins: [react(), backendWatch(), scramjetScopeGuard()],
   resolve: {
     alias: {
@@ -118,4 +171,4 @@ export default defineConfig({
     sourcemap: false,
     chunkSizeWarningLimit: 1200,
   },
-});
+}));
