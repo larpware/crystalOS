@@ -20,8 +20,7 @@
  * Configuration (environment variables):
  *   CRESCENT_PORT               port to listen on (default 8787)
  *   CRESCENT_HOST               interface to bind (default 127.0.0.1)
- *   CRESCENT_TRANSPORT          `epoxy` on hosted deployments, `libcurl` locally, or explicit
- *                               `libcurl`/`epoxy`
+ *   CRESCENT_TRANSPORT          `libcurl` by default, or explicit `libcurl`/`epoxy`
  *   CRESCENT_ALLOW_PRIVATE_IPS  `1` lets Wisp reach loopback/private addresses.
  *                               Needed to proxy sites on your own machine;
  *                               leave it off on a public deployment.
@@ -80,13 +79,13 @@ const PORT = Number(
 const HOST = process.env.CRESCENT_HOST ?? (process.env.PORT ? "0.0.0.0" : "127.0.0.1");
 const ALLOW_PRIVATE = process.env.CRESCENT_ALLOW_PRIVATE_IPS === "1";
 
-// Epoxy uses the browser/runtime transport path that works reliably on hosted
-// services. Keep libcurl for local development, but do not make Render's
-// default depend on its WASM TLS stack (which produces SSL error 35 for some
-// modern sites such as DuckDuckGo).
-const requestedTransport = process.env.PORT
-  ? "epoxy"
-  : (process.env.CRESCENT_TRANSPORT ?? "libcurl");
+// Libcurl is the tolerant hosted default. Epoxy's Rust HTTP parser rejects
+// otherwise usable sites when one response header contains a value it cannot
+// represent (`http::Error(InvalidHeaderValue)`). DuckDuckGo's separate TLS
+// failure is handled by the same-origin edge relay, so it no longer requires
+// changing the transport for the entire browser. An explicit environment
+// value remains available for local diagnostics or a deployment that needs it.
+const requestedTransport = process.env.CRESCENT_TRANSPORT ?? "libcurl";
 if (!TRANSPORTS.includes(requestedTransport)) {
   process.stderr.write(
     [
