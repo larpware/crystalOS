@@ -24,6 +24,8 @@ import { CrystalAi } from "./ai/CrystalAi";
 import { Social } from "./social/Social";
 import { Discord } from "./discord/Discord";
 import { QMovies } from "./qmovies/QMovies";
+import { CommunityAppRuntime } from "./community/CommunityAppRuntime";
+import { useAppsStore } from "@/state/apps";
 
 /* ==========================================================================
    Application registry
@@ -76,6 +78,9 @@ const components: Record<string, ComponentType<AppProps>> = {
 };
 
 export function getAppComponent(appId: string): ComponentType<AppProps> | null {
+  if (appId.startsWith("community:") || useAppsStore.getState().getCommunityApp?.(appId.replace(/^community:/, ""))) {
+    return CommunityAppRuntime;
+  }
   return components[appId] ?? null;
 }
 
@@ -88,6 +93,9 @@ export function unlistedComponentIds(): string[] {
 
 /** True when a catalogue entry actually has an implementation in this build. */
 export function isImplemented(appId: string): boolean {
+  if (appId.startsWith("community:") || useAppsStore.getState().getCommunityApp?.(appId.replace(/^community:/, ""))) {
+    return true;
+  }
   return appId in components;
 }
 

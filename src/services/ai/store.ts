@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { loadJSON, saveJSON } from "@/services/storage";
+import { DEFAULT_GATEWAY_URL } from "@/services/ai/gateway";
 
 /* ==========================================================================
    Crystal AI — conversations
@@ -35,10 +36,23 @@ export interface AiConversation {
   turns: AiTurn[];
 }
 
+/** Where answers come from: Puter.js, or the local Respan Gateway. */
+export type AiProvider = "puter" | "gateway";
+
 export interface AiSettings {
+  provider: AiProvider;
+  /** Base URL of the gateway this profile talks to, when `provider` is it. */
+  gatewayUrl: string;
+  /** Model asked for in gateway mode; the gateway routes the name. */
+  gatewayModel: string;
   model: string;
   systemPrompt: string;
   stream: boolean;
+}
+
+/** The model to send a turn with, whichever provider is selected. */
+export function activeModel(settings: AiSettings): string {
+  return settings.provider === "gateway" ? settings.gatewayModel : settings.model;
 }
 
 /**
@@ -54,6 +68,9 @@ export const SUGGESTED_MODELS: { id: string; label: string; note: string }[] = [
 ];
 
 export const DEFAULT_AI_SETTINGS: AiSettings = {
+  provider: "puter",
+  gatewayUrl: DEFAULT_GATEWAY_URL,
+  gatewayModel: "gpt-4o-mini",
   model: "gpt-5.4-nano",
   systemPrompt: "",
   stream: true,
@@ -109,6 +126,15 @@ function sanitizeSettings(value: unknown): AiSettings {
   if (typeof value !== "object" || value === null) return { ...DEFAULT_AI_SETTINGS };
   const record = value as Record<string, unknown>;
   return {
+    provider: record.provider === "gateway" ? "gateway" : "puter",
+    gatewayUrl:
+      typeof record.gatewayUrl === "string" && record.gatewayUrl.trim()
+        ? record.gatewayUrl
+        : DEFAULT_AI_SETTINGS.gatewayUrl,
+    gatewayModel:
+      typeof record.gatewayModel === "string" && record.gatewayModel.trim()
+        ? record.gatewayModel
+        : DEFAULT_AI_SETTINGS.gatewayModel,
     model: typeof record.model === "string" && record.model ? record.model : DEFAULT_AI_SETTINGS.model,
     systemPrompt: typeof record.systemPrompt === "string" ? record.systemPrompt : "",
     stream: typeof record.stream === "boolean" ? record.stream : true,

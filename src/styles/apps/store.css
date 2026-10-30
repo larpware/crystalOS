@@ -374,3 +374,24 @@
   font-size: var(--fs-sm);
   color: var(--text-secondary);
 }.cr-updates__table-row:last-child {  border-bottom: 0;}/* ---- Community submissions ---- */.cr-store__community {  display: flex;  flex-direction: column;  gap: 12px;}.cr-store__submit {  display: flex;  flex-direction: column;  gap: 10px;  max-width: 560px;  padding: 16px;  border: 1px solid var(--border-subtle);  border-radius: var(--radius-large);  background: var(--surface-1);}.cr-store__submit h3,.cr-store__review h3 {  margin: 0;  color: var(--text-primary);  font-size: var(--fs-md);  font-weight: 600;}.cr-store__submit textarea {  resize: vertical;}.cr-store__row {  display: flex;  flex-wrap: wrap;  align-items: center;  gap: 10px;}.cr-store__row select {  flex: 0 0 auto;}.cr-store__list,.cr-store__review {  display: flex;  flex-direction: column;  gap: 10px;}.cr-store__review-row {  display: flex;  flex-wrap: wrap;  align-items: center;  gap: 12px;  padding: 12px 14px;  border: 1px solid var(--border-subtle);  border-radius: var(--radius-large);  background: var(--surface-1);}@media (max-width: 560px) {  .cr-store__review-row > input {    flex: 1 1 100%;  }}.cr-store__review-text {  flex: 1;  min-width: 0;}.cr-store__review-text strong {  color: var(--text-primary);  font-size: var(--fs-md);}.cr-store__review-text p {  margin: 4px 0;}.cr-store__review-text small {  color: var(--text-muted);  font-size: var(--fs-xs);}.cr-store__review-row > input {  flex: 0 1 260px;}
+.cr-store__community-runtime {
+  position: absolute;
+  inset: 1rem;
+  z-index: 4;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  overflow: hidden;
+  border: 1px solid var(--cr-border, rgba(255,255,255,.12));
+  border-radius: 14px;
+  background: var(--cr-surface, #111);
+}
+.cr-store__community-runtime-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: .7rem 1rem;
+  border-bottom: 1px solid var(--cr-border, rgba(255,255,255,.12));
+}
+.cr-store__community-runtime-head div { display: grid; gap: .2rem; }
+.cr-store__community-runtime iframe { width: 100%; height: 100%; min-height: 24rem; border: 0; background: #fff; }

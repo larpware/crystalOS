@@ -1,0 +1,11 @@
+# The local Respan Gateway that Crystal AI can route through
+# (server/ai-gateway/serve.py, started with `npm run ai:gateway`).
+#
+# It is a Python package with prebuilt wheels, so it installs without a
+# compiler into the project's own environment:
+#
+#   python -m venv .venv
+#   .venv/Scripts/python -m pip install --only-binary=:all: -r server/ai-gateway/requirements.txt
+#
+# Guide: https://github.com/respanai/respan-gateway/blob/v0.3.0/python/README.md
+respan-gateway==0.3.0

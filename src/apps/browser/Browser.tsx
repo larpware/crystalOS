@@ -873,6 +873,13 @@ function DirectPane({ tab, active, proxyOn }: { tab: BrowserTab; active: boolean
   };
   const [status, setStatus] = useState<"loading" | "ready" | "stalled">("loading");
   const timerRef = useRef<number | null>(null);
+  /*
+   * The bar is a notice, not a modal: it explains why the page is being loaded
+   * this way, and once read it can be put away. Dismissing it only lasts until
+   * the tab navigates or switches loader (see browser.ts), so the warning is
+   * never gone for good — it simply stops sitting above every page.
+   */
+  const barHidden = tab.directBarHidden === true;
 
   useEffect(() => {
     setStatus("loading");
@@ -900,25 +907,34 @@ function DirectPane({ tab, active, proxyOn }: { tab: BrowserTab; active: boolean
 
   return (
     <div className="cr-browser__page" data-active={active} data-direct="true">
-      <div className="cr-browser__direct-bar" role="status">
-        <Icon name="warning" size={13} />
-        <span>
-          {proxyOn
-            ? `Direct mode: this window loads ${prettyTitle(tab.url)} itself, without Scramjet. A site that refuses to be framed stays blank.`
-            : `The proxy is off, so ${prettyTitle(tab.url)} is loaded directly in this window. A site that refuses to be framed stays blank.`}
-        </span>
-        <Button size="sm" icon="globe" onClick={useProxy}>
-          Use the proxy
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          icon="refresh"
-          onClick={() => updateTab(tab.id, { nonce: tab.nonce + 1, loading: true })}
-        >
-          Reload
-        </Button>
-      </div>
+      {!barHidden && (
+        <div className="cr-browser__direct-bar" role="status">
+          <Icon name="warning" size={13} />
+          <span>
+            {proxyOn
+              ? `Direct mode: this window loads ${prettyTitle(tab.url)} itself, without Scramjet. A site that refuses to be framed stays blank.`
+              : `The proxy is off, so ${prettyTitle(tab.url)} is loaded directly in this window. A site that refuses to be framed stays blank.`}
+          </span>
+          <Button size="sm" icon="globe" onClick={useProxy}>
+            Use the proxy
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            icon="refresh"
+            onClick={() => updateTab(tab.id, { nonce: tab.nonce + 1, loading: true })}
+          >
+            Reload
+          </Button>
+          <IconButton
+            className="cr-browser__direct-bar-close"
+            icon="close"
+            size={13}
+            label="Hide this notice"
+            onClick={() => updateTab(tab.id, { directBarHidden: true })}
+          />
+        </div>
+      )}
 
       <iframe
         key={tab.nonce}

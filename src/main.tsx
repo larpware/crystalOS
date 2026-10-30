@@ -35,6 +35,7 @@ import "./styles/apps/communities.css";
 import "./styles/apps/vpn.css";
 import "./styles/apps/ai.css";
 import "./styles/apps/social.css";
+import "./styles/apps/community.css";
 // Last: the small per-application pieces that had markup but no rule. Loaded
 // after every app stylesheet so it can complete them without competing.
 import "./styles/apps/details.css";

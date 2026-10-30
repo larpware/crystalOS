@@ -1,0 +1,39 @@
+# Crystal AI — the local Respan Gateway's configuration
+#
+# `npm run ai:gateway` serves this file on 127.0.0.1 and Crystal AI (Settings →
+# Routing → Local gateway) talks to it instead of Puter.js. The gateway runs on
+# this machine and spends the provider keys of whoever starts it — it is not a
+# hosted service, needs no Respan account and sends nothing anywhere else.
+#
+# Nothing in this file is a credential: `env:NAME` is read from the environment
+# when the gateway starts, so a key lives in the shell that launched it and
+# never in the repository.
+#
+# Guide: https://github.com/respanai/respan-gateway/blob/v0.3.0/python/README.md
+
+# A provider whose `env:` variable is not set stops the gateway at start-up, so
+# keep exactly the one you hold a key for, and swap the block if you use a
+# different vendor:
+#
+#   [providers.anthropic]
+#   vendor = "anthropic"
+#   key = "env:ANTHROPIC_API_KEY"
+#
+#   [providers.gemini]
+#   vendor = "gemini"
+#   key = "env:GEMINI_API_KEY"
+[providers.openai]
+vendor = "openai"
+key = "env:OPENAI_API_KEY"
+
+[cors]
+# The shell talks to the gateway from the browser, and the Vite dev server —
+# the origin `npm run dev` serves — is the only page allowed to. The gateway
+# listens on loopback with no client keys, which is only safe while that stays
+# true: do not expose this port.
+origins = ["http://127.0.0.1:5273", "http://localhost:5273"]
+
+[plugins.request_log]
+# Requests are kept in memory for the gateway's own request list and are gone
+# when it stops. Nothing is exported.
+history = 50

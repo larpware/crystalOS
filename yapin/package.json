@@ -1,0 +1,6 @@
+{
+  "name": "crystalos-yapin-verification-bot",
+  "private": true,
+  "type": "module",
+  "scripts": { "start": "node bot.js" }
+}

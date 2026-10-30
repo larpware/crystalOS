@@ -22,7 +22,8 @@ import { useVpnSync } from "@/hooks/useVpnSync";
 import { syncDeveloperMode } from "@/services/devtools";
 import { Icon } from "@/icons/Icon";
 import { Button } from "@/components/ui";
-import { notify, restartSession } from "@/services/os";
+import { notify, openApp, restartSession } from "@/services/os";
+import { resolveCommunityApp } from "@/services/communityApps";
 import {
   flushSessionSave,
   restoreSession as restoreDesktopSession,
@@ -344,6 +345,45 @@ export function App() {
           .join(" · "),
         icon: "warning",
       });
+    }
+  }, [powerState, setupComplete]);
+
+  /* ---- Deep link: Community app resolution from URL ------------------ */
+  const deepLinkHandled = useRef(false);
+  useEffect(() => {
+    if (!setupComplete || powerState !== "on" || deepLinkHandled.current) return;
+    if (typeof window === "undefined") return;
+
+    try {
+      const url = new URL(window.location.href);
+      const searchApp = url.searchParams.get("app") || url.searchParams.get("communityApp");
+      const token = url.searchParams.get("token") || url.searchParams.get("shareToken");
+      const match = url.pathname.match(/^\/apps\/([^/]+)/);
+      const targetIdentifier = searchApp || (match ? match[1] : null) || token;
+
+      if (targetIdentifier) {
+        deepLinkHandled.current = true;
+        void resolveCommunityApp(token || targetIdentifier).then((app) => {
+          if (app) {
+            openApp("store", {
+              args: { communityAppId: app.id, section: "community" },
+            });
+            notify({
+              title: "Community Application",
+              body: `Opening "${app.name}" (${app.verificationStatus}).`,
+              icon: "store",
+            });
+          } else {
+            notify({
+              title: "Application Not Found",
+              body: "The requested community application was not found or the share link is invalid.",
+              icon: "warning",
+            });
+          }
+        });
+      }
+    } catch {
+      // ignore URL parse errors
     }
   }, [powerState, setupComplete]);
 

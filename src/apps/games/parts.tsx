@@ -9,7 +9,7 @@ import {
 } from "@/state/games";
 import { formatRelative } from "@/utils/format";
 import { useWindowStore } from "@/state/windows";
-import { categoryLabels, tilePalette, type CrystalOSGame } from "./catalogue";
+import { categoryLabels, type CrystalOSGame } from "./catalogue";
 import { gameDisplayTitle } from "./launch";
 import { BuiltinBreakout } from "./builtins/Breakout";
 import { BuiltinSnake } from "./builtins/Snake";
@@ -17,47 +17,30 @@ import { BuiltinSnake } from "./builtins/Snake";
 /* ==========================================================================
    Shared Games parts
 
-   Cover art, tiles, the detail panel and the player. Both the Games app and
-   the Game Library use these, so the library never drifts from the store.
+   Cards, the detail panel and the player. Both the Games app and the Game
+   Library use these, so the library never drifts from the store.
+
+   No cover art: the catalogue's cover URLs belong to hosts that serve them
+   cross-origin, and the browser blocks most of them as opaque responses — the
+   tiles spent their life on a broken image and a fallback letter. Until there
+   is a real art API, a game is its name and its genre, which is also all a
+   list of 1247 games needs to be scannable.
    ========================================================================== */
-
-export function GameCover({ game, radius = 6 }: { game: CrystalOSGame; radius?: number }) {
-  const [failed, setFailed] = useState(false);
-  const palette = tilePalette(game.title);
-
-  if (!game.cover || failed) {
-    return (
-      <div
-        className="cr-game-cover cr-game-cover--generated"
-        style={{
-          borderRadius: radius,
-          background: `linear-gradient(155deg, ${palette.from} 0%, ${palette.to} 100%)`,
-        }}
-        aria-hidden="true"
-      >
-        <span className="cr-game-cover__letter">{palette.letter}</span>
-        <span className="cr-game-cover__title">{game.title}</span>
-      </div>
-    );
-  }
-
-  return (
-    <div className="cr-game-cover" style={{ borderRadius: radius }} aria-hidden="true">
-      <img src={game.cover} alt="" loading="lazy" decoding="async" onError={() => setFailed(true)} />
-    </div>
-  );
-}
 
 export function GameCard({
   game,
   onPlay,
   onOpen,
   launched = false,
+  locked = false,
+  onVerify,
 }: {
   game: CrystalOSGame;
   onPlay: () => void;
   onOpen: () => void;
   launched?: boolean;
+  locked?: boolean;
+  onVerify?: () => void;
 }) {
   const favourite = useGamesStore((state) => state.favourites.includes(game.id));
   const toggleFavourite = useGamesStore((state) => state.toggleFavourite);
@@ -68,7 +51,10 @@ export function GameCard({
     <article className="cr-game-card" data-launched={launched}>
       {game.editorsChoice && <span className="cr-game-card__choice">Editor's Choice</span>}
       <button type="button" className="cr-game-card__hit" onClick={onOpen} aria-label={`${title} details`}>
-        <GameCover game={game} />
+        <span className="cr-game-card__text">
+          <span className="cr-game-card__title">{title}</span>
+          <span className="cr-game-card__sub">{locked ? "Locked · verify ownership" : categoryLabels[game.category]}</span>
+        </span>
         <span
           className="cr-game-card__favourite"
           role="button"
@@ -89,21 +75,12 @@ export function GameCard({
         </span>
       </button>
       <div className="cr-game-card__meta">
-        <div className="cr-game-card__text">
-          <span className="cr-game-card__title">{title}</span>
-          <span className="cr-game-card__sub">{categoryLabels[game.category]}</span>
-        </div>
         <Tooltip label={`Play ${title}`}>
-          <Button size="sm" variant="primary" icon="play" onClick={onPlay}>
-            Play
+          <Button size="sm" variant={locked ? "ghost" : "primary"} icon={locked ? "lock" : "play"} onClick={locked ? onVerify : onPlay}>
+            {locked ? "Verify ownership" : "Play"}
           </Button>
         </Tooltip>
       </div>
-      {favourite && (
-        <span className="cr-game-card__flag">
-          <Icon name="star" size={11} />
-        </span>
-      )}
     </article>
   );
 }
@@ -166,9 +143,6 @@ export function GameDetail({
 
   return (
     <div className="cr-game-detail">
-      <div className="cr-game-detail__art">
-        <GameCover game={game} radius={8} />
-      </div>
       <div className="cr-game-detail__body">
         <header>
           <h2>{title}</h2>
@@ -346,25 +320,59 @@ export function GamePlayer({
   const maximized = useWindowStore(
     (state) => state.windows.find((window) => window.id === windowId)?.state === "maximized",
   );
+  const shellFull = useWindowStore(
+    (state) => state.windows.find((window) => window.id === windowId)?.full === true,
+  );
   const toggleMaximize = useWindowStore((state) => state.toggleMaximize);
+  const toggleFullScreen = useWindowStore((state) => state.toggleFullScreen);
+
+  /* The caller builds `onSession` inline, so it is a new function on every
+     render of the library — which is why it must not be a dependency of the
+     session timer. It was, and the result was a loop with a five-second fuse:
+     every render re-ran this effect, once five seconds had passed each run
+     reported a session, that updated the store, the store re-rendered the
+     library, the library built a new callback, and the effect ran again. The
+     shell never got another frame and the frame's document was torn down on
+     every pass. A callback's identity says nothing about the session it
+     reports, so the current one is held in a ref instead. */
+  const reportSession = useRef(onSession);
+  reportSession.current = onSession;
 
   useEffect(() => {
     startedAt.current = Date.now();
     return () => {
       const seconds = Math.round((Date.now() - startedAt.current) / 1000);
-      if (seconds >= 5) onSession(seconds);
+      if (seconds >= 5) reportSession.current(seconds);
     };
-  }, [game.id, nonce, onSession]);
+  }, [game.id, nonce]);
+
+  /* The shell's own full screen: the window to the viewport with the panel and
+     dock standing aside, exactly what the title bar's Full screen button does.
+     It needs no permission, so it is also where a refused browser request
+     lands. */
+  const enterShellFull = () => {
+    const current = useWindowStore.getState().windows.find((window) => window.id === windowId);
+    if (current?.full) return;
+    toggleFullScreen(windowId);
+  };
 
   /* A profile asking for fullscreen gets one attempt as the frame mounts.
      Browsers only honour requestFullscreen while a gesture is still live, and
      Play was clicked a moment ago, so it usually lands — but a refusal is not a
-     failure, and the bar's own fullscreen control is still there. Re-attempted
-     when the frame is reloaded, matching the reset on `nonce`. */
+     failure: it falls through to the shell's own full screen rather than
+     leaving the setting with no visible effect. Re-attempted when the frame is
+     reloaded, matching the reset on `nonce`. */
   useEffect(() => {
-    if (!profile.fullscreenOnLaunch || !document.fullscreenEnabled) return;
-    hostRef.current?.requestFullscreen?.().catch(() => undefined);
-  }, [profile.fullscreenOnLaunch, nonce]);
+    if (!profile.fullscreenOnLaunch) return;
+    if (!document.fullscreenEnabled) {
+      enterShellFull();
+      return;
+    }
+    hostRef.current
+      ?.requestFullscreen?.()
+      .catch(() => useWindowStore.getState().toggleFullScreen(windowId));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile.fullscreenOnLaunch, nonce, windowId]);
 
   useEffect(() => {
     const onChange = () => setFullscreen(document.fullscreenElement === hostRef.current);
@@ -372,15 +380,39 @@ export function GamePlayer({
     return () => document.removeEventListener("fullscreenchange", onChange);
   }, []);
 
+  /* Two modes, and the button must never do nothing. The browser's own takes
+     the stage to the top layer; the shell's takes the window to the viewport
+     and hides the chrome. A browser that refuses the first — no live gesture, a
+     hidden window, an embedding frame without the permission — used to leave
+     this click with no effect at all, which read as "fullscreen does nothing
+     and nothing hides". The refusal now falls through to the shell's mode, and
+     exiting leaves whichever mode was actually entered. */
+  const engaged = fullscreen || shellFull;
+
   const toggleFullscreen = async () => {
     const host = hostRef.current;
     if (!host) return;
-    try {
-      if (document.fullscreenElement) await document.exitFullscreen();
-      else await host.requestFullscreen();
-    } catch {
-      setFullscreen(false);
+    if (fullscreen) {
+      try {
+        await document.exitFullscreen();
+      } catch {
+        setFullscreen(false);
+      }
+      return;
     }
+    if (shellFull) {
+      toggleFullScreen(windowId);
+      return;
+    }
+    if (document.fullscreenEnabled) {
+      try {
+        await host.requestFullscreen();
+        return;
+      } catch {
+        /* refused — the shell's mode below is the same view without asking */
+      }
+    }
+    enterShellFull();
   };
 
   return (
@@ -406,10 +438,10 @@ export function GamePlayer({
               onClick={() => toggleMaximize(windowId)}
             />
           </Tooltip>
-          <Tooltip label={fullscreen ? "Exit fullscreen" : "Fullscreen"}>
+          <Tooltip label={engaged ? "Exit fullscreen" : "Fullscreen"}>
             <IconButton
-              icon={fullscreen ? "collapse" : "expand"}
-              label={fullscreen ? "Exit fullscreen" : "Fullscreen"}
+              icon={engaged ? "collapse" : "expand"}
+              label={engaged ? "Exit fullscreen" : "Fullscreen"}
               onClick={() => void toggleFullscreen()}
             />
           </Tooltip>

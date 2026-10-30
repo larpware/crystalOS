@@ -9,17 +9,35 @@ export interface InstalledApp {
   version: string;
 }
 
+export interface InstalledCommunityApp {
+  id: string;
+  name: string;
+  description: string;
+  websiteUrl: string;
+  iconUrl?: string | null;
+  category: string;
+  developerUsername?: string;
+  developerDisplayName?: string;
+  installedAt: number;
+}
+
 interface AppsState {
   recents: string[];
   launchCounts: Record<string, number>;
   /** Apps the user removed from the store. Bundled code stays on disk. */
   removed: string[];
   installed: InstalledApp[];
+  /** User-installed community applications */
+  installedCommunityApps: InstalledCommunityApp[];
 
   recordLaunch: (appId: string) => void;
   clearRecents: () => void;
   install: (appId: string, version: string) => void;
   remove: (appId: string) => void;
+  installCommunity: (app: InstalledCommunityApp) => void;
+  uninstallCommunity: (appId: string) => void;
+  syncCommunityInstallations: (apps: InstalledCommunityApp[]) => void;
+  getCommunityApp: (appId: string) => InstalledCommunityApp | undefined;
   /** Marks a bundled app as present without showing an install animation. */
   syncBundled: (entries: { appId: string; version: string }[]) => void;
 }
@@ -31,6 +49,7 @@ export const useAppsStore = create<AppsState>()(
       launchCounts: {},
       removed: [],
       installed: [],
+      installedCommunityApps: [],
 
       recordLaunch: (appId) =>
         set({
@@ -53,6 +72,30 @@ export const useAppsStore = create<AppsState>()(
           installed: get().installed.filter((entry) => entry.appId !== appId),
           removed: [...new Set([...get().removed, appId])],
         }),
+
+      installCommunity: (app) => {
+        const cleanId = app.id.replace(/^community:/, "");
+        const filtered = get().installedCommunityApps.filter((a) => a.id !== cleanId);
+        set({
+          installedCommunityApps: [...filtered, { ...app, id: cleanId, installedAt: Date.now() }],
+        });
+      },
+
+      uninstallCommunity: (appId) => {
+        const cleanId = appId.replace(/^community:/, "");
+        set({
+          installedCommunityApps: get().installedCommunityApps.filter((a) => a.id !== cleanId),
+        });
+      },
+
+      syncCommunityInstallations: (apps) => {
+        set({ installedCommunityApps: apps });
+      },
+
+      getCommunityApp: (appId) => {
+        const cleanId = appId.replace(/^community:/, "");
+        return get().installedCommunityApps.find((a) => a.id === cleanId);
+      },
 
       syncBundled: (entries) => {
         const known = new Map(get().installed.map((entry) => [entry.appId, entry]));

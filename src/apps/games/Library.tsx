@@ -4,6 +4,8 @@ import { Icon } from "@/icons/Icon";
 import { useGamesStore } from "@/state/games";
 import { openApp } from "@/services/os";
 import { useWindowStore } from "@/state/windows";
+import { useAuthStore } from "@/state/auth";
+import { loadVerificationSnapshot } from "@/services/verification";
 import type { AppProps } from "@/types";
 import { formatRelative } from "@/utils/format";
 import {
@@ -14,8 +16,8 @@ import {
   games,
   type CrystalOSGame,
 } from "./catalogue";
-import { GameCard, GameCover, GamePlayer } from "./parts";
-import { gameDisplayTitle, launchGame, launchGameInWindow } from "./launch";
+import { GameCard, GamePlayer } from "./parts";
+import { authorizeGameLaunch, gameDisplayTitle, launchGame, launchGameInWindow } from "./launch";
 
 /* ==========================================================================
    Game Library
@@ -60,6 +62,16 @@ export function GameLibrary({ windowId, args }: AppProps) {
   const setWindowPerGame = useGamesStore((state) => state.setWindowPerGame);
   const setWindowTitle = useWindowStore((state) => state.setTitle);
   const closeWindow = useWindowStore((state) => state.close);
+  const account = useAuthStore((state) => state.account);
+  const [lockedIds, setLockedIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    let alive = true;
+    void loadVerificationSnapshot(true).then((state) => {
+      if (alive) setLockedIds(new Set([...state.restricted].filter((id) => !state.owned.has(id))));
+    });
+    return () => { alive = false; };
+  }, [account?.id]);
 
   /** The name a game is shown under: the profile's override, else the catalogue's. */
   const titleOf = (game: CrystalOSGame) => gameDisplayTitle(game, profiles[game.id]?.title ?? "");
@@ -67,7 +79,11 @@ export function GameLibrary({ windowId, args }: AppProps) {
   /** Every Play path goes through launchGame, so a profile set to open in a
       Browser tab never ends up in this window's frame. Embedded games either
       take over this window or open a player window of their own. */
-  const startGame = (game: CrystalOSGame) => {
+  const startGame = async (game: CrystalOSGame) => {
+    if (!(await authorizeGameLaunch(game))) {
+      openApp("settings", { args: { page: "accounts" } });
+      return;
+    }
     if (launchGame(game) !== "embedded") return;
     if (windowPerGame) {
       launchGameInWindow(game);
@@ -96,6 +112,16 @@ export function GameLibrary({ windowId, args }: AppProps) {
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playing, profiles, setWindowTitle, windowId]);
+
+  useEffect(() => {
+    if (!playing) return;
+    void authorizeGameLaunch(playing).then((allowed) => {
+      if (!allowed) {
+        closeWindow(windowId);
+        openApp("settings", { args: { page: "accounts" } });
+      }
+    });
+  }, [closeWindow, playing, windowId]);
 
   const playtime = useMemo(() => {
     const map = new Map<string, number>();
@@ -262,9 +288,6 @@ export function GameLibrary({ windowId, args }: AppProps) {
               <div className="cr-library__home">
                 <section className="cr-library__hero" aria-label="Featured game">
                   <article className="cr-library__feature">
-                    <div className="cr-library__feature-art">
-                      <GameCover game={hero} radius={8} />
-                    </div>
                     <div className="cr-library__feature-body">
                       <Badge tone="accent">Featured</Badge>
                       <h2>{titleOf(hero)}</h2>
@@ -292,10 +315,9 @@ export function GameLibrary({ windowId, args }: AppProps) {
                         className="cr-library__hero-tile"
                         onClick={() => startGame(game)}
                       >
-                        <GameCover game={game} radius={5} />
                         <span className="cr-library__hero-tile-text">
                           <span>{titleOf(game)}</span>
-                          <span className="cr-row__desc">{game.host}</span>
+                          <span className="cr-row__desc">{categoryLabels[game.category]}</span>
                         </span>
                         <Icon name="play" size={14} />
                       </button>
@@ -419,6 +441,8 @@ export function GameLibrary({ windowId, args }: AppProps) {
                       <GameCard
                         key={game.id}
                         game={game}
+                        locked={lockedIds.has(game.id)}
+                        onVerify={() => openApp("settings", { args: { page: "accounts" } })}
                         launched={playtime.has(game.id)}
                         onPlay={() => startGame(game)}
                         onOpen={() => setFocusedId(game.id)}
@@ -442,7 +466,6 @@ export function GameLibrary({ windowId, args }: AppProps) {
                         onClick={() => setFocusedId(game.id)}
                       >
                         <span className="cr-library__table-game">
-                          <GameCover game={game} radius={4} />
                           <span>
                             <strong>{titleOf(game)}</strong>
                             <span className="cr-row__desc">{game.host}</span>
@@ -477,9 +500,6 @@ export function GameLibrary({ windowId, args }: AppProps) {
               <aside className="cr-library__detail">
                 {focused && (
                   <>
-                    <div className="cr-library__detail-art">
-                      <GameCover game={focused} radius={7} />
-                    </div>
                     <h3>{titleOf(focused)}</h3>
                     <div className="cr-library__detail-badges">
                       <Badge>{categoryLabels[focused.category]}</Badge>

@@ -2,6 +2,7 @@ import { launchUrl, openApp } from "@/services/os";
 import { useGamesStore } from "@/state/games";
 import { useWindowStore } from "@/state/windows";
 import type { CrystalOSGame } from "./catalogue";
+import { checkGameAccess } from "@/services/verification";
 
 /* ==========================================================================
    Game launch
@@ -12,6 +13,10 @@ import type { CrystalOSGame } from "./catalogue";
    ========================================================================== */
 
 export type LaunchOutcome = "embedded" | "browser" | "external";
+
+export async function authorizeGameLaunch(game: CrystalOSGame): Promise<boolean> {
+  return checkGameAccess(game.id);
+}
 
 /**
  * Starts a game the way its profile asks, and reports which mode was used.

@@ -3,10 +3,13 @@ import { Badge, Button, EmptyState, Segmented, TextInput } from "@/components/ui
 import { Icon } from "@/icons/Icon";
 import { useGamesStore } from "@/state/games";
 import { useWindowStore } from "@/state/windows";
+import { useAuthStore } from "@/state/auth";
+import { loadVerificationSnapshot } from "@/services/verification";
 import type { AppProps } from "@/types";
 import { formatRelative } from "@/utils/format";
 import {
   categoryCounts,
+  categoryLabels,
   featuredGames,
   gameById,
   games,
@@ -15,8 +18,9 @@ import {
   type CrystalOSGame,
   type GameCategory,
 } from "./catalogue";
-import { gameDisplayTitle, launchGame, launchGameInWindow } from "./launch";
-import { GameCard, GameCover, GameDetail, GamePlayer } from "./parts";
+import { authorizeGameLaunch, gameDisplayTitle, launchGame, launchGameInWindow } from "./launch";
+import { GameCard, GameDetail, GamePlayer } from "./parts";
+import { openApp } from "@/services/os";
 
 /* ==========================================================================
    CrystalOS Games
@@ -49,13 +53,27 @@ export function Games({ windowId, args }: AppProps) {
   const windowPerGame = useGamesStore((state) => state.windowPerGame);
   const setWindowTitle = useWindowStore((state) => state.setTitle);
   const closeWindow = useWindowStore((state) => state.close);
+  const account = useAuthStore((state) => state.account);
+  const [lockedIds, setLockedIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    let alive = true;
+    void loadVerificationSnapshot(true).then((state) => {
+      if (alive) setLockedIds(new Set([...state.restricted].filter((id) => !state.owned.has(id))));
+    });
+    return () => { alive = false; };
+  }, [account?.id]);
 
   /**
    * Every Play path goes through here. A profile set to "Browser tab" or
    * "System browser" is completed by launchGame and never reaches the frame, so
    * `playing` is only set for the games that really run in this window.
    */
-  const startGame = (game: CrystalOSGame) => {
+  const startGame = async (game: CrystalOSGame) => {
+    if (!(await authorizeGameLaunch(game))) {
+      openApp("settings", { args: { page: "accounts" } });
+      return;
+    }
     if (launchGame(game) !== "embedded") return;
     if (windowPerGame) {
       launchGameInWindow(game);
@@ -79,6 +97,16 @@ export function Games({ windowId, args }: AppProps) {
   useEffect(() => {
     setPage(1);
   }, [category, query, view]);
+
+  useEffect(() => {
+    if (!playing) return;
+    void authorizeGameLaunch(playing).then((allowed) => {
+      if (!allowed) {
+        closeWindow(windowId);
+        openApp("settings", { args: { page: "accounts" } });
+      }
+    });
+  }, [closeWindow, playing, windowId]);
 
   useEffect(() => {
     setWindowTitle(
@@ -171,10 +199,9 @@ export function Games({ windowId, args }: AppProps) {
                         className="cr-games__hero-tile"
                         onClick={() => startGame(game)}
                       >
-                        <GameCover game={game} radius={5} />
                         <span className="cr-games__hero-tile-text">
                           <span>{game.title}</span>
-                          <span className="cr-row__desc">{game.host}</span>
+                          <span className="cr-row__desc">{categoryLabels[game.category]}</span>
                         </span>
                         <Icon name="play" size={14} />
                       </button>
@@ -241,6 +268,8 @@ export function Games({ windowId, args }: AppProps) {
                     <GameCard
                       key={game.id}
                       game={game}
+                      locked={lockedIds.has(game.id)}
+                      onVerify={() => openApp("settings", { args: { page: "accounts" } })}
                       launched={Boolean(launchCounts.get(game.id))}
                       onPlay={() => startGame(game)}
                       onOpen={() => setDetail(game)}
@@ -322,9 +351,6 @@ function FeaturedHero({
   if (!game) return null;
   return (
     <article className="cr-games__feature">
-      <div className="cr-games__feature-art">
-        <GameCover game={game} radius={8} />
-      </div>
       <div className="cr-games__feature-body">
         <Badge tone="accent">Featured</Badge>
         <h2>{game.title}</h2>

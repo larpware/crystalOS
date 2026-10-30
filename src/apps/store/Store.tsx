@@ -1,45 +1,30 @@
 import { useEffect, useMemo, useState } from "react";
-import { Badge, Button, EmptyState, Segmented, Textarea, TextInput } from "@/components/ui";
+import { Badge, Button, EmptyState, Segmented, TextInput } from "@/components/ui";
 import { AppIcon, Icon } from "@/icons/Icon";
 import { appCatalog, metaFor, optionalApps } from "@/apps/catalog";
 import { isImplemented } from "@/apps/registry";
-import {
-  adminQueue,
-  approvedApps,
-  mySubmissions,
-  reviewSubmission,
-  submitApp,
-  type StoreSubmission,
-} from "@/services/appStore";
 import { notify, openApp } from "@/services/os";
 import { useAppsStore } from "@/state/apps";
 import { useAuthStore } from "@/state/auth";
-import { useBrowserStore } from "@/state/browser";
 import { SYSTEM_VERSION } from "@/version";
-import type { AppCapability, AppCategory } from "@/types";
+import type { AppCapability, AppCategory, AppProps } from "@/types";
 import { APP_CATEGORY_LABEL } from "@/types";
 import { formatRelative } from "@/utils/format";
+import { CommunityAppsGallery } from "@/apps/community/CommunityAppsGallery";
+import { MyCommunitySubmissions } from "@/apps/community/MyCommunitySubmissions";
+import { CommunityModerationDashboard } from "@/apps/community/CommunityModerationDashboard";
+import { SubmitCommunityAppModal } from "@/apps/community/SubmitCommunityAppModal";
 
 /* ==========================================================================
    CrystalOS Store
 
-   This store is honest about its install model: every application in it is
-   bundled with the OS. Installing records that the application is enabled;
-   removing hides it from this profile. There is no download, so there is no
-   progress bar pretending to be one.
+   Provides access to both:
+   1. Official Built-in Apps: bundled with the OS, enabled/removed per profile.
+   2. Community Apps: user-submitted, verified sandboxed web applications.
    ========================================================================== */
 
-type Section = "catalogue" | "installed" | "updates" | "community" | "submit" | "mine" | "review";
+type Section = "catalogue" | "installed" | "updates" | "community" | "mine" | "review";
 
-function hostOf(url: string): string {
-  try {
-    return new URL(url).host;
-  } catch {
-    return url;
-  }
-}
-
-/** What a declared capability means in plain words, shown on every card. */
 const CAPABILITY_LABEL: Record<AppCapability, string> = {
   filesystem: "Virtual files",
   network: "Network",
@@ -49,37 +34,52 @@ const CAPABILITY_LABEL: Record<AppCapability, string> = {
   camera: "Camera",
 };
 
-export function Store() {
+export function Store({ args }: AppProps = { windowId: "store" }) {
   const installed = useAppsStore((state) => state.installed);
   const removed = useAppsStore((state) => state.removed);
+  const installedCommunityApps = useAppsStore((state) => state.installedCommunityApps);
   const install = useAppsStore((state) => state.install);
   const remove = useAppsStore((state) => state.remove);
   const syncBundled = useAppsStore((state) => state.syncBundled);
   const launchCounts = useAppsStore((state) => state.launchCounts);
+
   const account = useAuthStore((state) => state.account);
-  const isAdmin = account?.role === "admin";
-  const [section, setSection] = useState<Section>("catalogue");
+  const isStaff = account?.role === "admin" || (account?.role as string) === "moderator";
+
+  const initialSection = ((): Section => {
+    if (args?.communityAppId || args?.section === "community") return "community";
+    if (args?.section === "mine") return "mine";
+    if (args?.section === "review" && isStaff) return "review";
+    if (args?.section === "installed") return "installed";
+    if (args?.section === "updates") return "updates";
+    return "catalogue";
+  })();
+
+  const [section, setSection] = useState<Section>(initialSection);
   const [category, setCategory] = useState<AppCategory | "all">("all");
   const [query, setQuery] = useState("");
-  const [community, setCommunity] = useState<StoreSubmission[] | null>(null);
-  const [mine, setMine] = useState<StoreSubmission[] | null>(null);
-  const [queue, setQueue] = useState<StoreSubmission[] | null>(null);
-  const [pendingCount, setPendingCount] = useState(0);
-  const [subName, setSubName] = useState("");
-  const [subDescription, setSubDescription] = useState("");
-  const [subCategory, setSubCategory] = useState<AppCategory>("productivity");
-  const [subUrl, setSubUrl] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [notes, setNotes] = useState<Record<string, string>>({});
+  const [submitModalOpen, setSubmitModalOpen] = useState(Boolean(args?.action === "submit"));
 
   // Record every bundled application the first time the store is opened.
   useEffect(() => {
     syncBundled(appCatalog.map((meta) => ({ appId: meta.id, version: meta.version })));
   }, [syncBundled]);
 
-  // Only optional applications are listed. Applications that are part of the
-  // operating system itself live in Settings → Applications under "System
-  // apps", not here — the Store is for things you can add or remove.
+  // Sync if args change
+  useEffect(() => {
+    if (args?.communityAppId) {
+      setSection("community");
+    } else if (
+      args?.section &&
+      ["catalogue", "installed", "updates", "community", "mine", "review"].includes(args.section as string)
+    ) {
+      setSection(args.section as Section);
+    }
+    if (args?.action === "submit") {
+      setSubmitModalOpen(true);
+    }
+  }, [args?.communityAppId, args?.section, args?.action]);
+
   const catalogue = useMemo(() => optionalApps(), []);
 
   const categories = useMemo(() => {
@@ -107,98 +107,16 @@ export function Store() {
     return meta && meta.version !== entry.version;
   });
 
-  /* ---- Community submissions ------------------------------------------- */
-
-  // Refetched on every activation, not cached: a moderator's decision made
-  // anywhere else should show up the next time the tab is opened.
-  useEffect(() => {
-    if (section !== "community") return;
-    let cancelled = false;
-    void approvedApps().then((result) => {
-      if (!cancelled) setCommunity(result.ok ? result.data.submissions : []);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [section]);
-
-  useEffect(() => {
-    if (section !== "mine" || !account || account.guest) return;
-    let cancelled = false;
-    void mySubmissions().then((result) => {
-      if (!cancelled) setMine(result.ok ? result.data.submissions : []);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [section, account]);
-
-  useEffect(() => {
-    if (section !== "review" || !isAdmin) return;
-    void adminQueue().then((result) => {
-      if (result.ok) {
-        setQueue(result.data.submissions);
-        setPendingCount(result.data.pendingCount);
-      } else {
-        setQueue([]);
-      }
-    });
-  }, [section, isAdmin]);
-
-  const openCommunityApp = (url: string) => {
-    const tabId = useBrowserStore.getState().newTab(url, true);
-    openApp("browser", { args: { tabId } });
-  };
-
-  const doSubmit = async () => {
-    setSubmitting(true);
-    const result = await submitApp({
-      name: subName.trim(),
-      description: subDescription.trim(),
-      category: subCategory,
-      url: subUrl.trim(),
-    });
-    setSubmitting(false);
-    if (result.ok) {
-      notify({ title: "Crystal Store", body: "Submitted — a moderator will review it." });
-      setSubName("");
-      setSubDescription("");
-      setSubUrl("");
-      setMine(null);
-      setSection("mine");
-    } else {
-      notify({ title: "Crystal Store", body: result.error.message });
-    }
-  };
-
-  const decide = async (id: string, action: "approve" | "reject") => {
-    const note = (notes[id] ?? "").trim();
-    const result = await reviewSubmission(id, action, note || null);
-    if (result.ok) {
-      setNotes((current) => ({ ...current, [id]: "" }));
-      const fresh = await adminQueue();
-      if (fresh.ok) {
-        setQueue(fresh.data.submissions);
-        setPendingCount(fresh.data.pendingCount);
-      }
-      setCommunity(null);
-      setMine(null);
-    } else {
-      notify({ title: "Crystal Store", body: result.error.message });
-    }
-  };
-
   const showsBundled =
     section === "catalogue" || section === "installed" || section === "updates";
 
   const sectionOptions: { value: Section; label: string }[] = [
-    { value: "catalogue", label: "Catalogue" },
+    { value: "catalogue", label: "Official Apps" },
     { value: "installed", label: "Enabled" },
     { value: "updates", label: `Updates ${pendingUpdates.length || ""}`.trim() },
-    { value: "community", label: "Community" },
-    { value: "submit", label: "Submit" },
-    { value: "mine", label: "Mine" },
-    ...(isAdmin ? [{ value: "review" as Section, label: `Review ${pendingCount || ""}`.trim() }] : []),
+    { value: "community", label: "Community Apps" },
+    { value: "mine", label: "My Submissions" },
+    ...(isStaff ? [{ value: "review" as Section, label: "Staff Review" }] : []),
   ];
 
   return (
@@ -207,13 +125,25 @@ export function Store() {
         <div className="cr-store__hero-text">
           <h2>CrystalOS Store</h2>
           <p className="cr-row__desc">
-            Optional applications bundled with CrystalOS {SYSTEM_VERSION.version}: {catalogue.length}{" "}
-            of them, {catalogue.filter((meta) => isImplemented(meta.id)).length} with an implementation in
-            this build. Nothing here is downloaded — enabling adds the application to this profile and
-            removing it hides it. The system applications that are part of the OS are listed in
-            Settings → Applications.
+            Explore official applications bundled with CrystalOS {SYSTEM_VERSION.version} alongside verified community web applications submitted by creators. Official apps are run natively within the system; community apps are isolated in secure sandboxed windows.
           </p>
           <div className="cr-store__actions">
+            <Button
+              variant="primary"
+              icon="send"
+              onClick={() => {
+                if (!account || account.guest) {
+                  notify({
+                    title: "Authentication Required",
+                    body: "Sign in with an account to submit an application for verification.",
+                  });
+                } else {
+                  setSubmitModalOpen(true);
+                }
+              }}
+            >
+              Submit Application
+            </Button>
             <Button icon="users" onClick={() => openApp("social")}>
               Discussions
             </Button>
@@ -228,11 +158,11 @@ export function Store() {
         <div className="cr-store__hero-stats">
           <div>
             <strong>{installed.length}</strong>
-            <span>in this profile</span>
+            <span>official enabled</span>
           </div>
           <div>
-            <strong>{removed.length}</strong>
-            <span>removed</span>
+            <strong>{installedCommunityApps.length}</strong>
+            <span>community installed</span>
           </div>
           <div>
             <strong>{pendingUpdates.length}</strong>
@@ -248,28 +178,32 @@ export function Store() {
           onChange={setSection}
           options={sectionOptions}
         />
-        <div className="cr-store__search">
-          <TextInput
-            icon="search"
-            value={query}
-            aria-label="Search the store"
-            placeholder="Search applications"
-            onChange={(event) => setQuery(event.target.value)}
-          />
-        </div>
-        <select
-          className="cr-select"
-          aria-label="Filter by category"
-          value={category}
-          onChange={(event) => setCategory(event.target.value as AppCategory | "all")}
-        >
-          <option value="all">All categories</option>
-          {categories.map(([id, count]) => (
-            <option key={id} value={id}>
-              {APP_CATEGORY_LABEL[id]} ({count})
-            </option>
-          ))}
-        </select>
+        {showsBundled && (
+          <>
+            <div className="cr-store__search">
+              <TextInput
+                icon="search"
+                value={query}
+                aria-label="Search the store"
+                placeholder="Search official applications"
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </div>
+            <select
+              className="cr-select"
+              aria-label="Filter by category"
+              value={category}
+              onChange={(event) => setCategory(event.target.value as AppCategory | "all")}
+            >
+              <option value="all">All categories</option>
+              {categories.map(([id, count]) => (
+                <option key={id} value={id}>
+                  {APP_CATEGORY_LABEL[id]} ({count})
+                </option>
+              ))}
+            </select>
+          </>
+        )}
       </div>
 
       <div className="cr-store__scroll">
@@ -284,294 +218,126 @@ export function Store() {
         )}
 
         {section === "community" && (
-          <div className="cr-store__community">
-            <p className="cr-row__desc">
-              Applications proposed by CrystalOS members and approved by a store moderator. A
-              community application is a web application: opening one starts it in the CrystalOS
-              Browser, so nothing is uploaded and nothing else ever runs.
-            </p>
-            {community === null ? (
-              <EmptyState icon="store" title="Loading the community catalogue" hint="One moment." />
-            ) : community.length === 0 ? (
-              <EmptyState
-                icon="store"
-                title="No community applications yet"
-                hint="Propose the first one from the Submit tab."
-              />
-            ) : (
-              <div className="cr-store__grid">
-                {community.map((app) => (
-                  <article key={app.id} className="cr-store__card">
-                    <header>
-                      <Icon name="store" size={34} />
-                      <div>
-                        <h3>{app.name}</h3>
-                        <div className="cr-store__meta">
-                          <Badge>{app.category}</Badge>
-                          <span className="cr-row__desc">
-                            by {app.submitter.displayName ?? app.submitter.username ?? "unknown"}
-                          </span>
-                        </div>
-                      </div>
-                    </header>
-                    <p className="cr-store__summary">{app.description}</p>
-                    <footer>
-                      <span className="cr-row__desc">{hostOf(app.url)}</span>
-                      <div className="cr-store__actions">
-                        <Button size="sm" icon="external" onClick={() => openCommunityApp(app.url)}>
-                          Open in Browser
-                        </Button>
-                      </div>
-                    </footer>
-                  </article>
-                ))}
-              </div>
-            )}
-          </div>
+          <CommunityAppsGallery
+            onOpenSubmit={() => setSubmitModalOpen(true)}
+            initialAppId={args?.communityAppId as string | undefined}
+          />
         )}
 
-        {section === "submit" &&
-          (!account || account.guest ? (
-            <EmptyState
-              icon="user"
-              title="Submitting needs a CrystalOS account"
-              hint="Submissions are tied to an account so a moderator can answer them. Sign in from Settings → Account."
-            />
-          ) : (
-            <div className="cr-store__submit">
-              <h3>Propose an application</h3>
-              <p className="cr-row__desc">
-                Submissions are web applications: give the URL the Browser should open, plus enough
-                description for a moderator to judge it. Approval lists the link in the Community
-                tab — it never uploads or executes code on the server.
-              </p>
-              <TextInput
-                value={subName}
-                aria-label="Application name"
-                placeholder="Application name"
-                onChange={(event) => setSubName(event.target.value)}
-              />
-              <Textarea
-                value={subDescription}
-                rows={3}
-                aria-label="Description"
-                placeholder="What does it do? What is it good at?"
-                onChange={(event) => setSubDescription(event.target.value)}
-              />
-              <TextInput
-                value={subUrl}
-                aria-label="Application URL"
-                placeholder="https://…"
-                onChange={(event) => setSubUrl(event.target.value)}
-              />
-              <div className="cr-store__row">
-                <select
-                  className="cr-select"
-                  aria-label="Category"
-                  value={subCategory}
-                  onChange={(event) => setSubCategory(event.target.value as AppCategory)}
-                >
-                  {Object.entries(APP_CATEGORY_LABEL).map(([id, label]) => (
-                    <option key={id} value={id}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-                <Button
-                  variant="primary"
-                  icon="send"
-                  disabled={submitting}
-                  onClick={() => void doSubmit()}
-                >
-                  Submit for review
-                </Button>
-              </div>
-            </div>
-          ))}
+        {section === "mine" && (
+          <MyCommunitySubmissions onOpenSubmit={() => setSubmitModalOpen(true)} />
+        )}
 
-        {section === "mine" &&
-          (!account || account.guest ? (
-            <EmptyState
-              icon="user"
-              title="Your submissions live with your account"
-              hint="Sign in from Settings → Account to propose applications and track their review."
-            />
-          ) : mine === null ? (
-            <EmptyState icon="store" title="Loading your submissions" hint="One moment." />
-          ) : mine.length === 0 ? (
-            <EmptyState
-              icon="store"
-              title="You have not submitted anything yet"
-              hint="Propose an application from the Submit tab."
-            />
-          ) : (
-            <div className="cr-store__list">
-              {mine.map((app) => (
-                <div key={app.id} className="cr-store__review-row">
-                  <div className="cr-store__review-text">
-                    <strong>{app.name}</strong>
-                    <Badge
-                      tone={
-                        app.status === "approved"
-                          ? "success"
-                          : app.status === "rejected"
-                            ? "danger"
-                            : "warning"
-                      }
-                    >
-                      {app.status}
-                    </Badge>
-                    <p className="cr-row__desc">{app.description}</p>
-                    {app.reviewNote && <small>Moderator: {app.reviewNote}</small>}
-                  </div>
-                  <span className="cr-row__desc">
-                    {formatRelative(app.createdAt)} · {hostOf(app.url)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          ))}
-
-        {section === "review" && isAdmin && (
-          <div className="cr-store__review">
-            <h3>Moderation queue{pendingCount ? ` · ${pendingCount} pending` : ""}</h3>
-            <p className="cr-row__desc">
-              Approving lists the application in the Community tab; rejecting keeps it private to
-              its submitter. Either way the note reaches them in Mine.
-            </p>
-            {queue === null ? (
-              <EmptyState icon="store" title="Loading the queue" hint="One moment." />
-            ) : queue.length === 0 ? (
-              <EmptyState icon="check" title="The queue is clear" hint="Every submission has been reviewed." />
-            ) : (
-              queue.map((app) => (
-                <div key={app.id} className="cr-store__review-row">
-                  <div className="cr-store__review-text">
-                    <strong>{app.name}</strong> <Badge>{app.category}</Badge>
-                    <p className="cr-row__desc">{app.description}</p>
-                    <small className="cr-row__desc">
-                      {app.url} · by {app.submitter.username ?? "unknown"} · {formatRelative(app.createdAt)}
-                    </small>
-                  </div>
-                  <TextInput
-                    value={notes[app.id] ?? ""}
-                    aria-label={`Note for ${app.name}`}
-                    placeholder="Note for the submitter (optional)"
-                    onChange={(event) =>
-                      setNotes((current) => ({ ...current, [app.id]: event.target.value }))
-                    }
-                  />
-                  <div className="cr-store__actions">
-                    <Button size="sm" variant="primary" icon="check" onClick={() => void decide(app.id, "approve")}>
-                      Approve
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => void decide(app.id, "reject")}>
-                      Reject
-                    </Button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
+        {section === "review" && isStaff && (
+          <CommunityModerationDashboard />
         )}
 
         {showsBundled &&
           (list.length === 0 ? (
-          <EmptyState
-            icon={section === "updates" ? "check" : "store"}
-            title={
-              section === "updates"
-                ? "Every application is up to date"
-                : section === "installed"
-                  ? "Nothing enabled in this profile"
-                  : "No applications match"
-            }
-            hint={
-              section === "updates"
-                ? "Nothing to apply right now."
-                : "Try a different search term or category."
-            }
-          />
-        ) : (
-          <div className="cr-store__grid">
-            {list.map((meta) => {
-              const entry = installed.find((item) => item.appId === meta.id);
-              const isRemoved = removed.includes(meta.id);
-              const launches = launchCounts[meta.id] ?? 0;
-              const ready = isImplemented(meta.id);
-              return (
-                <article key={meta.id} className="cr-store__card" data-removed={isRemoved}>
-                  <header>
-                    <AppIcon appId={meta.id} name={meta.icon} size={42} />
-                    <div>
-                      <h3>{meta.name}</h3>
-                      <div className="cr-store__meta">
-                        <Badge>{APP_CATEGORY_LABEL[meta.category]}</Badge>
-                        <span className="cr-row__desc">v{meta.version}</span>
-                        {!ready && <Badge tone="warning">Not in this build</Badge>}
+            <EmptyState
+              icon={section === "updates" ? "check" : "store"}
+              title={
+                section === "updates"
+                  ? "Every application is up to date"
+                  : section === "installed"
+                    ? "Nothing enabled in this profile"
+                    : "No applications match"
+              }
+              hint={
+                section === "updates"
+                  ? "Nothing to apply right now."
+                  : "Try a different search term or category."
+              }
+            />
+          ) : (
+            <div className="cr-store__grid">
+              {list.map((meta) => {
+                const entry = installed.find((item) => item.appId === meta.id);
+                const isRemoved = removed.includes(meta.id);
+                const launches = launchCounts[meta.id] ?? 0;
+                const ready = isImplemented(meta.id);
+                return (
+                  <article key={meta.id} className="cr-store__card" data-removed={isRemoved}>
+                    <header>
+                      <AppIcon appId={meta.id} name={meta.icon} size={42} />
+                      <div>
+                        <h3>{meta.name}</h3>
+                        <div className="cr-store__meta">
+                          <Badge>{APP_CATEGORY_LABEL[meta.category]}</Badge>
+                          <span className="cr-row__desc">v{meta.version}</span>
+                          {!ready && <Badge tone="warning">Not in this build</Badge>}
+                        </div>
                       </div>
-                    </div>
-                  </header>
+                    </header>
 
-                  <p className="cr-store__summary">{meta.summary}</p>
+                    <p className="cr-store__summary">{meta.summary}</p>
 
-                  <ul className="cr-store__features">
-                    {meta.features.slice(0, 3).map((feature) => (
-                      <li key={feature}>
-                        <Icon name="check" size={12} />
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-
-                  {meta.capabilities && meta.capabilities.length > 0 && (
-                    <div className="cr-store__caps">
-                      <span className="cr-row__desc">Declares:</span>
-                      {meta.capabilities.map((capability) => (
-                        <Badge key={capability}>{CAPABILITY_LABEL[capability]}</Badge>
+                    <ul className="cr-store__features">
+                      {meta.features.slice(0, 3).map((feature) => (
+                        <li key={feature}>
+                          <Icon name="check" size={12} />
+                          {feature}
+                        </li>
                       ))}
-                    </div>
-                  )}
+                    </ul>
 
-                  <footer>
-                    <span className="cr-row__desc">
-                      {isRemoved
-                        ? "Removed from this profile"
-                        : entry
-                          ? launches > 0
-                            ? `Enabled · launched ${launches}×`
-                             : `Enabled ${formatRelative(entry.installedAt)}`
-                          : "Bundled"}
-                    </span>
-                    <div className="cr-store__actions">
-                      <Button
-                        size="sm"
-                        icon="external"
-                        disabled={!ready}
-                        title={ready ? undefined : "This catalogue entry has no bundle in this build."}
-                        onClick={() => openApp(meta.id)}
-                      >
-                        Open
-                      </Button>
-                      {isRemoved ? (
-                        <Button size="sm" variant="primary" icon="download" onClick={() => install(meta.id, meta.version)}>
-                          Enable
+                    {meta.capabilities && meta.capabilities.length > 0 && (
+                      <div className="cr-store__caps">
+                        <span className="cr-row__desc">Declares:</span>
+                        {meta.capabilities.map((capability) => (
+                          <Badge key={capability}>{CAPABILITY_LABEL[capability]}</Badge>
+                        ))}
+                      </div>
+                    )}
+
+                    <footer>
+                      <span className="cr-row__desc">
+                        {isRemoved
+                          ? "Removed from this profile"
+                          : entry
+                            ? launches > 0
+                              ? `Enabled · launched ${launches}×`
+                              : `Enabled ${formatRelative(entry.installedAt)}`
+                            : "Bundled"}
+                      </span>
+                      <div className="cr-store__actions">
+                        <Button
+                          size="sm"
+                          icon="external"
+                          disabled={!ready}
+                          title={ready ? undefined : "This catalogue entry has no bundle in this build."}
+                          onClick={() => openApp(meta.id)}
+                        >
+                          Open
                         </Button>
-                      ) : (
-                        !meta.system && (
-                          <Button size="sm" variant="ghost" icon="trash" onClick={() => remove(meta.id)}>
-                            Remove
+                        {isRemoved ? (
+                          <Button size="sm" variant="primary" icon="download" onClick={() => install(meta.id, meta.version)}>
+                            Enable
                           </Button>
-                        )
-                      )}
-                    </div>
-                  </footer>
-                </article>
-              );
-            })}
-          </div>
+                        ) : (
+                          !meta.system && (
+                            <Button size="sm" variant="ghost" icon="trash" onClick={() => remove(meta.id)}>
+                              Remove
+                            </Button>
+                          )
+                        )}
+                      </div>
+                    </footer>
+                  </article>
+                );
+              })}
+            </div>
           ))}
       </div>
+
+      <SubmitCommunityAppModal
+        open={submitModalOpen}
+        onClose={() => setSubmitModalOpen(false)}
+        onSubmitted={() => {
+          setSubmitModalOpen(false);
+          setSection("mine");
+        }}
+      />
     </div>
   );
 }

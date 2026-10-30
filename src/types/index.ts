@@ -553,6 +553,12 @@ export interface BrowserTab {
    * user's own browser.
    */
   direct?: boolean;
+  /**
+   * Set when the person dismissed the direct-load status bar. The notice comes
+   * back on the next navigation and whenever the load mode changes, so hiding
+   * it is a per-page dismissal rather than turning the warning off for good.
+   */
+  directBarHidden?: boolean;
 }
 
 /*

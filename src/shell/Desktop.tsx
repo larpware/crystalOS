@@ -127,6 +127,7 @@ export function Desktop() {
       const meta = appId ? metaFor(appId) : undefined;
       if (!appId || !meta) return [];
       const onDesktop = hasDesktopShortcut(appId);
+      const isCommunity = meta.isCommunity || appId.startsWith("community:");
       return [
         {
           id: "open",
@@ -142,6 +143,30 @@ export function Desktop() {
           separatorBefore: true,
           run: () => addDesktopShortcut(appId),
         },
+        ...(isCommunity
+          ? [
+              {
+                id: "details",
+                label: "Application details",
+                icon: "info" as IconName,
+                run: () => openApp("store", { args: { communityAppId: appId.replace(/^community:/, "") } }),
+              },
+              {
+                id: "uninstall",
+                label: "Uninstall application",
+                icon: "trash" as IconName,
+                danger: true,
+                run: () => {
+                  const cleanId = appId.replace(/^community:/, "");
+                  useAppsStore.getState().uninstallCommunity(cleanId);
+                  const fs = useFsStore.getState();
+                  const scNode = fs.nodes.find((n) => n.appId === appId || n.appId === cleanId);
+                  if (scNode) fs.trashMany([scNode.id]);
+                  notify({ title: "Community App", body: `Uninstalled ${meta.name}.` });
+                },
+              },
+            ]
+          : []),
       ];
     }
 

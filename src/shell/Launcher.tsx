@@ -58,6 +58,7 @@ export function Launcher() {
   const recents = useAppsStore((state) => state.recents);
   const launchCounts = useAppsStore((state) => state.launchCounts);
   const removed = useAppsStore((state) => state.removed);
+  const installedCommunityApps = useAppsStore((state) => state.installedCommunityApps);
   const performanceMode = useSystemStore((state) => state.performanceMode);
 
   const [query, setQuery] = useState("");
@@ -67,10 +68,24 @@ export function Launcher() {
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  const available = useMemo(
-    () => appCatalog.filter((app) => !removed.includes(app.id)),
-    [removed],
-  );
+  const available = useMemo(() => {
+    const official = appCatalog.filter((app) => !removed.includes(app.id));
+    const community = (installedCommunityApps ?? []).map((comm) => ({
+      id: `community:${comm.id}`,
+      name: comm.name,
+      summary: comm.description,
+      icon: "grid" as const,
+      category: (comm.category as AppCategory) || "utilities",
+      defaultSize: { width: 1024, height: 680 },
+      minSize: { width: 440, height: 380 },
+      singleton: false,
+      version: "1.0.0",
+      features: [comm.description],
+      isCommunity: true,
+      iconUrl: comm.iconUrl ?? null,
+    }));
+    return [...official, ...community];
+  }, [removed, installedCommunityApps]);
 
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -274,7 +289,11 @@ export function Launcher() {
                       <span className="cr-launcher__row-name">{app.name}</span>
                       <span className="cr-launcher__row-summary cr-truncate">{app.summary}</span>
                     </span>
-                    {!isImplemented(app.id) && <Badge tone="warning">Not bundled</Badge>}
+                    {app.isCommunity ? (
+                      <Badge tone="default">Community</Badge>
+                    ) : (
+                      !isImplemented(app.id) && <Badge tone="warning">Not bundled</Badge>
+                    )}
                   </button>
                 </li>
               ))}
@@ -300,7 +319,10 @@ export function Launcher() {
                   <span className="cr-launcher__tile-icon">
                     <AppIcon appId={app.id} name={app.icon} size={iconSize} />
                   </span>
-                  <span className="cr-launcher__tile-name cr-clamp-2">{app.name}</span>
+                  <span className="cr-launcher__tile-name cr-clamp-2">
+                    {app.name}
+                    {app.isCommunity && <span style={{ display: "block", fontSize: "10px", color: "var(--text-muted)" }}>Community</span>}
+                  </span>
                 </button>
               ))}
             </div>

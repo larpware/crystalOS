@@ -1,6 +1,19 @@
 node_modules/
 dist/
 
+# Environment file: never committed, never printed, never touched by tooling
+# beyond what Vite and Wrangler already load as part of a normal build/dev.
+.env
+.env.*
+!.env.example
+
+# Wrangler runtime state (wrangler dev / dry-run output). Never committed.
+.wrangler/
+
+# Python environment for the local AI gateway (server/ai-gateway). Created with
+# `python -m venv .venv`; it holds installed packages, never a credential.
+.venv/
+
 # Accounts database (SQLite + WAL sidecars) — created at runtime, never committed.
 server/accounts/data/
 

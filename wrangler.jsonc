@@ -1,0 +1,39 @@
+// CrystalOS — Cloudflare Workers configuration
+//
+// This IS the production deployment (crystalos.kiyanxp3.workers.dev), not a
+// second one. The Worker serves every /api/* request and static asset
+// handling falls to the Assets pipeline, with the SPA fallback configured so
+// React Router deep links keep working exactly as before.
+//
+// Deploy:  npm run build && npm run deploy:workers   (requires wrangler auth)
+// Dev:     npm run build && npm run dev:workers
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "crystalos",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-01-15",
+  "assets": {
+    // Built by `npm run build` (tsc + vite + deploy-config).
+    "directory": "dist",
+    // React navigation: unknown paths return index.html, and the shell
+    // mounts its own routing from there — same behaviour as the Netlify
+    // SPA fallback had.
+    "not_found_handling": "single-page-application",
+    // The API must reach the Worker. Without this the asset pipeline would
+    // answer /api/* with index.html, which is exactly how the backend broke
+    // in production before. "/api" is listed as well as "/api/*" because a
+    // bare glob does not match its own directory path.
+    "run_worker_first": ["/api", "/api/*"]
+  },
+  "observability": {
+    "enabled": true
+  },
+  "vars": {
+    // The project URL is not a secret (the browser already publishes it);
+    // the key below is read from worker secrets/vars, never stored here.
+    "SUPABASE_URL": "https://zukxpoqqcvhumhzysibq.supabase.co"
+  }
+  // Secrets (set once via `wrangler secret put`, NOT stored in this repo):
+  //   SUPABASE_PUBLISHABLE_KEY — publishable key; verification calls use it.
+  //   CRESCENT_ADMINS          — optional comma-separated admin usernames.
+}

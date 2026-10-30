@@ -20,8 +20,23 @@ const KEY_VARS = [
   "VITE_SUPABASE_ANON_KEY",
 ] as const;
 
+/**
+ * Static references, so Vite's define step always substitutes them.
+ *
+ * The names above are also read dynamically below (one helper, one list), but
+ * a build only inlines keys it can see statically — with dynamic access alone
+ * the bundle can end up with no project URL at all and the shell silently
+ * degrades to "Supabase is not configured" on a deployment that configured it
+ * perfectly well. These three lines cost nothing and remove that failure mode.
+ */
+const STATIC_ENV: Record<string, string | undefined> = {
+  VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL,
+  VITE_SUPABASE_PUBLISHABLE_KEY: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+  VITE_SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY,
+};
+
 function readEnv(name: string): string {
-  const value = (import.meta.env as Record<string, unknown>)?.[name];
+  const value = STATIC_ENV[name] ?? (import.meta.env as Record<string, unknown>)?.[name];
   return typeof value === "string" ? value.trim() : "";
 }
 

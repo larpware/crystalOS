@@ -198,6 +198,9 @@ export const useBrowserStore = create<BrowserState>()(
           url,
           title,
           direct: false,
+          // A new address is a new page: whatever was said about the last one
+          // no longer applies, so the direct-load bar announces itself again.
+          directBarHidden: false,
           error: blocked ?? undefined,
           loading: !blocked,
         });
@@ -210,7 +213,13 @@ export const useBrowserStore = create<BrowserState>()(
         const tab = get().tabs.find((candidate) => candidate.id === id);
         if (!tab || tab.url === url) return;
         const title = prettyTitle(url);
-        get().updateTab(id, { url, title, loading: false, error: undefined });
+        get().updateTab(id, {
+          url,
+          title,
+          loading: false,
+          error: undefined,
+          directBarHidden: false,
+        });
         if (!url.startsWith("about:")) get().addHistory(url, title);
       },
 
@@ -226,6 +235,9 @@ export const useBrowserStore = create<BrowserState>()(
               ? {
                   ...tab,
                   direct,
+                  // Switching loader changes what the bar would say, so it is
+                  // worth saying again after a mode change.
+                  directBarHidden: false,
                   error: undefined,
                   loading: direct,
                   // Remounting the pane is what actually switches loaders.

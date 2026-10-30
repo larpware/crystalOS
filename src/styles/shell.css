@@ -2588,7 +2588,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-3);
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-family: var(--font-ui);
   font-size: var(--fs-xs);
   font-weight: 550;
@@ -2609,7 +2609,7 @@
 
 .cr-standby__date {
   font-size: var(--fs-lg);
-  color: var(--text-secondary);
+  color: var(--text-primary);
   letter-spacing: 0.01em;
 }
 
@@ -2617,7 +2617,7 @@
   position: absolute;
   bottom: 7vh;
   margin: 0;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: var(--fs-xs);
   font-weight: 500;
   letter-spacing: 0.14em;

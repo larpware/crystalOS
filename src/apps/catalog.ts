@@ -1,5 +1,6 @@
 import type { AppCapability, AppCategory } from "@/types";
 import type { IconName } from "@/icons/icons";
+import { useAppsStore } from "@/state/apps";
 
 /* ==========================================================================
    Application catalogue
@@ -35,6 +36,10 @@ export interface AppMeta {
   version: string;
   /** Feature bullets used by the store detail view. */
   features: string[];
+  /** Set to true for user-installed community apps */
+  isCommunity?: boolean;
+  /** Custom icon URL for community applications */
+  iconUrl?: string | null;
 }
 
 export const appCatalog: AppMeta[] = [
@@ -426,7 +431,38 @@ export const appCatalog: AppMeta[] = [
 ];
 
 export function metaFor(appId: string): AppMeta | undefined {
-  return appCatalog.find((app) => app.id === appId);
+  const bundled = appCatalog.find((app) => app.id === appId);
+  if (bundled) return bundled;
+
+  // Check if it is a community app:
+  try {
+    const cleanId = appId.replace(/^community:/, "");
+    const comm = useAppsStore.getState().getCommunityApp?.(cleanId);
+    if (comm) {
+      return {
+        id: `community:${comm.id}`,
+        name: comm.name,
+        summary: comm.description,
+        icon: "grid",
+        category: (comm.category as AppCategory) || "utilities",
+        defaultSize: { width: 1024, height: 680 },
+        minSize: { width: 440, height: 380 },
+        singleton: false,
+        version: "1.0.0",
+        isCommunity: true,
+        iconUrl: comm.iconUrl ?? null,
+        features: [
+          `Community application submitted by ${comm.developerDisplayName || comm.developerUsername || "developer"}`,
+          "Runs securely inside isolated sandboxed iframe",
+          `Website domain: ${comm.websiteUrl}`,
+        ],
+      };
+    }
+  } catch {
+    // During early bootstrap before store initialization
+  }
+
+  return undefined;
 }
 
 /** Applications the Store manages: bundled, optional, never system apps. */

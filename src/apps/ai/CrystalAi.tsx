@@ -8,8 +8,10 @@ import {
   Modal,
   Row,
   Section,
+  Segmented,
   Select,
   Spinner,
+  TextInput,
   Textarea,
   Switch,
   type MenuItem,
@@ -29,6 +31,13 @@ import {
   type PuterStreamPart,
 } from "@/services/ai/puter";
 import {
+  chatThroughGateway,
+  describeGatewayError,
+  GATEWAY_SUGGESTED_MODELS,
+  listGatewayModels,
+} from "@/services/ai/gateway";
+import {
+  activeModel,
   SUGGESTED_MODELS,
   useAiStore,
   type AiConversation,
@@ -43,7 +52,9 @@ import { formatRelative } from "@/utils/format";
 
    A conversation with a model, through Puter.js — Puter's User-Pays model, so
    the person signs in with their own Puter account and their usage is theirs.
-   CrystalOS holds no key, sees no credential, and never pretends an answer
+   Settings → Routing can send the same conversation through the local Respan
+   Gateway instead, which spends the developer's own provider keys; the app
+   holds no key either way, sees no credential, and never pretends an answer
    arrived when it did not.
 
    Every failure has a face: the script that will not load, the account out of
@@ -85,6 +96,15 @@ export function CrystalAi({ args }: AppProps) {
     [conversations, activeId],
   );
   const busy = busyId !== null && busyId === active?.id;
+  const usingGateway = settings.provider === "gateway";
+  const chosenModel = activeModel(settings);
+
+  const updateModel = useCallback(
+    (value: string) => {
+      store.getState().updateSettings(usingGateway ? { gatewayModel: value } : { model: value });
+    },
+    [store, usingGateway],
+  );
 
   /* An app that opens on nothing opens on a fresh conversation, so the first
      thing on screen is a composer, not a choreography of clicks. */
@@ -109,6 +129,8 @@ export function CrystalAi({ args }: AppProps) {
   }, [active?.turns.length, busy]);
 
   const ensureRuntime = useCallback(async (): Promise<boolean> => {
+    /* A gateway turn never touches Puter, so there is no script to load. */
+    if (usingGateway) return true;
     if (puterReady()) return true;
     try {
       await loadPuter();
@@ -120,7 +142,7 @@ export function CrystalAi({ args }: AppProps) {
       setRuntime(puterState());
       return false;
     }
-  }, []);
+  }, [usingGateway]);
 
   useEffect(() => {
     void ensureRuntime();
@@ -128,6 +150,15 @@ export function CrystalAi({ args }: AppProps) {
 
   const loadAllModels = useCallback(async () => {
     setModelsError(null);
+    if (usingGateway) {
+      try {
+        const ids = await listGatewayModels(settings.gatewayUrl);
+        setAllModels(ids.map((id) => ({ id })));
+      } catch (error) {
+        setModelsError(describeGatewayError(error));
+      }
+      return;
+    }
     if (!(await ensureRuntime())) return;
     try {
       const listed = await window.puter?.ai?.listModels?.();
@@ -138,7 +169,7 @@ export function CrystalAi({ args }: AppProps) {
     } catch (error) {
       setModelsError(describePuterError(error));
     }
-  }, [ensureRuntime]);
+  }, [ensureRuntime, settings.gatewayUrl, usingGateway]);
 
   const stop = useCallback(() => {
     abortRef.current?.abort();
@@ -168,7 +199,8 @@ export function CrystalAi({ args }: AppProps) {
   const runAnswer = useCallback(
     async (conversationId: string, answerId: string, historyTurns: AiTurn[]) => {
       const state = store.getState();
-      const model = state.settings.model;
+      const model = activeModel(state.settings);
+      const throughGateway = state.settings.provider === "gateway";
 
       const history = historyTurns
         .filter((t) => !t.error && (t.content.trim() !== "" || t.role === "user"))
@@ -186,6 +218,27 @@ export function CrystalAi({ args }: AppProps) {
         store.getState().patchTurn(conversationId, answerId, { content, ...(error ? { error } : {}) });
 
       try {
+        /* The gateway path is the same conversation, sent to the local gateway
+           instead of Puter: one request, streamed into the same answer turn. */
+        if (throughGateway) {
+          let accumulated = "";
+          for await (const delta of chatThroughGateway({
+            baseUrl: state.settings.gatewayUrl,
+            model,
+            messages,
+            stream: state.settings.stream,
+            signal: controller.signal,
+          })) {
+            if (controller.signal.aborted) break;
+            accumulated += delta;
+            patch(accumulated);
+          }
+          if (!controller.signal.aborted && accumulated.trim() === "") {
+            patch("", "The model returned an empty answer. Try again or pick another model.");
+          }
+          return;
+        }
+
         const response = await window.puter!.ai!.chat(messages, {
           model,
           // normalize guarantees OpenAI-style `message.content` as a string,
@@ -233,7 +286,10 @@ export function CrystalAi({ args }: AppProps) {
             store.getState().conversations.find((c) => c.id === conversationId)?.turns.find(
               (t) => t.id === answerId,
             ) ?? null;
-          patch(current?.content ?? "", describePuterError(error));
+          patch(
+            current?.content ?? "",
+            throughGateway ? describeGatewayError(error) : describePuterError(error),
+          );
         }
       } finally {
         abortRef.current = null;
@@ -273,7 +329,7 @@ export function CrystalAi({ args }: AppProps) {
       id: answerId,
       role: "assistant",
       content: "",
-      model: state.settings.model,
+      model: activeModel(state.settings),
       createdAt: Date.now(),
     });
     state.setBusy(conversationId);
@@ -300,7 +356,7 @@ export function CrystalAi({ args }: AppProps) {
     state.patchTurn(conversation.id, last.id, {
       content: "",
       error: undefined,
-      model: state.settings.model,
+      model: activeModel(state.settings),
       createdAt: Date.now(),
     });
     state.setBusy(conversation.id);
@@ -322,15 +378,22 @@ export function CrystalAi({ args }: AppProps) {
   };
 
   const modelOptions = useMemo(() => {
-    const base = SUGGESTED_MODELS.map((m) => ({ value: m.id, label: m.label }));
-    if (!allModels) return base;
+    const base = (usingGateway ? GATEWAY_SUGGESTED_MODELS : SUGGESTED_MODELS).map((m) => ({
+      value: m.id,
+      label: m.label,
+    }));
+    // The configured model is always offered, even before the catalogue loads.
+    const listed = [
+      ...(usingGateway ? [settings.gatewayModel] : []),
+      ...(allModels ?? []).map((m) => m.id),
+    ];
     const known = new Set(base.map((b) => b.value));
-    const extra = allModels
-      .filter((m) => !known.has(m.id))
+    const extra = listed
+      .filter((id) => id.trim() !== "" && !known.has(id))
       .slice(0, 400)
-      .map((m) => ({ value: m.id, label: m.id }));
+      .map((id) => ({ value: id, label: id }));
     return [...base, ...extra];
-  }, [allModels]);
+  }, [allModels, settings.gatewayModel, usingGateway]);
 
   const menuItems: MenuItem[] = menu
     ? [
@@ -401,18 +464,20 @@ export function CrystalAi({ args }: AppProps) {
         <footer className="cr-ai__side-foot">
           <Icon name="sparkle" size={12} />
           <span>
-            Powered by Puter.js — AI usage is billed to your Puter account, not CrystalOS.
+            {usingGateway
+              ? "Routed through the local Respan Gateway — your provider's keys, not CrystalOS's."
+              : "Powered by Puter.js — AI usage is billed to your Puter account, not CrystalOS."}
           </span>
         </footer>
       </aside>
 
       <main className="cr-ai__main">
-        {runtime.status === "loading" && (
+        {!usingGateway && runtime.status === "loading" && (
           <div className="cr-ai__runtime">
             <Spinner label="Loading Puter.js" />
           </div>
         )}
-        {runtime.status === "error" && (
+        {!usingGateway && runtime.status === "error" && (
           <EmptyState
             icon="warning"
             title="Crystal AI could not start"
@@ -424,13 +489,15 @@ export function CrystalAi({ args }: AppProps) {
             }
           />
         )}
-        {offline.offline && runtime.status !== "error" && (
+        {offline.offline && (usingGateway || runtime.status !== "error") && (
           <div className="cr-ai__notice">
             <Icon name="wifi-off" size={14} />
             <span>
               {offline.reason === "forced"
                 ? "Offline mode is on, so Crystal AI will not send anything. Turn it off in Quick Settings to talk to a model."
-                : "No network connection. Crystal AI needs one — it talks to Puter's cloud."}
+                : usingGateway
+                  ? "No network connection. The gateway on this machine needs one to reach its provider."
+                  : "No network connection. Crystal AI needs one — it talks to Puter's cloud."}
             </span>
           </div>
         )}
@@ -495,8 +562,8 @@ export function CrystalAi({ args }: AppProps) {
           <div className="cr-ai__composer-models">
             <Select
               aria-label="Model"
-              value={settings.model}
-              onChange={(event) => store.getState().updateSettings({ model: event.target.value })}
+              value={chosenModel}
+              onChange={(event) => updateModel(event.target.value)}
               options={modelOptions}
             />
             <Button
@@ -560,6 +627,58 @@ export function CrystalAi({ args }: AppProps) {
         onClose={() => setSettingsOpen(false)}
       >
         <Section
+          title="Routing"
+          description="Answers come from Puter.js by default. The local Respan Gateway is the other way: a small process on this machine (`npm run ai:gateway`) that spends your own provider key and serves the same OpenAI chat API."
+        >
+          <Row
+            label="Answers from"
+            description="Puter.js uses your Puter account. The local gateway uses the provider key in its own environment and needs no account."
+            control={
+              <Segmented
+                label="Where answers come from"
+                value={settings.provider}
+                options={[
+                  { value: "puter", label: "Puter.js" },
+                  { value: "gateway", label: "Local gateway" },
+                ]}
+                onChange={(provider) => store.getState().updateSettings({ provider })}
+              />
+            }
+          />
+          {usingGateway && (
+            <>
+              <Row
+                label="Gateway URL"
+                description="The address `npm run ai:gateway` prints, with /v1 on the end. Loopback only: it spends the provider key of whoever started it."
+                stacked
+              >
+                <TextInput
+                  value={settings.gatewayUrl}
+                  onChange={(event) =>
+                    store.getState().updateSettings({ gatewayUrl: event.target.value })
+                  }
+                  placeholder="http://127.0.0.1:8790/v1"
+                  aria-label="Gateway URL"
+                />
+              </Row>
+              <Row
+                label="Gateway model"
+                description="The model name the gateway routes, e.g. gpt-4o-mini. Which names exist depends on the providers its configuration declares."
+                stacked
+              >
+                <TextInput
+                  value={settings.gatewayModel}
+                  onChange={(event) =>
+                    store.getState().updateSettings({ gatewayModel: event.target.value })
+                  }
+                  placeholder="gpt-4o-mini"
+                  aria-label="Gateway model"
+                />
+              </Row>
+            </>
+          )}
+        </Section>
+        <Section
           title="Assistant"
           description="A system prompt shapes every answer in every conversation until you change it."
         >
@@ -579,16 +698,16 @@ export function CrystalAi({ args }: AppProps) {
             />
           </Row>
           <Row
-            label="Default model"
-            description="Models are provided by Puter. Availability and pricing are Puter's; free accounts have a monthly allowance."
+            label="Puter model"
+            description="Used when answers come from Puter.js. Availability and pricing are Puter's; free accounts have a monthly allowance."
             control={
               <Select
-                aria-label="Default model"
+                aria-label="Puter model"
                 value={settings.model}
                 onChange={(event) =>
                   store.getState().updateSettings({ model: event.target.value })
                 }
-                options={modelOptions}
+                options={SUGGESTED_MODELS.map((m) => ({ value: m.id, label: m.label }))}
               />
             }
           />
@@ -606,7 +725,7 @@ export function CrystalAi({ args }: AppProps) {
         </Section>
         <Section
           title="Your data"
-          description="Conversations are stored in this browser profile under the same local storage as the rest of CrystalOS. They are never uploaded anywhere except to Puter as the context of the next turn — that is how a model remembers the conversation."
+          description="Conversations are stored in this browser profile under the same local storage as the rest of CrystalOS. They are never uploaded anywhere except back to the model — Puter, or the gateway and the provider behind it — as the context of the next turn, which is how a model remembers the conversation."
         >
           <Row
             label="Delete all conversations"
@@ -630,9 +749,13 @@ export function CrystalAi({ args }: AppProps) {
       </Modal>
 
       {modelsOpen && (
-        <div className="cr-ai__models-panel" role="dialog" aria-label="Models from Puter">
+        <div
+          className="cr-ai__models-panel"
+          role="dialog"
+          aria-label={usingGateway ? "Models from the gateway" : "Models from Puter"}
+        >
           <header>
-            <span>Models from Puter</span>
+            <span>{usingGateway ? "Models from the gateway" : "Models from Puter"}</span>
             <IconButton
               label="Close model catalogue"
               icon="close"
@@ -648,9 +771,9 @@ export function CrystalAi({ args }: AppProps) {
                   key={model.id}
                   type="button"
                   className="cr-ai__models-item"
-                  data-active={model.id === settings.model}
+                  data-active={model.id === chosenModel}
                   onClick={() => {
-                    store.getState().updateSettings({ model: model.id });
+                    updateModel(model.id);
                     setModelsOpen(false);
                   }}
                 >
@@ -661,11 +784,15 @@ export function CrystalAi({ args }: AppProps) {
             </div>
           ) : (
             <div className="cr-ai__thinking">
-              <Spinner label="Loading the catalogue from Puter" />
+              <Spinner
+                label={usingGateway ? "Loading the catalogue from the gateway" : "Loading the catalogue from Puter"}
+              />
             </div>
           )}
           <p className="cr-ai__models-note">
-            Catalogue as reported by Puter. Availability and pricing are Puter's.
+            {usingGateway
+              ? "Catalogue as reported by the gateway's providers. Availability and pricing are theirs."
+              : "Catalogue as reported by Puter. Availability and pricing are Puter's."}
           </p>
         </div>
       )}

@@ -1,6 +1,7 @@
 import { useMemo, type CSSProperties, type SVGProps } from "react";
 import { icons, type IconName } from "./icons";
 import { useAppearanceStore } from "@/state/appearance";
+import { useAppsStore } from "@/state/apps";
 import { appArtFor } from "./appIcons";
 
 export type { IconName };
@@ -112,6 +113,11 @@ export function AppIcon({ appId, name, size = 34, plain, className, style }: App
   const packId = useAppearanceStore((state) => state.iconPackId);
   const packs = useAppearanceStore((state) => state.customIconPacks);
   const override = useMemo(() => {
+    if (appId.startsWith("community:") || appId.includes("-")) {
+      const cleanId = appId.replace(/^community:/, "");
+      const comm = useAppsStore.getState().getCommunityApp?.(cleanId);
+      if (comm?.iconUrl) return comm.iconUrl;
+    }
     if (packId !== "crescent") {
       const pack = packs.find((entry) => entry.id === packId);
       const url = pack?.mapping?.[appId];
