@@ -109,6 +109,23 @@ function loadScriptOnce(src: string): Promise<void> {
 const BACKEND_HELP =
   "The Scramjet backend is not answering on this origin. Start it with `npm run scramjet` (or `npm run dev:all` while developing), then retry.";
 
+/** Never leave the proxy UI in an endless connecting state. */
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error(message)), timeoutMs);
+    promise.then(
+      (value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      (error: unknown) => {
+        window.clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
 interface BackendStatus {
   ok: boolean;
   transport?: string;
@@ -202,7 +219,11 @@ async function createController(): Promise<ScramjetController> {
 
   try {
     const created = await window.initBootstrap();
-    await created.wait();
+    await withTimeout(
+      created.wait(),
+      10_000,
+      "Scramjet did not finish starting within 10 seconds. Check the backend assets and service worker, then retry.",
+    );
     await waitForScopeServiceWorker();
     controller = created;
     publish({
@@ -244,17 +265,22 @@ async function waitForScopeServiceWorker(timeoutMs = 2_500): Promise<void> {
         await new Promise((resolve) => window.setTimeout(resolve, 100));
         continue;
       }
-      await new Promise((resolve) => {
+      const remaining = Math.max(1, deadline - Date.now());
+      await withTimeout(new Promise<void>((resolve) => {
         const done = () => {
           worker.removeEventListener("statechange", done);
           resolve(undefined);
         };
         worker.addEventListener("statechange", done);
-      });
-    } catch {
+      }), remaining, "The Scramjet service worker did not activate in time.");
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("did not activate in time")) {
+        throw error;
+      }
       return;
     }
   }
+  throw new Error("The Scramjet service worker did not activate in time.");
 }
 
 /** Resolves with the shared controller, starting it on first use. */
