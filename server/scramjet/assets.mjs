@@ -34,6 +34,7 @@
  */
 
 import { readFile, readdir, stat } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -49,12 +50,13 @@ const WASM = "application/wasm";
 const HYBRID_TRANSPORT_POSTLUDE = `
 ;(function () {
   if (typeof window === "undefined" || !window.EpoxyTransport || !window.LibcurlTransport) return;
-  const EpoxyClient = window.EpoxyTransport.EpoxyClient;
+  const exported = window.EpoxyTransport;
+  const EpoxyClient = exported.EpoxyClient || (typeof exported === "function" ? exported : exported.default);
   const LibcurlClient = window.LibcurlTransport.LibcurlClient;
   if (typeof EpoxyClient !== "function" || typeof LibcurlClient !== "function") {
     throw new Error("The CrystalOS hybrid transport could not find both clients.");
   }
-  if (EpoxyClient.__crystalHybridTransport) return;
+  if (exported.EpoxyClient?.__crystalHybridTransport) return;
   class CrystalHybridTransport {
     constructor(options) {
       this.options = options;
@@ -98,7 +100,8 @@ const HYBRID_TRANSPORT_POSTLUDE = `
         try {
           return await this.epoxy.request(remote, method, body, headers, signal);
         } catch (epoxyError) {
-          if (signal?.aborted) throw epoxyError;
+          const safeRetry = ["GET", "HEAD", "OPTIONS"].includes(String(method || "GET").toUpperCase());
+          if (signal?.aborted || !safeRetry || !/InvalidHeaderValue/.test(String(epoxyError))) throw epoxyError;
           try {
             await this.ensureLibcurl();
             return await this.libcurl.request(remote, method, body, headers, signal);
@@ -117,7 +120,7 @@ const HYBRID_TRANSPORT_POSTLUDE = `
     }
   }
   Object.defineProperty(CrystalHybridTransport, "__crystalHybridTransport", { value: true });
-  window.EpoxyTransport.EpoxyClient = CrystalHybridTransport;
+  exported.EpoxyClient = CrystalHybridTransport;
 })();
 `;
 
@@ -264,9 +267,13 @@ function wispRewritePrelude(config) {
  * the same-origin Worker relay when its direct TLS handshake is closed. */
 const EPOXY_COMPAT_INSTALLER = `
 const exported = window.EpoxyTransport;
-const Transport = typeof exported === "function" ? exported : exported.default;
-if (typeof Transport !== "function") throw new Error("The Epoxy browser transport export is unavailable.");
-if (!exported.EpoxyClient?.__crystalDuckDuckGoRelay) {
+if (!exported) throw new Error("The Epoxy browser transport export is unavailable.");
+const current = exported.EpoxyClient;
+if (!current?.__crystalDuckDuckGoRelay) {
+  const Transport = current?.__crystalHybridTransport
+    ? current
+    : (typeof exported === "function" ? exported : exported.default);
+  if (typeof Transport !== "function") throw new Error("The Epoxy browser transport export is unavailable.");
   class CrystalEpoxyTransport extends Transport {
     async request(remote, method, body, headers, signal) {
       const hostname = String(remote?.hostname ?? "").toLowerCase();
@@ -576,20 +583,27 @@ export function createAssets({
     const hybridLibcurl = isEpoxyClient && transport === "epoxy"
       ? await locate(ASSETS.find((entry) => entry.url === "/clients/libcurl-client.js"))
       : null;
-    const body = req.method === "HEAD"
-      ? null
-      : await readFile(asset.file).then(async (source) => {
-          if (!isEpoxyClient) return source;
-          if (!hybridLibcurl) return Buffer.concat([source, Buffer.from(epoxyCompatPostlude())]);
-          const libcurlSource = await readFile(hybridLibcurl.file);
-          return Buffer.concat([
-            libcurlSource,
-            source,
-            Buffer.from(HYBRID_TRANSPORT_POSTLUDE),
-          ]);
-        });
-    const isHybrid = Boolean(hybridLibcurl);
-    const etag = `"${info.size.toString(16)}-${Math.trunc(info.mtimeMs).toString(16)}${isEpoxyClient ? (isHybrid ? "-hybrid" : "-compat") : ""}"`;
+    let responseBody = null;
+    if (isEpoxyClient) {
+      const source = await readFile(asset.file);
+      if (!hybridLibcurl) {
+        responseBody = Buffer.concat([source, Buffer.from(epoxyCompatPostlude())]);
+      } else {
+        const libcurlSource = await readFile(hybridLibcurl.file);
+        responseBody = Buffer.concat([
+          libcurlSource,
+          source,
+          Buffer.from(HYBRID_TRANSPORT_POSTLUDE),
+          Buffer.from(epoxyCompatPostlude()),
+        ]);
+      }
+    } else if (req.method !== "HEAD") {
+      responseBody = await readFile(asset.file);
+    }
+    const body = req.method === "HEAD" ? null : responseBody;
+    const etag = isEpoxyClient
+      ? `"${createHash("sha256").update(responseBody).digest("hex")}"`
+      : `"${info.size.toString(16)}-${Math.trunc(info.mtimeMs).toString(16)}"`;
     if (req.headers["if-none-match"] === etag) {
       res.writeHead(304, { etag, "cache-control": "no-cache" });
       res.end();

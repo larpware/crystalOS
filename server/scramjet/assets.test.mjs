@@ -294,6 +294,24 @@ describe("clientConfig", () => {
     }
   });
 
+  it("serves both clients with the hybrid wrapper for hosted Epoxy fallback", async () => {
+    const world = await fixture();
+    try {
+      const assets = createAssets({ ...world.options, transport: "epoxy" });
+      const exchange = fakeExchange();
+      assert.equal(await assets.serve(exchange.req, exchange.res, "/clients/epoxy-client.js"), true);
+      const script = String(exchange.captured.body);
+      assert.ok(script.includes("libcurl-client"), "libcurl fallback client is bundled first");
+      assert.ok(script.includes("epoxy-client"), "Epoxy remains the primary client");
+      assert.ok(script.includes("__crystalHybridTransport"), "hybrid fallback wrapper is installed");
+      assert.ok(script.includes("__crystalDuckDuckGoRelay"), "DuckDuckGo relay wraps the hybrid client");
+      assert.match(script, /exported\.default/, "wrapper supports Epoxy's actual UMD default export");
+      assert.equal(exchange.captured.headers["cache-control"], "no-cache");
+    } finally {
+      await world.cleanup();
+    }
+  });
+
   it("lists what is missing instead of failing later", async () => {
     const empty = await fixture({ installed: false });
     try {

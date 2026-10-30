@@ -324,9 +324,12 @@ const EPOXY_COMPAT_POSTLUDE = `
 ;(function () {
   if (typeof window === "undefined" || !window.EpoxyTransport) return;
   const exported = window.EpoxyTransport;
-  const Transport = typeof exported === "function" ? exported : exported.default;
-  if (typeof Transport !== "function") throw new Error("The Epoxy browser transport export is unavailable.");
   if (exported.EpoxyClient?.__crystalDuckDuckGoRelay) return;
+  const current = exported.EpoxyClient;
+  const Transport = current?.__crystalHybridTransport
+    ? current
+    : (typeof exported === "function" ? exported : exported.default);
+  if (typeof Transport !== "function") throw new Error("The Epoxy browser transport export is unavailable.");
   class CrystalEpoxyTransport extends Transport {
     async request(remote, method, body, headers, signal) {
       const hostname = String(remote?.hostname ?? "").toLowerCase();
