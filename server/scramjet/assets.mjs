@@ -191,8 +191,10 @@ function wispRewritePrelude(config) {
  * current package without modifying the upstream bootstrap bundle. */
 function epoxyCompatPrelude() {
   return [
-    '\tif (typeof window !== "undefined" && typeof window.EpoxyTransport === "function" && !window.EpoxyTransport.EpoxyClient) {',
-    '\t\tconst __EpoxyTransport = window.EpoxyTransport;',
+    '\tif (typeof window !== "undefined" && window.EpoxyTransport && typeof window.EpoxyTransport.EpoxyClient !== "function") {',
+    '\t\tconst __EpoxyExport = window.EpoxyTransport;',
+    '\t\tconst __EpoxyTransport = typeof __EpoxyExport === "function" ? __EpoxyExport : __EpoxyExport.default;',
+    '\t\tif (typeof __EpoxyTransport !== "function") throw new Error("The Epoxy browser transport export is unavailable.");',
     '\t\twindow.EpoxyTransport = {',
     '\t\t\tEpoxyClient: class {',
     '\t\t\t\tconstructor(options) { this.__transport = new __EpoxyTransport({ wisp: options.wisp }); this.__ready = this.__transport.init(); }',
