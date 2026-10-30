@@ -106,6 +106,30 @@ function loadScriptOnce(src: string): Promise<void> {
   });
 }
 
+/** Removes a stale root worker/bootstrap pair before a real retry. */
+async function resetScramjetWorker(): Promise<void> {
+  try {
+    const registration = await navigator.serviceWorker.getRegistration("/");
+    await registration?.unregister();
+  } catch {
+    // A browser may refuse unregister while offline; the next registration
+    // attempt still gets the normal error rather than hiding the cause.
+  }
+  try {
+    const keys = await caches.keys();
+    await Promise.all(
+      keys
+        .filter((key) => key.startsWith("crystal-") || key.startsWith("crescent-"))
+        .map((key) => caches.delete(key)),
+    );
+  } catch {
+    // Cache cleanup is recovery assistance, never a reason to mask the error.
+  }
+  const script = document.querySelector<HTMLScriptElement>('script[data-scramjet="/bootstrap-init.js"]');
+  script?.remove();
+  delete window.initBootstrap;
+}
+
 const BACKEND_HELP =
   "The Scramjet backend is not answering on this origin. Start it with `npm run scramjet` (or `npm run dev:all` while developing), then retry.";
 
@@ -219,11 +243,16 @@ async function createController(): Promise<ScramjetController> {
 
   try {
     const created = await window.initBootstrap();
-    await withTimeout(
-      created.wait(),
-      10_000,
-      "Scramjet did not finish starting within 10 seconds. Check the backend assets and service worker, then retry.",
-    );
+    try {
+      await withTimeout(
+        created.wait(),
+        10_000,
+        "Scramjet did not finish starting within 10 seconds. Check the backend assets and service worker, then retry.",
+      );
+    } catch (error) {
+      await resetScramjetWorker();
+      throw error;
+    }
     await waitForScopeServiceWorker();
     controller = created;
     publish({
@@ -295,10 +324,11 @@ export function ensureScramjet(): Promise<ScramjetController> {
 }
 
 /** Clears a failed state so the next attempt starts from scratch. */
-export function retryScramjet(): Promise<ScramjetController> {
+export async function retryScramjet(): Promise<ScramjetController> {
   pending = null;
   controller = null;
   publish({ status: "idle", error: null });
+  await resetScramjetWorker();
   return ensureScramjet();
 }
 
