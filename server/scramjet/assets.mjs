@@ -65,6 +65,7 @@ const HYBRID_TRANSPORT_POSTLUDE = `
       this.epoxyReady = false;
       this.libcurlReady = false;
       this.libcurlInit = null;
+      this.libcurlOrigins = new Set();
       this.ready = false;
     }
 
@@ -96,15 +97,29 @@ const HYBRID_TRANSPORT_POSTLUDE = `
     }
 
     async request(remote, method, body, headers, signal) {
+      const origin = remote?.origin || "";
+      const normalizedMethod = String(method || "GET").toUpperCase();
+      const safeRetry = ["GET", "HEAD", "OPTIONS"].includes(normalizedMethod) && body == null;
+
+      // Once Epoxy has failed for this origin and Libcurl has served it, keep
+      // subsequent assets on the working transport instead of repeating the
+      // same failed TLS handshake for every stylesheet, font, and image.
+      if (this.epoxyReady && origin && this.libcurlOrigins.has(origin)) {
+        await this.ensureLibcurl();
+        return this.libcurl.request(remote, method, body, headers, signal);
+      }
+
       if (this.epoxyReady) {
         try {
           return await this.epoxy.request(remote, method, body, headers, signal);
         } catch (epoxyError) {
-          const safeRetry = ["GET", "HEAD", "OPTIONS"].includes(String(method || "GET").toUpperCase());
-          if (signal?.aborted || !safeRetry || !/InvalidHeaderValue/.test(String(epoxyError))) throw epoxyError;
+          const retryableTransportFailure = /InvalidHeaderValue|invalid header|failed to parse header value|SSL connect error|SSL_ERROR_|ERR_SSL_|ERR_CONNECTION_|ERR_NETWORK|ERR_TIMED_OUT|ERR_HTTP2_|TLS.*(?:handshake|EOF|error|failed)|UnexpectedEof|connection (?:reset|closed|refused|aborted)|timed? ?out|failed to connect|failed to fetch|network error|error code 35|ECONNREFUSED|ECONNRESET|ECONNABORTED|ETIMEDOUT|EPIPE|ENOTCONN|socket hang up|stream error|PROTOCOL_ERROR|HTTP2_ERR/i.test(String(epoxyError));
+          if (signal?.aborted || !safeRetry || !retryableTransportFailure) throw epoxyError;
           try {
             await this.ensureLibcurl();
-            return await this.libcurl.request(remote, method, body, headers, signal);
+            const response = await this.libcurl.request(remote, method, body, headers, signal);
+            if (origin) this.libcurlOrigins.add(origin);
+            return response;
           } catch {
             throw epoxyError;
           }

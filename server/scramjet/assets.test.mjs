@@ -351,8 +351,9 @@ describe("clientConfig", () => {
       assert.equal(safeResult.body, "fallback");
       assert.deepEqual(calls.slice(0, 4), ["epoxy:init", "epoxy:request", "libcurl:init", "libcurl:request"]);
 
+      // Use a different origin so the origin-sticky routing doesn't bypass Epoxy
       await assert.rejects(
-        client.request(new URL("https://example.com/form"), "POST", "payload", [], undefined),
+        client.request(new URL("https://other.com/form"), "POST", "payload", [], undefined),
         /InvalidHeaderValue/,
       );
       assert.equal(calls.filter((call) => call === "libcurl:request").length, 1);
@@ -361,6 +362,44 @@ describe("clientConfig", () => {
       assert.equal(calls.at(-1), "duckduckgo:relay");
     } finally {
       await world.cleanup();
+    }
+  });
+
+  it("retries on SSL and connection errors, not just header errors", async () => {
+    const errorPatterns = [
+      "SSL connect error (error:0A000086)",
+      "ERR_SSL_PROTOCOL_ERROR",
+      "TLS handshake failed",
+      "connection reset by peer",
+      "ECONNREFUSED",
+      "error code 35",
+    ];
+
+    for (const errorMsg of errorPatterns) {
+      const world = await fixture({
+        packageOverrides: {
+          "libcurl-transport": {
+            "dist/index.js": `window.LibcurlTransport = { LibcurlClient: class { async init() {} async request() { return { status: 200, statusText: "OK", headers: [], body: "libcurl-ok" }; } async connect() {} } };`,
+          },
+          "epoxy-transport": {
+            "dist/index.js": `window.EpoxyTransport = { default: class { async init() {} async request() { throw new Error(${JSON.stringify(errorMsg)}); } async connect() {} } };`,
+          },
+        },
+      });
+      try {
+        const assets = createAssets({ ...world.options, transport: "epoxy" });
+        const exchange = fakeExchange();
+        await assets.serve(exchange.req, exchange.res, "/clients/epoxy-client.js");
+        const window = {};
+        runInNewContext(String(exchange.captured.body), { window, location: { origin: "https://test.local" }, URL, Headers, Response, fetch: async () => new Response("", { status: 200 }) });
+        const Client = window.EpoxyTransport.EpoxyClient;
+        const client = new Client({ wisp: "wss://test.local/wisp/" });
+        await client.init();
+        const result = await client.request(new URL("https://example.com/style.css"), "GET", null, [], undefined);
+        assert.equal(result.body, "libcurl-ok", `Expected fallback for error: ${errorMsg}`);
+      } finally {
+        await world.cleanup();
+      }
     }
   });
 
