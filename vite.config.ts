@@ -167,7 +167,7 @@ export default defineConfig(({ mode }) => ({
     },
   },
   build: {
-    target: "es2022",
+    target: "es2024",
     sourcemap: false,
     chunkSizeWarningLimit: 1200,
   },
