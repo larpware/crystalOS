@@ -8,13 +8,27 @@ import type { ReleaseNote, SystemVersion } from "@/types";
    ========================================================================== */
 
 export const SYSTEM_VERSION: SystemVersion = {
-  version: "1.6.1",
-  build: "2026.10.29-crystal.1",
-  releaseDate: "2026-10-29",
+  version: "1.6.2",
+  build: "2026.10.31-crystal.1",
+  releaseDate: "2026-10-31",
   codename: "CrystalOS",
 };
 
 export const releaseNotes: ReleaseNote[] = [
+  {
+    version: "1.6.2",
+    date: "2026-10-31",
+    added: [
+      "Hybrid proxy transport with Epoxy→libcurl fallback. When Epoxy's TLS handshake fails on a host (SSL errors, connection resets, timeouts), libcurl takes over automatically. Once a host is served by libcurl, all subsequent requests to that host stay on libcurl for the session — so a failed TLS handshake does not repeat for every stylesheet, font and image on the same site.",
+    ],
+    fixed: [
+      "DuckDuckGo and other sites with strict TLS now load through the proxy. The previous build only retried on header parse errors; the fallback now covers SSL connect errors (error code 35), ERR_SSL_*, connection resets, ECONNREFUSED, timeouts and other transport failures.",
+      "The libcurl fallback client is now actually loaded when transport is \"epoxy\". The asset filter was excluding it, so the hybrid transport had no fallback to reach for.",
+    ],
+    changed: [
+      "Build target updated from ES2022 to ES2024 for modern browser optimization.",
+    ],
+  },
   {
     version: "1.6.1",
     date: "2026-10-29",
@@ -225,7 +239,7 @@ export const releaseNotes: ReleaseNote[] = [
 ];
 
 export const aboutBuild = {
-  runtime: "Browser (ES2022 build)",
+  runtime: "Browser (ES2024 build)",
   renderer: "React 19",
   bundler: "Vite",
   state: "Zustand stores, one per domain",
